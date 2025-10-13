@@ -1,0 +1,283 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ADMIN
+  SUPERVISOR
+  TEACHER
+  STUDENT
+}
+
+enum SubmissionStatus {
+  PENDING
+  SUBMITTED
+  GRADED
+  LATE
+}
+
+enum AnnouncementPriority {
+  LOW
+  NORMAL
+  HIGH
+  URGENT
+}
+
+enum FileType {
+  DOCUMENT
+  IMAGE
+  VIDEO
+  AUDIO
+  OTHER
+}
+
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  password  String
+  role      Role
+  firstName String
+  lastName  String
+  phone     String?
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations based on role
+  student      Student?
+  teacher      Teacher?
+  announcements Announcement[]
+  filesUploaded File[]
+
+  refreshTokens RefreshToken[]
+
+  @@index([email])
+  @@index([role])
+  @@map("users")
+}
+
+model RefreshToken {
+  id        String   @id @default(uuid())
+  token     String   @unique
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([token])
+  @@map("refresh_tokens")
+}
+
+model Student {
+  id             String    @id @default(uuid())
+  userId         String    @unique
+  user           User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  parentEmail    String?
+  parentPhone    String?
+  enrollmentDate DateTime  @default(now())
+  classId        String?
+  class          Class?    @relation(fields: [classId], references: [id], onDelete: SetNull)
+  
+  submissions   Submission[]
+  grades        Grade[]
+  evaluations   Evaluation[]
+
+  @@index([userId])
+  @@index([classId])
+  @@map("students")
+}
+
+model Teacher {
+  id             String   @id @default(uuid())
+  userId         String   @unique
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  subject        String?
+  specialization String?
+  hireDate       DateTime @default(now())
+
+  classes     Class[]
+  homework    Homework[]
+  grades      Grade[]
+  evaluations Evaluation[]
+
+  @@index([userId])
+  @@map("teachers")
+}
+
+model Class {
+  id           String   @id @default(uuid())
+  name         String
+  grade        String
+  academicYear String
+  teacherId    String?
+  teacher      Teacher? @relation(fields: [teacherId], references: [id], onDelete: SetNull)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  students Student[]
+  homework Homework[]
+  subjects Subject[]
+
+  @@index([teacherId])
+  @@index([academicYear])
+  @@map("classes")
+}
+
+model Subject {
+  id          String   @id @default(uuid())
+  name        String
+  code        String   @unique
+  description String?
+  classId     String?
+  class       Class?   @relation(fields: [classId], references: [id], onDelete: SetNull)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  grades Grade[]
+
+  @@index([classId])
+  @@map("subjects")
+}
+
+model Homework {
+  id          String   @id @default(uuid())
+  title       String
+  description String
+  dueDate     DateTime
+  classId     String
+  class       Class    @relation(fields: [classId], references: [id], onDelete: Cascade)
+  teacherId   String
+  teacher     Teacher  @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+  fileUrls    String[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  submissions Submission[]
+  files       File[]
+
+  @@index([classId])
+  @@index([teacherId])
+  @@index([dueDate])
+  @@map("homework")
+}
+
+model Submission {
+  id          String           @id @default(uuid())
+  homeworkId  String
+  homework    Homework         @relation(fields: [homeworkId], references: [id], onDelete: Cascade)
+  studentId   String
+  student     Student          @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  submittedAt DateTime?
+  fileUrls    String[]
+  status      SubmissionStatus @default(PENDING)
+  grade       Float?
+  feedback    String?
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  files File[]
+
+  @@unique([homeworkId, studentId])
+  @@index([homeworkId])
+  @@index([studentId])
+  @@index([status])
+  @@map("submissions")
+}
+
+model Grade {
+  id           String   @id @default(uuid())
+  studentId    String
+  student      Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  subjectId    String
+  subject      Subject  @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  grade        Float
+  term         String
+  academicYear String
+  teacherId    String
+  teacher      Teacher  @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+  notes        String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([studentId])
+  @@index([subjectId])
+  @@index([teacherId])
+  @@index([academicYear, term])
+  @@map("grades")
+}
+
+model Announcement {
+  id          String                @id @default(uuid())
+  title       String
+  content     String
+  authorId    String
+  author      User                  @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  targetRoles Role[]
+  priority    AnnouncementPriority  @default(NORMAL)
+  expiresAt   DateTime?
+  createdAt   DateTime              @default(now())
+  updatedAt   DateTime              @updatedAt
+
+  files File[]
+
+  @@index([authorId])
+  @@index([createdAt])
+  @@index([priority])
+  @@map("announcements")
+}
+
+model File {
+  id             String   @id @default(uuid())
+  name           String
+  url            String
+  type           FileType
+  size           Int
+  uploadedById   String
+  uploadedBy     User     @relation(fields: [uploadedById], references: [id], onDelete: Cascade)
+  
+  // Polymorphic relations (optional fields)
+  homeworkId     String?
+  homework       Homework? @relation(fields: [homeworkId], references: [id], onDelete: Cascade)
+  submissionId   String?
+  submission     Submission? @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+  announcementId String?
+  announcement   Announcement? @relation(fields: [announcementId], references: [id], onDelete: Cascade)
+  
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([uploadedById])
+  @@index([homeworkId])
+  @@index([submissionId])
+  @@index([announcementId])
+  @@map("files")
+}
+
+model Evaluation {
+  id               String   @id @default(uuid())
+  studentId        String
+  student          Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  teacherId        String
+  teacher          Teacher  @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+  term             String
+  academicYear     String
+  behaviorScore    Float
+  performanceScore Float
+  comments         String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@index([studentId])
+  @@index([teacherId])
+  @@index([academicYear, term])
+  @@map("evaluations")
+}

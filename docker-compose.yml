@@ -1,0 +1,69 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: study-institute-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: study_institute
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres123
+    ports:
+      - '5432:5432'
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - study-institute-network
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U postgres']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: study-institute-redis
+    restart: unless-stopped
+    ports:
+      - '6379:6379'
+    volumes:
+      - redis_data:/data
+    networks:
+      - study-institute-network
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    command: redis-server --appendonly yes
+
+  # Uncomment for local S3-compatible storage
+  # minio:
+  #   image: minio/minio:latest
+  #   container_name: study-institute-minio
+  #   restart: unless-stopped
+  #   environment:
+  #     MINIO_ROOT_USER: minioadmin
+  #     MINIO_ROOT_PASSWORD: minioadmin123
+  #   ports:
+  #     - '9000:9000'
+  #     - '9001:9001'
+  #   volumes:
+  #     - minio_data:/data
+  #   networks:
+  #     - study-institute-network
+  #   command: server /data --console-address ":9001"
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+  # minio_data:
+  #   driver: local
+
+networks:
+  study-institute-network:
+    driver: bridge
+
