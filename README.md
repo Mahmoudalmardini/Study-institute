@@ -39,32 +39,69 @@ A full-stack web application for managing an educational institute with role-bas
 
 ## 📋 Prerequisites
 
-- Node.js 18 or higher
-- Docker & Docker Compose
-- npm or yarn package manager
+- **Docker & Docker Compose** (recommended)
+  - OR Node.js 18+ and npm (for manual setup)
 
 ## 🛠️ Installation & Setup
 
-### 1. Clone the Repository
+### Quick Start with Docker (Recommended)
+
+The easiest way to run the entire application is with Docker:
 
 ```bash
+# Clone the repository
 git clone <repository-url>
 cd study-institute
+
+# Start all services (database, backend, frontend)
+docker-compose up -d
 ```
 
-### 2. Start Database Services
+**That's it!** The application is now running:
+- **Frontend**: http://localhost:3000
+- **Backend API**: http://localhost:3001
+- **PostgreSQL**: localhost:5432
+- **Redis**: localhost:6379
+
+For detailed Docker instructions, production deployment, and advanced configuration, see **[DOCKER.md](./DOCKER.md)**.
+
+**Quick Docker Commands:**
+```bash
+# View logs
+docker-compose logs -f
+
+# Stop services
+docker-compose down
+
+# Rebuild after changes
+docker-compose up -d --build
+```
+
+Or use the Makefile for convenience:
+```bash
+make dev-up      # Start development environment
+make dev-down    # Stop development environment
+make dev-logs    # View logs
+make help        # See all available commands
+```
+
+### Manual Setup (Without Docker)
+
+If you prefer to run services manually:
+
+#### 1. Start Database Services
 
 Ensure Docker Desktop is running, then start PostgreSQL and Redis:
 
 ```bash
-docker-compose up -d
+docker-compose up -d postgres redis
 ```
 
 This will start:
 - PostgreSQL on `localhost:5432`
 - Redis on `localhost:6379`
 
-### 3. Backend Setup
+#### 2. Backend Setup
 
 ```bash
 cd backend
@@ -85,9 +122,9 @@ npx prisma migrate dev --name init
 npm run start:dev
 ```
 
-The backend API will be available at `http://localhost:3001/api`
+The backend API will be available at `http://localhost:3001`
 
-### 4. Frontend Setup
+#### 3. Frontend Setup
 
 Open a new terminal:
 
@@ -233,7 +270,36 @@ See [Backend README](./backend/README.md) for complete API documentation.
 
 ## 🚀 Development
 
-### Backend Development
+### With Docker (Recommended)
+
+```bash
+# Start development environment with hot reload
+make dev-up
+
+# View logs
+make dev-logs
+
+# Restart services
+make dev-restart
+
+# Access backend shell
+make shell-backend
+
+# Run database migrations
+make migrate-dev
+
+# Open Prisma Studio
+make studio
+
+# Stop services
+make dev-down
+```
+
+See [DOCKER.md](./DOCKER.md) for comprehensive Docker documentation.
+
+### Manual Development
+
+#### Backend Development
 
 ```bash
 cd backend
@@ -254,7 +320,7 @@ npm run test
 npx prisma studio
 ```
 
-### Frontend Development
+#### Frontend Development
 
 ```bash
 cd frontend
@@ -367,7 +433,42 @@ Built with clean architecture principles and best practices for scalability and 
 
 ---
 
-For more detailed documentation, see:
-- [Backend Documentation](./backend/README.md)
-- [API Documentation](#api-documentation)
+## 📚 Additional Documentation
+
+- **[Docker Deployment Guide](./DOCKER.md)** - Complete guide for Docker deployment (development & production)
+- **[Setup Guide](./SETUP.md)** - Detailed manual setup instructions
+- **[Project Status](./PROJECT_STATUS.md)** - Current implementation status and roadmap
+- **[Backend Documentation](./backend/README.md)** - Backend API details
+
+## 🐳 Deployment
+
+### Production with Docker
+
+For production deployment with Docker:
+
+```bash
+# Copy and configure production environment
+cp .env.production.example .env.production
+# Edit .env.production with your secure values
+
+# Deploy production stack
+make prod-up
+
+# View production logs
+make prod-logs
+```
+
+For detailed production deployment instructions including SSL configuration, monitoring, and best practices, see **[DOCKER.md](./DOCKER.md)**.
+
+### Traditional Deployment
+
+For deployment to traditional hosting environments, cloud platforms (AWS, GCP, Azure), or VPS:
+
+1. Build both applications
+2. Set up PostgreSQL and Redis
+3. Configure environment variables
+4. Run migrations
+5. Start services with a process manager (PM2, systemd)
+
+Detailed instructions available in [SETUP.md](./SETUP.md)
 

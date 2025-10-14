@@ -1,0 +1,11 @@
+# Ignore SSL certificates and keys
+ssl/
+*.pem
+*.key
+*.crt
+*.cert
+
+# Ignore logs
+logs/
+*.log
+

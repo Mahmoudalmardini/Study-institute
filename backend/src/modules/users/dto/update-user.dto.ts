@@ -1,5 +1,4 @@
 import {
-  IsEmail,
   IsEnum,
   IsString,
   MinLength,
@@ -9,7 +8,7 @@ import {
 import { Role } from '@prisma/client';
 
 export class UpdateUserDto {
-  @IsEmail()
+  @IsString() // Changed from @IsEmail() to allow username format
   @IsOptional()
   email?: string;
 
