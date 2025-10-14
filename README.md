@@ -42,8 +42,6 @@ A full-stack web application for managing an educational institute with role-bas
 - **Docker & Docker Compose** (recommended)
   - OR Node.js 18+ and npm (for manual setup)
 
-## 🛠️ Installation & Setup
-
 ### Quick Start with Docker (Recommended)
 
 The easiest way to run the entire application is with Docker:
@@ -471,4 +469,3 @@ For deployment to traditional hosting environments, cloud platforms (AWS, GCP, A
 5. Start services with a process manager (PM2, systemd)
 
 Detailed instructions available in [SETUP.md](./SETUP.md)
-
