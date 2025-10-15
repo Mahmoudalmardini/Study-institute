@@ -20,6 +20,15 @@ interface HomeworkSubmission {
   feedback?: string;
 }
 
+interface Teacher {
+  id: string;
+  user: {
+    firstName: string;
+    lastName: string;
+    email: string;
+  };
+}
+
 export default function StudentHomeworkPage() {
   const router = useRouter();
   const { t, locale } = useI18n();
@@ -32,10 +41,13 @@ export default function StudentHomeworkPage() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [myTeachers, setMyTeachers] = useState<Teacher[]>([]);
+  const [studentProfileId, setStudentProfileId] = useState<string | null>(null);
 
   const [formData, setFormData] = useState({
     title: '',
     description: '',
+    teacherId: '',
   });
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [isDragging, setIsDragging] = useState(false);
@@ -50,8 +62,65 @@ export default function StudentHomeworkPage() {
 
     setUser({ name: 'Student', role: 'STUDENT' });
     setMounted(true);
+    fetchStudentData();
     fetchHomework();
   }, [router]);
+
+  const fetchStudentData = async () => {
+    try {
+      const token = localStorage.getItem('accessToken');
+      
+      console.log('Fetching student profile...');
+      
+      // Get student profile (backend auto-creates if doesn't exist)
+      const profileRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/students/me`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      if (!profileRes.ok) {
+        console.error('Failed to get student profile:', profileRes.status);
+        const errorData = await profileRes.json();
+        console.error('Error details:', errorData);
+        return;
+      }
+
+      const profileData = await profileRes.json();
+      const profile = profileData.data;
+      console.log('Student profile retrieved:', profile);
+      
+      setStudentProfileId(profile.id);
+
+      // Fetch assigned teachers
+      console.log('Fetching assigned teachers for profile:', profile.id);
+      const teachersRes = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL}/student-teachers/student/${profile.id}`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+
+      if (teachersRes.ok) {
+        const teachersData = await teachersRes.json();
+        console.log('Raw teachers response:', teachersData);
+        
+        const assignments = teachersData.data || [];
+        console.log('Teacher assignments:', assignments);
+        
+        const teachers = assignments.map((assignment: any) => {
+          console.log('Processing assignment:', assignment);
+          return assignment.teacher;
+        });
+        
+        console.log('Processed teachers list:', teachers);
+        console.log('Number of teachers:', teachers.length);
+        setMyTeachers(teachers);
+      } else {
+        const errorData = await teachersRes.json();
+        console.log('Error fetching teachers:', teachersRes.status, errorData);
+        setMyTeachers([]);
+      }
+    } catch (err) {
+      console.error('Error fetching student data:', err);
+    }
+  };
 
   const fetchHomework = async () => {
     setLoading(true);
@@ -137,8 +206,17 @@ export default function StudentHomeworkPage() {
   };
 
   const openAddForm = () => {
+    console.log('Opening add form, myTeachers:', myTeachers);
+    console.log('Number of teachers:', myTeachers.length);
+    
+    if (myTeachers.length === 0) {
+      console.error('No teachers available!');
+      setError('You need to be assigned to at least one teacher before submitting homework. Please contact your administrator.');
+      return;
+    }
+    
     setEditingHomework(null);
-    setFormData({ title: '', description: '' });
+    setFormData({ title: '', description: '', teacherId: '' });
     setSelectedFiles([]);
     setShowForm(true);
     setError('');
@@ -150,6 +228,7 @@ export default function StudentHomeworkPage() {
     setFormData({
       title: homework.title,
       description: homework.description,
+      teacherId: '',
     });
     setSelectedFiles([]);
     setShowForm(true);
@@ -160,7 +239,7 @@ export default function StudentHomeworkPage() {
   const closeForm = () => {
     setShowForm(false);
     setEditingHomework(null);
-    setFormData({ title: '', description: '' });
+    setFormData({ title: '', description: '', teacherId: '' });
     setSelectedFiles([]);
     setError('');
   };
@@ -175,40 +254,46 @@ export default function StudentHomeworkPage() {
       return;
     }
 
+    if (!formData.teacherId) {
+      setError('Please select a teacher to submit this homework to.');
+      return;
+    }
+
     setSubmitting(true);
 
     try {
       const token = localStorage.getItem('accessToken');
-      const formDataToSend = new FormData();
-      formDataToSend.append('title', formData.title);
-      formDataToSend.append('description', formData.description);
       
-      selectedFiles.forEach((file, index) => {
-        formDataToSend.append('files', file);
+      console.log('Submitting homework to teacher (multipart):', formData.teacherId);
+      
+      const fd = new FormData();
+      fd.append('title', formData.title);
+      fd.append('description', formData.description);
+      fd.append('teacherId', formData.teacherId);
+      selectedFiles.forEach((file) => fd.append('files', file));
+
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/homework/submit-to-teacher`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+        body: fd,
       });
 
-      // TODO: Replace with actual API call
-      // const url = editingHomework
-      //   ? `${process.env.NEXT_PUBLIC_API_URL}/homework/submissions/${editingHomework.id}`
-      //   : `${process.env.NEXT_PUBLIC_API_URL}/homework/submissions`;
-      // const method = editingHomework ? 'PATCH' : 'POST';
-      
-      // const response = await fetch(url, {
-      //   method,
-      //   headers: {
-      //     'Authorization': `Bearer ${token}`,
-      //   },
-      //   body: formDataToSend,
-      // });
+      const data = await response.json();
+      console.log('Submission response:', data);
 
-      // if (response.ok) {
-        setSuccess(editingHomework ? t.homework.homeworkUpdated : t.homework.homeworkSubmitted);
+      if (response.ok) {
+        setSuccess(t.homework.homeworkSubmitted);
         fetchHomework();
         setTimeout(() => {
           closeForm();
         }, 1500);
-      // }
+      } else {
+        setError(data.message || 'Failed to submit homework');
+      }
     } catch (err: any) {
+      console.error('Submit error:', err);
       setError(err.message || t.homework.error);
     } finally {
       setSubmitting(false);
@@ -403,6 +488,33 @@ export default function StudentHomeworkPage() {
                   rows={5}
                   className="mt-2 w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-300"
                 />
+              </div>
+
+              {/* Teacher Selection */}
+              <div>
+                <label htmlFor="teacher" className="block text-sm font-medium text-gray-700">
+                  {t.homework.selectTeacher || 'Select Teacher'} *
+                </label>
+                <select
+                  id="teacher"
+                  value={formData.teacherId}
+                  onChange={(e) => setFormData({ ...formData, teacherId: e.target.value })}
+                  required
+                  disabled={submitting}
+                  className="mt-2 w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-300 bg-white"
+                >
+                  <option value="">{t.homework.chooseTeacher || 'Choose a teacher...'}</option>
+                  {myTeachers.map((teacher) => (
+                    <option key={teacher.id} value={teacher.id}>
+                      {teacher.user.firstName} {teacher.user.lastName}
+                    </option>
+                  ))}
+                </select>
+                {myTeachers.length === 0 && (
+                  <p className="mt-2 text-sm text-amber-600">
+                    ⚠️ You are not assigned to any teachers yet. Please contact your administrator.
+                  </p>
+                )}
               </div>
 
               {/* File Upload */}

@@ -90,6 +90,7 @@ model Student {
   submissions   Submission[]
   grades        Grade[]
   evaluations   Evaluation[]
+  teachers      StudentTeacher[]
 
   @@index([userId])
   @@index([classId])
@@ -108,6 +109,7 @@ model Teacher {
   homework    Homework[]
   grades      Grade[]
   evaluations Evaluation[]
+  students    StudentTeacher[]
 
   @@index([userId])
   @@map("teachers")
@@ -153,8 +155,8 @@ model Homework {
   title       String
   description String
   dueDate     DateTime
-  classId     String
-  class       Class    @relation(fields: [classId], references: [id], onDelete: Cascade)
+  classId     String?
+  class       Class?   @relation(fields: [classId], references: [id], onDelete: SetNull)
   teacherId   String
   teacher     Teacher  @relation(fields: [teacherId], references: [id], onDelete: Cascade)
   fileUrls    String[]
@@ -280,4 +282,22 @@ model Evaluation {
   @@index([teacherId])
   @@index([academicYear, term])
   @@map("evaluations")
+}
+
+model StudentTeacher {
+  id          String   @id @default(uuid())
+  studentId   String
+  student     Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  teacherId   String
+  teacher     Teacher  @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+  assignedBy  String   // User ID of admin/supervisor who made the assignment
+  assignedAt  DateTime @default(now())
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([studentId, teacherId])
+  @@index([studentId])
+  @@index([teacherId])
+  @@index([assignedBy])
+  @@map("student_teachers")
 }

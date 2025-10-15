@@ -59,24 +59,126 @@ export default function TeacherHomeworkPage() {
     setUser({ name: 'Teacher', role: 'TEACHER' });
     setMounted(true);
     fetchSubmissions();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [router]);
 
   const fetchSubmissions = async () => {
     setLoading(true);
     try {
       const token = localStorage.getItem('accessToken');
-      // TODO: Replace with actual API call
-      // const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/homework/submissions`, {
-      //   headers: { 'Authorization': `Bearer ${token}` },
-      // });
-      // const data = await response.json();
-      // setSubmissions(data.data);
+      // Use the conflict-safe endpoint path
+      const url = `${process.env.NEXT_PUBLIC_API_URL}/homework/submissions/received`;
       
-      // Mock data for demonstration
-      setSubmissions([]);
-    } catch (err: any) {
+      console.log('=== FETCHING TEACHER SUBMISSIONS ===');
+      console.log('URL:', url);
+      console.log('Token:', token ? 'Present' : 'Missing');
+      
+      const response = await fetch(url, {
+        headers: { 'Authorization': `Bearer ${token}` },
+      });
+
+      console.log('Response status:', response.status);
+      console.log('Response statusText:', response.statusText);
+      console.log('Response ok:', response.ok);
+      console.log('Response headers:', Object.fromEntries(response.headers.entries()));
+
+      if (!response.ok) {
+        // Safely read error payload as text, then try JSON
+        let errorPayload: Record<string, unknown> | { message?: string } = {};
+        try {
+          const text = await response.text();
+          try { errorPayload = text ? JSON.parse(text) : {}; } catch { errorPayload = { message: text }; }
+        } catch {
+          errorPayload = {};
+        }
+        console.error('Error response:', errorPayload);
+        
+        if (response.status === 401) {
+          localStorage.clear();
+          router.push('/login');
+          return;
+        }
+        const errorMessage = typeof errorPayload?.message === 'string' 
+          ? errorPayload.message 
+          : 'Failed to fetch submissions';
+        throw new Error(errorMessage);
+      }
+
+      const data = await response.json();
+      console.log('Submissions response:', data);
+      
+      // Normalize response to an array
+      // Handle common API envelope shapes: data, {data}, {data:{data}}, {result}
+      const rawListCandidate =
+        Array.isArray(data)
+          ? data
+          : Array.isArray(data?.data)
+          ? data.data
+          : Array.isArray(data?.result)
+          ? data.result
+          : Array.isArray(data?.data?.data)
+          ? data.data.data
+          : [];
+
+      const rawList: unknown[] = rawListCandidate || [];
+
+      // Transform data to match the interface
+      type SubmissionApi = {
+        id: string;
+        homework?: { title?: string; description?: string } | null;
+        submittedAt?: string;
+        status?: string;
+        grade?: number | null;
+        feedback?: string | null;
+        fileUrls?: string[] | null;
+        student?: { user?: { id?: string; firstName?: string; lastName?: string } | null } | null;
+      };
+
+      const buildFileUrl = (u: string): string => {
+        if (/^https?:\/\//i.test(u)) return u;
+        const cleaned = u.replace(/^\.\/?/, '');
+        // For uploaded files, use the base URL without /api prefix
+        // because ServeStaticModule serves files at /uploads (not /api/uploads)
+        const baseUrl = process.env.NEXT_PUBLIC_API_URL?.replace(/\/api$/, '') || 'http://localhost:3001';
+        return `${baseUrl}/${cleaned}`;
+      };
+
+      const fileNameFrom = (u: string): string => {
+        try {
+          const parts = u.split('?')[0].split('#')[0].split('/');
+          return parts[parts.length - 1] || 'file';
+        } catch {
+          return 'file';
+        }
+      };
+
+      const transformedSubmissions: StudentHomeworkSubmission[] = (rawList as SubmissionApi[]).map((sub: SubmissionApi) => ({
+        id: sub.id,
+        title: sub.homework?.title ?? '',
+        description: sub.homework?.description ?? '',
+        files: (sub.fileUrls ?? []).map((url) => ({
+          name: fileNameFrom(url),
+          url: buildFileUrl(url),
+          size: 0,
+        })),
+        submittedAt: sub.submittedAt ?? new Date().toISOString(),
+        status: ((sub.status || '').toLowerCase() as 'pending' | 'graded' | 'returned'),
+        grade: (sub.grade ?? undefined) as number | undefined,
+        feedback: sub.feedback ?? undefined,
+        student: {
+          id: sub.student?.user?.id ?? '',
+          firstName: sub.student?.user?.firstName ?? '',
+          lastName: sub.student?.user?.lastName ?? '',
+        },
+      }));
+
+      console.log('Transformed submissions:', transformedSubmissions);
+      setSubmissions(transformedSubmissions);
+      // Clear any previous error now that we have a successful response
+      setError('');
+    } catch (err: unknown) {
       console.error('Fetch submissions error:', err);
-      setError(err.message || 'Failed to load homework submissions');
+      setError((err as Error)?.message || 'Failed to load homework submissions');
     } finally {
       setLoading(false);
     }
@@ -123,9 +225,8 @@ export default function TeacherHomeworkPage() {
     setSubmitting(true);
 
     try {
-      const token = localStorage.getItem('accessToken');
-      
       // TODO: Replace with actual API call
+      // const token = localStorage.getItem('accessToken');
       // const response = await fetch(
       //   `${process.env.NEXT_PUBLIC_API_URL}/homework/submissions/${selectedSubmission?.id}/grade`,
       //   {
@@ -148,8 +249,9 @@ export default function TeacherHomeworkPage() {
           closeGradeModal();
         }, 1500);
       // }
-    } catch (err: any) {
-      setError(err.message || t.homework.error);
+    } catch (err) {
+      const error = err as Error;
+      setError(error.message || t.homework.error);
     } finally {
       setSubmitting(false);
     }
@@ -194,6 +296,39 @@ export default function TeacherHomeworkPage() {
     const sizes = ['Bytes', 'KB', 'MB', 'GB'];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
     return Math.round((bytes / Math.pow(k, i)) * 100) / 100 + ' ' + sizes[i];
+  };
+
+  const handleDownloadFile = async (fileUrl: string, fileName: string) => {
+    try {
+      // Fetch the file as a blob
+      const response = await fetch(fileUrl);
+      if (!response.ok) {
+        throw new Error('Failed to download file');
+      }
+      
+      const blob = await response.blob();
+      
+      // Create a temporary URL for the blob
+      const blobUrl = window.URL.createObjectURL(blob);
+      
+      // Create a temporary anchor element and trigger download
+      const link = document.createElement('a');
+      link.href = blobUrl;
+      link.download = fileName;
+      link.style.display = 'none';
+      
+      // Append to body, click, and remove
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      // Clean up the blob URL
+      window.URL.revokeObjectURL(blobUrl);
+    } catch (error) {
+      console.error('Download error:', error);
+      setError('Failed to download file. Please try again.');
+      setTimeout(() => setError(''), 3000);
+    }
   };
 
   const filteredSubmissions = submissions.filter((submission) => {
@@ -354,16 +489,39 @@ export default function TeacherHomeworkPage() {
                           </svg>
                           {t.teacher.attachedFiles} ({submission.files.length})
                         </p>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        <div className="grid grid-cols-1 gap-2">
                           {submission.files.map((file, fileIndex) => (
-                            <div key={fileIndex} className="flex items-center gap-2 p-2 bg-gray-50 rounded border border-gray-200">
-                              <svg className="w-4 h-4 text-teal-500 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                                <path fillRule="evenodd" d="M8 4a3 3 0 00-3 3v4a5 5 0 0010 0V7a1 1 0 112 0v4a7 7 0 11-14 0V7a5 5 0 0110 0v4a3 3 0 11-6 0V7a1 1 0 012 0v4a1 1 0 102 0V7a3 3 0 00-3-3z" clipRule="evenodd" />
-                              </svg>
-                              <span className="text-xs text-gray-700 truncate flex-1">{file.name}</span>
-                              <span className="text-xs text-gray-500 flex-shrink-0">
-                                {formatFileSize(file.size)}
-                              </span>
+                            <div key={fileIndex} className="flex items-center justify-between gap-2 p-2 bg-gray-50 rounded border border-gray-200">
+                              <div className="flex items-center gap-2 flex-1 min-w-0">
+                                <svg className="w-4 h-4 text-teal-500 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                                  <path fillRule="evenodd" d="M8 4a3 3 0 00-3 3v4a5 5 0 0010 0V7a1 1 0 112 0v4a7 7 0 11-14 0V7a5 5 0 0110 0v4a3 3 0 11-6 0V7a1 1 0 012 0v4a1 1 0 102 0V7a3 3 0 00-3-3z" clipRule="evenodd" />
+                                </svg>
+                                <span className="text-xs text-gray-700 truncate flex-1">{file.name}</span>
+                                {file.size > 0 && (
+                                  <span className="text-xs text-gray-500 flex-shrink-0">
+                                    {formatFileSize(file.size)}
+                                  </span>
+                                )}
+                              </div>
+                              <div className="flex items-center gap-2 flex-shrink-0">
+                                <a
+                                  href={file.url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-teal-600 hover:text-teal-700 text-xs font-medium"
+                                  aria-label="Open file"
+                                >
+                                  Open
+                                </a>
+                                <button
+                                  type="button"
+                                  onClick={() => handleDownloadFile(file.url, file.name)}
+                                  className="text-teal-600 hover:text-teal-700 text-xs font-medium underline"
+                                  aria-label="Download file"
+                                >
+                                  Download
+                                </button>
+                              </div>
                             </div>
                           ))}
                         </div>
@@ -446,7 +604,7 @@ export default function TeacherHomeworkPage() {
               {selectedSubmission.files.length > 0 && (
                 <div className="mb-6">
                   <p className="text-sm font-semibold text-gray-700 mb-3">{t.teacher.attachedFiles}:</p>
-                  <div className="space-y-2">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     {selectedSubmission.files.map((file, index) => (
                       <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-200">
                         <div className="flex items-center gap-2 flex-1 min-w-0">
@@ -454,15 +612,27 @@ export default function TeacherHomeworkPage() {
                             <path fillRule="evenodd" d="M8 4a3 3 0 00-3 3v4a5 5 0 0010 0V7a1 1 0 112 0v4a7 7 0 11-14 0V7a5 5 0 0110 0v4a3 3 0 11-6 0V7a1 1 0 012 0v4a1 1 0 102 0V7a3 3 0 00-3-3z" clipRule="evenodd" />
                           </svg>
                           <span className="text-sm text-gray-700 truncate">{file.name}</span>
-                          <span className="text-xs text-gray-500">({formatFileSize(file.size)})</span>
+                          {file.size > 0 && <span className="text-xs text-gray-500">({formatFileSize(file.size)})</span>}
                         </div>
-                        <a
-                          href={file.url}
-                          download
-                          className="text-teal-600 hover:text-teal-700 text-sm font-medium ml-2 rtl:ml-0 rtl:mr-2"
-                        >
-                          {t.teacher.downloadFile}
-                        </a>
+                        <div className="flex items-center gap-3">
+                          <a
+                            href={file.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-teal-600 hover:text-teal-700 text-sm font-medium"
+                            aria-label="Open file in new tab"
+                          >
+                            Open
+                          </a>
+                          <button
+                            type="button"
+                            onClick={() => handleDownloadFile(file.url, file.name)}
+                            className="text-teal-600 hover:text-teal-700 text-sm font-medium underline"
+                            aria-label="Download file"
+                          >
+                            {t.teacher.downloadFile}
+                          </button>
+                        </div>
                       </div>
                     ))}
                   </div>

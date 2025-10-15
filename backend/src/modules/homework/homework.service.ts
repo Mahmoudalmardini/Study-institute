@@ -388,4 +388,153 @@ export class HomeworkService {
 
     return submissions;
   }
+
+  // Direct student submissions to teachers (without homework assignment)
+  async submitToTeacher(
+    studentUserId: string,
+    dto: any,
+    files?: Express.Multer.File[],
+  ) {
+    console.log('[submitToTeacher] Student user ID:', studentUserId);
+    console.log('[submitToTeacher] DTO:', dto);
+    console.log('[submitToTeacher] Files received:', files?.length || 0);
+    console.log('[submitToTeacher] File details:', files?.map(f => ({
+      filename: f.filename,
+      originalname: f.originalname,
+      path: f.path,
+      size: f.size,
+    })));
+    
+    // Find student profile
+    let student = await this.prisma.student.findUnique({
+      where: { userId: studentUserId },
+    });
+
+    console.log('[submitToTeacher] Student profile:', student);
+
+    if (!student) {
+      // Auto-create student profile if it doesn't exist
+      console.log('[submitToTeacher] Creating student profile');
+      student = await this.prisma.student.create({
+        data: { userId: studentUserId },
+      });
+      console.log('[submitToTeacher] Created student profile:', student);
+    }
+
+    // Verify teacher exists
+    console.log('[submitToTeacher] Looking for teacher with ID:', dto.teacherId);
+    const teacher = await this.prisma.teacher.findUnique({
+      where: { id: dto.teacherId },
+    });
+
+    console.log('[submitToTeacher] Teacher profile:', teacher);
+
+    if (!teacher) {
+      throw new NotFoundException('Teacher not found');
+    }
+
+    // Create a simple homework assignment for this submission
+    console.log('[submitToTeacher] Creating homework with teacherId:', teacher.id);
+    const homework = await this.prisma.homework.create({
+      data: {
+        title: dto.title,
+        description: dto.description,
+        dueDate: new Date(), // Immediate submission
+        teacherId: teacher.id,
+        classId: student.classId || null, // Use student's class or null
+      },
+    });
+
+    console.log('[submitToTeacher] Created homework:', homework);
+
+    // Build file URLs from uploaded files
+    const fileUrls = files ? files.map((f) => f.path) : [];
+    console.log('[submitToTeacher] File URLs to save:', fileUrls);
+
+    // Create submission
+    const submission = await this.prisma.submission.create({
+      data: {
+        homeworkId: homework.id,
+        studentId: student.id,
+        submittedAt: new Date(),
+        status: 'PENDING',
+        fileUrls: fileUrls,
+      },
+      include: {
+        homework: true,
+        student: {
+          include: {
+            user: {
+              select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+                email: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    console.log('[submitToTeacher] Created submission:', submission);
+    console.log('[submitToTeacher] Submission fileUrls:', submission.fileUrls);
+
+    return submission;
+  }
+
+  async getTeacherSubmissions(teacherUserId: string) {
+    console.log('[getTeacherSubmissions] Fetching submissions for teacher user:', teacherUserId);
+    
+    // Find teacher profile
+    const teacher = await this.prisma.teacher.findFirst({
+      where: { userId: teacherUserId },
+    });
+
+    console.log('[getTeacherSubmissions] Teacher profile found:', teacher);
+
+    if (!teacher) {
+      console.log('[getTeacherSubmissions] No teacher profile found, returning empty array');
+      return []; // Return empty array if no teacher profile
+    }
+
+    console.log('[getTeacherSubmissions] Searching for submissions with teacherId:', teacher.id);
+
+    // Get all submissions for homework created by this teacher
+    const submissions = await this.prisma.submission.findMany({
+      where: {
+        homework: {
+          teacherId: teacher.id,
+        },
+      },
+      include: {
+        homework: {
+          select: {
+            id: true,
+            title: true,
+            description: true,
+            dueDate: true,
+          },
+        },
+        student: {
+          include: {
+            user: {
+              select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+                email: true,
+              },
+            },
+          },
+        },
+      },
+      orderBy: { submittedAt: 'desc' },
+    });
+
+    console.log('[getTeacherSubmissions] Found submissions:', submissions.length);
+    console.log('[getTeacherSubmissions] Submissions:', JSON.stringify(submissions, null, 2));
+
+    return submissions;
+  }
 }

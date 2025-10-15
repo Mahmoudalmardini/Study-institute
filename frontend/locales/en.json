@@ -104,6 +104,8 @@
     "homeworkTitlePlaceholder": "Enter homework title",
     "description": "Description",
     "descriptionPlaceholder": "Describe your homework submission",
+    "selectTeacher": "Select Teacher",
+    "chooseTeacher": "Choose a teacher...",
     "attachments": "Attachments",
     "uploadFiles": "Upload Files",
     "uploadImages": "Upload Images or Documents",

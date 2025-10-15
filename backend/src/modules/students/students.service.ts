@@ -124,7 +124,7 @@ export class StudentsService {
   }
 
   async findByUserId(userId: string) {
-    const student = await this.prisma.student.findUnique({
+    let student = await this.prisma.student.findUnique({
       where: { userId },
       include: {
         user: {
@@ -141,7 +141,33 @@ export class StudentsService {
     });
 
     if (!student) {
-      throw new NotFoundException('Student not found');
+      // Auto-create student profile if it doesn't exist
+      const user = await this.prisma.user.findUnique({
+        where: { id: userId },
+      });
+
+      if (!user || user.role !== 'STUDENT') {
+        throw new NotFoundException('Student user not found');
+      }
+
+      // Create the student profile automatically
+      student = await this.prisma.student.create({
+        data: {
+          userId: userId,
+        },
+        include: {
+          user: {
+            select: {
+              id: true,
+              email: true,
+              firstName: true,
+              lastName: true,
+              phone: true,
+            },
+          },
+          class: true,
+        },
+      });
     }
 
     return student;

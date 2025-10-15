@@ -47,16 +47,20 @@ export default function LoginPage() {
         throw new Error(data.message || 'Login failed');
       }
 
-      // Store tokens
+      // Store tokens and user data
       localStorage.setItem('accessToken', data.data.accessToken);
       localStorage.setItem('refreshToken', data.data.refreshToken);
+      localStorage.setItem('userId', data.data.user.id);
+      localStorage.setItem('userRole', data.data.user.role);
       
       // Redirect based on role
       const user = data.data.user;
       switch (user.role) {
         case 'ADMIN':
-        case 'SUPERVISOR':
           router.push('/admin');
+          break;
+        case 'SUPERVISOR':
+          router.push('/supervisor');
           break;
         case 'TEACHER':
           router.push('/teacher');

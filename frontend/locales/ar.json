@@ -104,6 +104,8 @@
     "homeworkTitlePlaceholder": "أدخل عنوان الواجب",
     "description": "الوصف",
     "descriptionPlaceholder": "صف واجبك المنزلي",
+    "selectTeacher": "اختر المعلم",
+    "chooseTeacher": "اختر معلماً...",
     "attachments": "المرفقات",
     "uploadFiles": "رفع الملفات",
     "uploadImages": "رفع الصور أو المستندات",

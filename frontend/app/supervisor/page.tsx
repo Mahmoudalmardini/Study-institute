@@ -6,7 +6,7 @@ import { useI18n } from '@/lib/i18n-context';
 import SettingsMenu from '@/components/SettingsMenu';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
 
-export default function AdminDashboard() {
+export default function SupervisorDashboard() {
   const router = useRouter();
   const { t } = useI18n();
   const [user, setUser] = useState<any>(null);
@@ -20,7 +20,7 @@ export default function AdminDashboard() {
     }
 
     // TODO: Fetch user data from API
-    setUser({ name: 'Administrator', role: 'ADMIN' });
+    setUser({ name: 'Supervisor', role: 'SUPERVISOR' });
     setMounted(true);
   }, [router]);
 
@@ -45,7 +45,7 @@ export default function AdminDashboard() {
   return (
     <div className="min-h-screen gradient-bg">
       {/* Enhanced Header with Gradient */}
-      <nav className="gradient-primary shadow-lg sticky top-0 z-40">
+      <nav className="gradient-secondary shadow-lg sticky top-0 z-40">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center min-w-0 flex-1 gap-3">
@@ -56,12 +56,12 @@ export default function AdminDashboard() {
               </div>
               <h1 className="text-lg sm:text-xl font-bold text-white truncate">
                 <span className="hidden sm:inline">{t.common.appName} - </span>
-                {t.admin.title}
+                Supervisor
               </h1>
             </div>
             <div className="flex items-center gap-2 sm:gap-4 flex-shrink-0">
               <span className="hidden md:inline text-sm text-white/90 font-medium">
-                {t.admin.welcome}, {user.name}
+                Welcome, {user.name}
               </span>
               <SettingsMenu onLogout={handleLogout} />
             </div>
@@ -71,7 +71,7 @@ export default function AdminDashboard() {
 
       <main className="max-w-7xl mx-auto py-6 sm:py-8 px-4 sm:px-6 lg:px-8">
         {/* Welcome Banner */}
-        <div className={`mb-8 p-6 sm:p-8 bg-white rounded-2xl shadow-lg border-l-4 border-indigo-600 ${mounted ? 'animate-slide-up' : 'opacity-0'}`}>
+        <div className={`mb-8 p-6 sm:p-8 bg-white rounded-2xl shadow-lg border-l-4 border-blue-600 ${mounted ? 'animate-slide-up' : 'opacity-0'}`}>
           <div className="flex items-start gap-4">
             <div className="w-14 h-14 gradient-secondary rounded-xl flex items-center justify-center flex-shrink-0">
               <svg className="w-8 h-8 text-white" fill="currentColor" viewBox="0 0 20 20">
@@ -80,10 +80,10 @@ export default function AdminDashboard() {
             </div>
             <div className="flex-1">
               <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2">
-                {t.admin.welcomeBack}, {user.name}! 👋
+                Welcome back, {user.name}! 👋
               </h2>
               <p className="text-gray-600 text-base sm:text-lg">
-                {t.admin.dashboardGreeting}
+                Oversee student performance and manage educational activities
               </p>
             </div>
           </div>
@@ -91,31 +91,10 @@ export default function AdminDashboard() {
 
         <div className="space-y-4 sm:space-y-6">
           <div className="grid grid-cols-1 gap-4 sm:gap-6 sm:grid-cols-2 lg:grid-cols-3">
-            {/* Users Card - Clickable */}
-            <button
-              onClick={() => router.push('/admin/users')}
-              className={`bg-white overflow-hidden rounded-xl hover-lift p-6 sm:p-7 border-2 border-indigo-100 hover:border-indigo-300 text-start group ${mounted ? 'animate-slide-up stagger-1' : 'opacity-0'}`}
-            >
-              <div className="flex items-start justify-between">
-                <div className="flex-1">
-                  <div className="w-12 h-12 gradient-primary rounded-lg flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
-                    <svg className="w-7 h-7 text-white" fill="currentColor" viewBox="0 0 20 20">
-                      <path d="M9 6a3 3 0 11-6 0 3 3 0 016 0zM17 6a3 3 0 11-6 0 3 3 0 016 0zM12.93 17c.046-.327.07-.66.07-1a6.97 6.97 0 00-1.5-4.33A5 5 0 0119 16v1h-6.07zM6 11a5 5 0 015 5v1H1v-1a5 5 0 015-5z" />
-                    </svg>
-                  </div>
-                  <h3 className="text-xl font-bold text-gray-900 mb-2">{t.admin.users}</h3>
-                  <p className="text-sm text-gray-600">{t.admin.usersDesc}</p>
-                </div>
-                <svg className="w-6 h-6 text-indigo-500 flex-shrink-0 ms-2 rtl:rotate-180 group-hover:translate-x-1 rtl:group-hover:-translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                </svg>
-              </div>
-            </button>
-
             {/* Students Card - Clickable */}
             <button
-              onClick={() => router.push('/admin/students')}
-              className={`bg-white overflow-hidden rounded-xl hover-lift p-6 sm:p-7 border-2 border-emerald-100 hover:border-emerald-300 text-start group ${mounted ? 'animate-slide-up stagger-2' : 'opacity-0'}`}
+              onClick={() => router.push('/supervisor/students')}
+              className={`bg-white overflow-hidden rounded-xl hover-lift p-6 sm:p-7 border-2 border-emerald-100 hover:border-emerald-300 text-start group ${mounted ? 'animate-slide-up stagger-1' : 'opacity-0'}`}
             >
               <div className="flex items-start justify-between">
                 <div className="flex-1">
@@ -124,8 +103,8 @@ export default function AdminDashboard() {
                       <path d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" />
                     </svg>
                   </div>
-                  <h3 className="text-xl font-bold text-gray-900 mb-2">{t.admin.students}</h3>
-                  <p className="text-sm text-gray-600">{t.admin.studentsDesc}</p>
+                  <h3 className="text-xl font-bold text-gray-900 mb-2">Students</h3>
+                  <p className="text-sm text-gray-600">View and monitor all students</p>
                 </div>
                 <svg className="w-6 h-6 text-emerald-500 flex-shrink-0 ms-2 rtl:rotate-180 group-hover:translate-x-1 rtl:group-hover:-translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
@@ -135,8 +114,8 @@ export default function AdminDashboard() {
 
             {/* Teachers Card - Clickable */}
             <button
-              onClick={() => router.push('/admin/teachers')}
-              className={`bg-white overflow-hidden rounded-xl hover-lift p-6 sm:p-7 border-2 border-purple-100 hover:border-purple-300 text-start group ${mounted ? 'animate-slide-up stagger-3' : 'opacity-0'}`}
+              onClick={() => router.push('/supervisor/teachers')}
+              className={`bg-white overflow-hidden rounded-xl hover-lift p-6 sm:p-7 border-2 border-purple-100 hover:border-purple-300 text-start group ${mounted ? 'animate-slide-up stagger-2' : 'opacity-0'}`}
             >
               <div className="flex items-start justify-between">
                 <div className="flex-1">
@@ -145,8 +124,8 @@ export default function AdminDashboard() {
                       <path d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" />
                     </svg>
                   </div>
-                  <h3 className="text-xl font-bold text-gray-900 mb-2">{t.admin.teachers}</h3>
-                  <p className="text-sm text-gray-600">{t.admin.teachersDesc}</p>
+                  <h3 className="text-xl font-bold text-gray-900 mb-2">Teachers</h3>
+                  <p className="text-sm text-gray-600">View all teachers</p>
                 </div>
                 <svg className="w-6 h-6 text-purple-500 flex-shrink-0 ms-2 rtl:rotate-180 group-hover:translate-x-1 rtl:group-hover:-translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
@@ -154,37 +133,38 @@ export default function AdminDashboard() {
               </div>
             </button>
 
-            {/* Homework Card */}
-            <div className={`bg-white overflow-hidden rounded-xl hover-lift p-6 sm:p-7 border-2 border-orange-100 hover:border-orange-300 group ${mounted ? 'animate-slide-up stagger-4' : 'opacity-0'}`}>
-              <div className="w-12 h-12 bg-gradient-to-br from-orange-500 to-amber-500 rounded-lg flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+            {/* Evaluations Card */}
+            <div className={`bg-white overflow-hidden rounded-xl hover-lift p-6 sm:p-7 border-2 border-amber-100 hover:border-amber-300 group ${mounted ? 'animate-slide-up stagger-3' : 'opacity-0'}`}>
+              <div className="w-12 h-12 bg-gradient-to-br from-amber-500 to-orange-500 rounded-lg flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
                 <svg className="w-7 h-7 text-white" fill="currentColor" viewBox="0 0 20 20">
-                  <path d="M9 4.804A7.968 7.968 0 005.5 4c-1.255 0-2.443.29-3.5.804v10A7.969 7.969 0 015.5 14c1.669 0 3.218.51 4.5 1.385A7.962 7.962 0 0114.5 14c1.255 0 2.443.29 3.5.804v-10A7.968 7.968 0 0014.5 4c-1.255 0-2.443.29-3.5.804V12a1 1 0 11-2 0V4.804z" />
+                  <path d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z" />
+                  <path fillRule="evenodd" d="M4 5a2 2 0 012-2 3 3 0 003 3h2a3 3 0 003-3 2 2 0 012 2v11a2 2 0 01-2 2H6a2 2 0 01-2-2V5zm9.707 5.707a1 1 0 00-1.414-1.414L9 12.586l-1.293-1.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
                 </svg>
               </div>
-              <h3 className="text-xl font-bold text-gray-900 mb-2">{t.admin.homework}</h3>
-              <p className="text-sm text-gray-600">{t.admin.homeworkDesc}</p>
+              <h3 className="text-xl font-bold text-gray-900 mb-2">Evaluations</h3>
+              <p className="text-sm text-gray-600">Review student evaluations</p>
             </div>
 
-            {/* Grades Card */}
-            <div className={`bg-white overflow-hidden rounded-xl hover-lift p-6 sm:p-7 border-2 border-blue-100 hover:border-blue-300 group ${mounted ? 'animate-slide-up stagger-5' : 'opacity-0'}`}>
+            {/* Reports Card */}
+            <div className={`bg-white overflow-hidden rounded-xl hover-lift p-6 sm:p-7 border-2 border-blue-100 hover:border-blue-300 group ${mounted ? 'animate-slide-up stagger-4' : 'opacity-0'}`}>
               <div className="w-12 h-12 gradient-secondary rounded-lg flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
                 <svg className="w-7 h-7 text-white" fill="currentColor" viewBox="0 0 20 20">
                   <path d="M2 11a1 1 0 011-1h2a1 1 0 011 1v5a1 1 0 01-1 1H3a1 1 0 01-1-1v-5zM8 7a1 1 0 011-1h2a1 1 0 011 1v9a1 1 0 01-1 1H9a1 1 0 01-1-1V7zM14 4a1 1 0 011-1h2a1 1 0 011 1v12a1 1 0 01-1 1h-2a1 1 0 01-1-1V4z" />
                 </svg>
               </div>
-              <h3 className="text-xl font-bold text-gray-900 mb-2">{t.admin.grades}</h3>
-              <p className="text-sm text-gray-600">{t.admin.gradesDesc}</p>
+              <h3 className="text-xl font-bold text-gray-900 mb-2">Reports</h3>
+              <p className="text-sm text-gray-600">View analytics and reports</p>
             </div>
 
             {/* Announcements Card */}
-            <div className={`bg-white overflow-hidden rounded-xl hover-lift p-6 sm:p-7 border-2 border-red-100 hover:border-red-300 group ${mounted ? 'animate-slide-up stagger-6' : 'opacity-0'}`}>
+            <div className={`bg-white overflow-hidden rounded-xl hover-lift p-6 sm:p-7 border-2 border-red-100 hover:border-red-300 group ${mounted ? 'animate-slide-up stagger-5' : 'opacity-0'}`}>
               <div className="w-12 h-12 bg-gradient-to-br from-red-500 to-pink-500 rounded-lg flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
                 <svg className="w-7 h-7 text-white" fill="currentColor" viewBox="0 0 20 20">
                   <path fillRule="evenodd" d="M18 3a1 1 0 00-1.447-.894L8.763 6H5a3 3 0 000 6h.28l1.771 5.316A1 1 0 008 18h1a1 1 0 001-1v-4.382l6.553 3.276A1 1 0 0018 15V3z" clipRule="evenodd" />
                 </svg>
               </div>
-              <h3 className="text-xl font-bold text-gray-900 mb-2">{t.admin.announcements}</h3>
-              <p className="text-sm text-gray-600">{t.admin.announcementsDesc}</p>
+              <h3 className="text-xl font-bold text-gray-900 mb-2">Announcements</h3>
+              <p className="text-sm text-gray-600">View important announcements</p>
             </div>
           </div>
         </div>
