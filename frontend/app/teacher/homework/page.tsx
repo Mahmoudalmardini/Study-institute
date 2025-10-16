@@ -42,9 +42,9 @@ export default function TeacherHomeworkPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [selectedSubmission, setSelectedSubmission] = useState<StudentHomeworkSubmission | null>(null);
-  const [showGradeModal, setShowGradeModal] = useState(false);
-  const [gradeForm, setGradeForm] = useState({
-    grade: '',
+  const [showEvaluationModal, setShowEvaluationModal] = useState(false);
+  const [evaluationForm, setEvaluationForm] = useState({
+    evaluation: 'ACCEPTED' as 'ACCEPTED' | 'REJECTED',
     feedback: '',
   });
   const [submitting, setSubmitting] = useState(false);
@@ -193,62 +193,63 @@ export default function TeacherHomeworkPage() {
     }
   };
 
-  const openGradeModal = (submission: StudentHomeworkSubmission) => {
+  const openEvaluationModal = (submission: StudentHomeworkSubmission) => {
     setSelectedSubmission(submission);
-    setGradeForm({
-      grade: submission.grade?.toString() || '',
-      feedback: submission.feedback || '',
+    setEvaluationForm({
+      evaluation: 'ACCEPTED',
+      feedback: '',
     });
-    setShowGradeModal(true);
+    setShowEvaluationModal(true);
     setError('');
     setSuccess('');
   };
 
-  const closeGradeModal = () => {
-    setShowGradeModal(false);
+  const closeEvaluationModal = () => {
+    setShowEvaluationModal(false);
     setSelectedSubmission(null);
-    setGradeForm({ grade: '', feedback: '' });
+    setEvaluationForm({ evaluation: 'ACCEPTED', feedback: '' });
     setError('');
   };
 
-  const handleSubmitGrade = async (e: React.FormEvent) => {
+  const handleSubmitEvaluation = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     setSuccess('');
 
-    const gradeValue = parseInt(gradeForm.grade);
-    if (isNaN(gradeValue) || gradeValue < 0 || gradeValue > 100) {
-      setError(t.teacher.gradeValue);
+    if (!evaluationForm.feedback.trim()) {
+      setError('Feedback is required');
       return;
     }
 
     setSubmitting(true);
 
     try {
-      // TODO: Replace with actual API call
-      // const token = localStorage.getItem('accessToken');
-      // const response = await fetch(
-      //   `${process.env.NEXT_PUBLIC_API_URL}/homework/submissions/${selectedSubmission?.id}/grade`,
-      //   {
-      //     method: 'PATCH',
-      //     headers: {
-      //       'Authorization': `Bearer ${token}`,
-      //       'Content-Type': 'application/json',
-      //     },
-      //     body: JSON.stringify({
-      //       grade: gradeValue,
-      //       feedback: gradeForm.feedback,
-      //     }),
-      //   }
-      // );
+      const token = localStorage.getItem('accessToken');
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL}/homework/submissions/${selectedSubmission?.id}/evaluate`,
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            evaluation: evaluationForm.evaluation,
+            feedback: evaluationForm.feedback,
+          }),
+        }
+      );
 
-      // if (response.ok) {
-        setSuccess(t.teacher.gradeSubmitted);
+      if (response.ok) {
+        setSuccess('Evaluation submitted successfully and sent to admin for review');
         fetchSubmissions();
         setTimeout(() => {
-          closeGradeModal();
+          closeEvaluationModal();
         }, 1500);
-      // }
+      } else {
+        const errorData = await response.json();
+        setError(errorData.message || 'Failed to submit evaluation');
+      }
     } catch (err) {
       const error = err as Error;
       setError(error.message || t.homework.error);
@@ -270,10 +271,14 @@ export default function TeacherHomeworkPage() {
 
   const getStatusColor = (status: string) => {
     switch (status) {
+      case 'APPROVED_BY_ADMIN':
+        return 'bg-green-100 text-green-800 border-green-300';
+      case 'PENDING_ADMIN_REVIEW':
+        return 'bg-yellow-100 text-yellow-800 border-yellow-300';
+      case 'PENDING_TEACHER_REVIEW':
+        return 'bg-blue-100 text-blue-800 border-blue-300';
       case 'graded':
         return 'bg-green-100 text-green-800 border-green-300';
-      case 'returned':
-        return 'bg-yellow-100 text-yellow-800 border-yellow-300';
       default:
         return 'bg-blue-100 text-blue-800 border-blue-300';
     }
@@ -281,10 +286,14 @@ export default function TeacherHomeworkPage() {
 
   const getStatusText = (status: string) => {
     switch (status) {
+      case 'APPROVED_BY_ADMIN':
+        return 'Approved';
+      case 'PENDING_ADMIN_REVIEW':
+        return 'Pending Admin Review';
+      case 'PENDING_TEACHER_REVIEW':
+        return 'Pending Your Review';
       case 'graded':
         return t.teacher.graded;
-      case 'returned':
-        return t.homework.statusReturned;
       default:
         return t.teacher.pendingReview;
     }
@@ -550,13 +559,13 @@ export default function TeacherHomeworkPage() {
                   {/* Right Side - Action Button */}
                   <div className="flex-shrink-0">
                     <Button
-                      onClick={() => openGradeModal(submission)}
+                      onClick={() => openEvaluationModal(submission)}
                       className="w-full lg:w-auto gradient-secondary text-white font-semibold px-6 py-3 rounded-lg hover:shadow-lg transition-all duration-300 hover:scale-105"
                     >
                       <svg className="w-5 h-5 inline mr-2 rtl:mr-0 rtl:ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                       </svg>
-                      {submission.grade !== undefined ? t.homework.edit : t.teacher.gradeHomework}
+                      Evaluate Homework
                     </Button>
                   </div>
                 </div>
@@ -566,8 +575,8 @@ export default function TeacherHomeworkPage() {
         )}
       </main>
 
-      {/* Grading Modal */}
-      {showGradeModal && selectedSubmission && (
+      {/* Evaluation Modal */}
+      {showEvaluationModal && selectedSubmission && (
         <div className="fixed inset-0 bg-gray-900 bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-center justify-center p-4">
           <div className="relative w-full max-w-2xl bg-white rounded-2xl shadow-2xl animate-scale-in">
             <div className="p-6 sm:p-8">
@@ -575,7 +584,7 @@ export default function TeacherHomeworkPage() {
               <div className="flex justify-between items-start mb-6">
                 <div className="flex-1">
                   <h3 className="text-2xl font-bold text-gray-900 mb-2">
-                    {t.teacher.homeworkDetails}
+                    Evaluate Homework
                   </h3>
                   <p className="text-sm text-gray-600">
                     {t.teacher.submittedBy}: <span className="font-semibold">{selectedSubmission.student.firstName} {selectedSubmission.student.lastName}</span>
@@ -583,7 +592,7 @@ export default function TeacherHomeworkPage() {
                 </div>
                 <button
                   type="button"
-                  onClick={closeGradeModal}
+                  onClick={closeEvaluationModal}
                   className="text-gray-400 hover:text-gray-600 transition-colors"
                   aria-label={t.teacher.closeDetails}
                 >
@@ -639,8 +648,8 @@ export default function TeacherHomeworkPage() {
                 </div>
               )}
 
-              {/* Grading Form */}
-              <form onSubmit={handleSubmitGrade} className="space-y-5">
+              {/* Evaluation Form */}
+              <form onSubmit={handleSubmitEvaluation} className="space-y-5">
                 {error && (
                   <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
                     {error}
@@ -653,42 +662,77 @@ export default function TeacherHomeworkPage() {
                 )}
 
                 <div>
-                  <Label htmlFor="grade" className="text-gray-700 font-medium">
-                    {t.teacher.gradeValue} *
+                  <Label className="text-gray-700 font-medium mb-3 block">
+                    Evaluation Decision *
                   </Label>
-                  <Input
-                    id="grade"
-                    type="number"
-                    min="0"
-                    max="100"
-                    placeholder="0-100"
-                    value={gradeForm.grade}
-                    onChange={(e) => setGradeForm({ ...gradeForm, grade: e.target.value })}
-                    required
-                    disabled={submitting}
-                    className="mt-2"
-                  />
+                  <div className="space-y-3">
+                    <label className="flex items-center p-4 border-2 rounded-lg cursor-pointer transition-all hover:bg-green-50"
+                           style={{
+                             borderColor: evaluationForm.evaluation === 'ACCEPTED' ? '#10b981' : '#e5e7eb',
+                             backgroundColor: evaluationForm.evaluation === 'ACCEPTED' ? '#f0fdf4' : 'white'
+                           }}>
+                      <input
+                        type="radio"
+                        name="evaluation"
+                        value="ACCEPTED"
+                        checked={evaluationForm.evaluation === 'ACCEPTED'}
+                        onChange={(e) => setEvaluationForm({ ...evaluationForm, evaluation: e.target.value as 'ACCEPTED' | 'REJECTED' })}
+                        disabled={submitting}
+                        className="mr-3 h-5 w-5 text-green-600"
+                      />
+                      <div className="flex items-center gap-2">
+                        <svg className="w-6 h-6 text-green-600" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                        </svg>
+                        <span className="font-semibold text-gray-900">Accept Homework</span>
+                      </div>
+                    </label>
+                    
+                    <label className="flex items-center p-4 border-2 rounded-lg cursor-pointer transition-all hover:bg-red-50"
+                           style={{
+                             borderColor: evaluationForm.evaluation === 'REJECTED' ? '#ef4444' : '#e5e7eb',
+                             backgroundColor: evaluationForm.evaluation === 'REJECTED' ? '#fef2f2' : 'white'
+                           }}>
+                      <input
+                        type="radio"
+                        name="evaluation"
+                        value="REJECTED"
+                        checked={evaluationForm.evaluation === 'REJECTED'}
+                        onChange={(e) => setEvaluationForm({ ...evaluationForm, evaluation: e.target.value as 'ACCEPTED' | 'REJECTED' })}
+                        disabled={submitting}
+                        className="mr-3 h-5 w-5 text-red-600"
+                      />
+                      <div className="flex items-center gap-2">
+                        <svg className="w-6 h-6 text-red-600" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                        </svg>
+                        <span className="font-semibold text-gray-900">Reject Homework</span>
+                      </div>
+                    </label>
+                  </div>
                 </div>
 
                 <div>
                   <Label htmlFor="feedback" className="text-gray-700 font-medium">
-                    {t.teacher.feedback}
+                    Feedback *
                   </Label>
                   <textarea
                     id="feedback"
-                    placeholder={t.teacher.feedbackPlaceholder}
-                    value={gradeForm.feedback}
-                    onChange={(e) => setGradeForm({ ...gradeForm, feedback: e.target.value })}
+                    placeholder="Provide detailed feedback for the student..."
+                    value={evaluationForm.feedback}
+                    onChange={(e) => setEvaluationForm({ ...evaluationForm, feedback: e.target.value })}
                     disabled={submitting}
+                    required
                     rows={4}
                     className="mt-2 w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent transition-all duration-300"
                   />
+                  <p className="mt-1 text-xs text-gray-500">This will be reviewed by an admin before being sent to the student.</p>
                 </div>
 
                 <div className="flex flex-col-reverse sm:flex-row gap-3 pt-4">
                   <Button
                     type="button"
-                    onClick={closeGradeModal}
+                    onClick={closeEvaluationModal}
                     disabled={submitting}
                     className="flex-1 bg-gray-600 hover:bg-gray-700 text-white"
                   >
@@ -702,10 +746,10 @@ export default function TeacherHomeworkPage() {
                     {submitting ? (
                       <div className="flex items-center justify-center gap-2">
                         <LoadingSpinner size="sm" />
-                        <span>{t.teacher.savingGrade}</span>
+                        <span>Submitting...</span>
                       </div>
                     ) : (
-                      t.teacher.saveGrade
+                      'Submit Evaluation'
                     )}
                   </Button>
                 </div>

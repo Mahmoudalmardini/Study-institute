@@ -39,6 +39,17 @@ enum FileType {
   OTHER
 }
 
+enum EvaluationStatus {
+  ACCEPTED
+  REJECTED
+}
+
+enum ReviewStatus {
+  PENDING_TEACHER_REVIEW
+  PENDING_ADMIN_REVIEW
+  APPROVED_BY_ADMIN
+}
+
 model User {
   id        String   @id @default(uuid())
   email     String   @unique
@@ -181,8 +192,21 @@ model Submission {
   submittedAt DateTime?
   fileUrls    String[]
   status      SubmissionStatus @default(PENDING)
+  
+  // New admin review workflow fields
+  reviewStatus        ReviewStatus       @default(PENDING_TEACHER_REVIEW)
+  teacherEvaluation   EvaluationStatus?
+  teacherFeedback     String?
+  teacherReviewedAt   DateTime?
+  adminEvaluation     EvaluationStatus?
+  adminFeedback       String?
+  adminReviewedBy     String?
+  adminReviewedAt     DateTime?
+  
+  // Legacy fields (kept for backward compatibility)
   grade       Float?
   feedback    String?
+  
   createdAt   DateTime         @default(now())
   updatedAt   DateTime         @updatedAt
 
@@ -192,6 +216,7 @@ model Submission {
   @@index([homeworkId])
   @@index([studentId])
   @@index([status])
+  @@index([reviewStatus])
   @@map("submissions")
 }
 

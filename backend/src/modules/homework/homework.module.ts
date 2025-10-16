@@ -4,9 +4,11 @@ import { diskStorage } from 'multer';
 import { extname } from 'path';
 import { HomeworkService } from './homework.service';
 import { HomeworkController } from './homework.controller';
+import { PrismaModule } from '../prisma/prisma.module';
 
 @Module({
   imports: [
+    PrismaModule,
     MulterModule.register({
       storage: diskStorage({
         destination: './uploads',

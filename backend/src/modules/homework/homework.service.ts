@@ -9,7 +9,9 @@ import { CreateHomeworkDto } from './dto/create-homework.dto';
 import { UpdateHomeworkDto } from './dto/update-homework.dto';
 import { CreateSubmissionDto } from './dto/create-submission.dto';
 import { GradeSubmissionDto } from './dto/grade-submission.dto';
-import { SubmissionStatus } from '@prisma/client';
+import { TeacherEvaluateSubmissionDto } from './dto/teacher-evaluate-submission.dto';
+import { AdminReviewSubmissionDto } from './dto/admin-review-submission.dto';
+import { SubmissionStatus, ReviewStatus } from '@prisma/client';
 
 @Injectable()
 export class HomeworkService {
@@ -536,5 +538,190 @@ export class HomeworkService {
     console.log('[getTeacherSubmissions] Submissions:', JSON.stringify(submissions, null, 2));
 
     return submissions;
+  }
+
+  // Admin Review Workflow Methods
+  async teacherEvaluateSubmission(
+    submissionId: string,
+    teacherId: string,
+    dto: TeacherEvaluateSubmissionDto,
+  ) {
+    const submission = await this.prisma.submission.findUnique({
+      where: { id: submissionId },
+      include: {
+        homework: {
+          include: {
+            teacher: true,
+          },
+        },
+      },
+    });
+
+    if (!submission) {
+      throw new NotFoundException('Submission not found');
+    }
+
+    // Check if the teacher owns this homework
+    if (submission.homework.teacher.userId !== teacherId) {
+      throw new ForbiddenException(
+        'You can only evaluate submissions for your homework',
+      );
+    }
+
+    // Update submission with teacher evaluation
+    const evaluatedSubmission = await this.prisma.submission.update({
+      where: { id: submissionId },
+      data: {
+        teacherEvaluation: dto.evaluation,
+        teacherFeedback: dto.feedback,
+        teacherReviewedAt: new Date(),
+        reviewStatus: ReviewStatus.PENDING_ADMIN_REVIEW,
+        status: SubmissionStatus.SUBMITTED, // Keep as submitted until admin approves
+      },
+      include: {
+        homework: true,
+        student: {
+          include: {
+            user: {
+              select: {
+                firstName: true,
+                lastName: true,
+                email: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    return evaluatedSubmission;
+  }
+
+  async getSubmissionsPendingAdminReview() {
+    const submissions = await this.prisma.submission.findMany({
+      where: {
+        reviewStatus: ReviewStatus.PENDING_ADMIN_REVIEW,
+      },
+      include: {
+        homework: {
+          include: {
+            teacher: {
+              include: {
+                user: {
+                  select: {
+                    firstName: true,
+                    lastName: true,
+                  },
+                },
+              },
+            },
+          },
+        },
+        student: {
+          include: {
+            user: {
+              select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+                email: true,
+              },
+            },
+          },
+        },
+      },
+      orderBy: { teacherReviewedAt: 'asc' }, // Oldest first
+    });
+
+    return submissions;
+  }
+
+  async adminReviewSubmission(
+    submissionId: string,
+    adminUserId: string,
+    dto: AdminReviewSubmissionDto,
+  ) {
+    const submission = await this.prisma.submission.findUnique({
+      where: { id: submissionId },
+    });
+
+    if (!submission) {
+      throw new NotFoundException('Submission not found');
+    }
+
+    if (submission.reviewStatus !== ReviewStatus.PENDING_ADMIN_REVIEW) {
+      throw new BadRequestException(
+        'This submission is not pending admin review',
+      );
+    }
+
+    // Update submission with admin review
+    const reviewedSubmission = await this.prisma.submission.update({
+      where: { id: submissionId },
+      data: {
+        adminEvaluation: dto.evaluation,
+        adminFeedback: dto.feedback,
+        adminReviewedBy: adminUserId,
+        adminReviewedAt: new Date(),
+        reviewStatus: ReviewStatus.APPROVED_BY_ADMIN,
+        status: SubmissionStatus.GRADED, // Mark as graded when approved
+      },
+      include: {
+        homework: true,
+        student: {
+          include: {
+            user: {
+              select: {
+                firstName: true,
+                lastName: true,
+                email: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    return reviewedSubmission;
+  }
+
+  async getStudentHomeworkResults(studentUserId: string) {
+    const student = await this.prisma.student.findUnique({
+      where: { userId: studentUserId },
+    });
+
+    if (!student) {
+      throw new NotFoundException('Student profile not found');
+    }
+
+    const submissions = await this.prisma.submission.findMany({
+      where: {
+        studentId: student.id,
+        reviewStatus: ReviewStatus.APPROVED_BY_ADMIN,
+      },
+      include: {
+        homework: {
+          select: {
+            id: true,
+            title: true,
+            description: true,
+            dueDate: true,
+          },
+        },
+      },
+      orderBy: { adminReviewedAt: 'desc' },
+    });
+
+    // Format the results for the student
+    return submissions.map((submission) => ({
+      id: submission.id,
+      homeworkId: submission.homework.id,
+      homeworkTitle: submission.homework.title,
+      homeworkDescription: submission.homework.description,
+      submittedAt: submission.submittedAt,
+      result: submission.adminEvaluation,
+      feedback: submission.adminFeedback,
+      reviewedAt: submission.adminReviewedAt,
+    }));
   }
 }

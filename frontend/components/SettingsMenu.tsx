@@ -32,7 +32,7 @@ export default function SettingsMenu({ onLogout }: SettingsMenuProps) {
   };
 
   return (
-    <div className="relative" ref={dropdownRef}>
+    <div className="relative z-50" ref={dropdownRef}>
       {/* Settings Button - Enhanced for light header */}
       <button
         onClick={() => setIsOpen(!isOpen)}
@@ -63,7 +63,7 @@ export default function SettingsMenu({ onLogout }: SettingsMenuProps) {
 
       {/* Dropdown Menu with Animation */}
       {isOpen && (
-        <div className="absolute right-0 rtl:right-auto rtl:left-0 z-50 mt-2 w-56 origin-top-right rounded-xl bg-white shadow-2xl ring-1 ring-black ring-opacity-5 focus:outline-none animate-scale-in">
+        <div className="absolute right-0 rtl:right-auto rtl:left-0 z-[9999] mt-2 w-56 origin-top-right rounded-xl bg-white shadow-2xl ring-1 ring-black ring-opacity-5 focus:outline-none animate-scale-in">
           <div className="py-1">
             {/* Language Section */}
             <div className="px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide border-b border-gray-200">

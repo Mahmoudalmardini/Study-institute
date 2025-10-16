@@ -17,6 +17,8 @@ import { CreateHomeworkDto } from './dto/create-homework.dto';
 import { UpdateHomeworkDto } from './dto/update-homework.dto';
 import { CreateSubmissionDto } from './dto/create-submission.dto';
 import { GradeSubmissionDto } from './dto/grade-submission.dto';
+import { TeacherEvaluateSubmissionDto } from './dto/teacher-evaluate-submission.dto';
+import { AdminReviewSubmissionDto } from './dto/admin-review-submission.dto';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
@@ -46,6 +48,13 @@ export class HomeworkController {
   ) {
     const teacherId = user.role === Role.TEACHER ? user.id : undefined;
     return this.homeworkService.findAll(classId, teacherId);
+  }
+
+  // Specific routes must come before parameterized routes
+  @Get('my-homework-results')
+  @Roles(Role.STUDENT)
+  getMyHomeworkResults(@CurrentUser() user: CurrentUserData) {
+    return this.homeworkService.getStudentHomeworkResults(user.id);
   }
 
   @Get(':id')
@@ -135,6 +144,41 @@ export class HomeworkController {
       submissionId,
       user.id,
       gradeSubmissionDto,
+    );
+  }
+
+  // Admin Review Workflow Endpoints
+  @Post('submissions/:submissionId/evaluate')
+  @Roles(Role.TEACHER)
+  teacherEvaluateSubmission(
+    @CurrentUser() user: CurrentUserData,
+    @Param('submissionId') submissionId: string,
+    @Body() dto: TeacherEvaluateSubmissionDto,
+  ) {
+    return this.homeworkService.teacherEvaluateSubmission(
+      submissionId,
+      user.id,
+      dto,
+    );
+  }
+
+  @Get('submissions/pending-review')
+  @Roles(Role.ADMIN)
+  getSubmissionsPendingAdminReview() {
+    return this.homeworkService.getSubmissionsPendingAdminReview();
+  }
+
+  @Post('submissions/:submissionId/admin-review')
+  @Roles(Role.ADMIN)
+  adminReviewSubmission(
+    @CurrentUser() user: CurrentUserData,
+    @Param('submissionId') submissionId: string,
+    @Body() dto: AdminReviewSubmissionDto,
+  ) {
+    return this.homeworkService.adminReviewSubmission(
+      submissionId,
+      user.id,
+      dto,
     );
   }
 
