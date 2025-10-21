@@ -65,6 +65,7 @@ export class SubjectsController {
     return this.subjectsService.assignTeacher(
       id,
       assignTeacherDto.teacherId,
+      assignTeacherDto.classId,
       user.id,
     );
   }

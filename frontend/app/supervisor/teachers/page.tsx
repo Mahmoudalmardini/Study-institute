@@ -5,6 +5,22 @@ import { useRouter } from 'next/navigation';
 import { useI18n } from '@/lib/i18n-context';
 import SettingsMenu from '@/components/SettingsMenu';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
+import apiClient from '@/lib/api-client';
+
+interface Subject {
+  id: string;
+  name: string;
+  code?: string;
+  class?: {
+    id: string;
+    name: string;
+    grade?: string;
+  };
+}
+
+interface TeacherSubject {
+  subject: Subject;
+}
 
 interface Teacher {
   id: string;
@@ -14,15 +30,40 @@ interface Teacher {
   role: string;
   isActive: boolean;
   createdAt: string;
+  teacher?: {
+    id: string;
+    subjects?: TeacherSubject[];
+  };
 }
 
-export default function SupervisorTeachersPage() {
+interface Class {
+  id: string;
+  name: string;
+  grade?: string;
+}
+
+export default function TeachersPage() {
   const router = useRouter();
   const { t } = useI18n();
   const [teachers, setTeachers] = useState<Teacher[]>([]);
+  const [subjects, setSubjects] = useState<Subject[]>([]);
+  const [classes, setClasses] = useState<Class[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
+  const [selectedTeacher, setSelectedTeacher] = useState<Teacher | null>(null);
+  const [showSubjectModal, setShowSubjectModal] = useState(false);
+  const [assigningSubject, setAssigningSubject] = useState(false);
+  const [selectedClassFilter, setSelectedClassFilter] = useState<string>('');
+  const [selectedSubjectForAssignment, setSelectedSubjectForAssignment] = useState<Subject | null>(null);
+  const [showClassSelection, setShowClassSelection] = useState(false);
+  const [editingAssignment, setEditingAssignment] = useState<any>(null);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [showAssignmentModal, setShowAssignmentModal] = useState(false);
+  const [selectedSubjectId, setSelectedSubjectId] = useState<string>('');
+  const [selectedClassId, setSelectedClassId] = useState<string>('');
+
 
   useEffect(() => {
     const token = localStorage.getItem('accessToken');
@@ -31,6 +72,8 @@ export default function SupervisorTeachersPage() {
       return;
     }
     fetchTeachers();
+    fetchSubjects();
+    fetchClasses();
   }, [router]);
 
   const fetchTeachers = async () => {
@@ -43,31 +86,279 @@ export default function SupervisorTeachersPage() {
         return;
       }
 
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/users?role=TEACHER`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-
-      if (response.status === 401) {
-        // Token expired or invalid, redirect to login
-        localStorage.removeItem('accessToken');
-        localStorage.removeItem('refreshToken');
-        router.push('/login');
-        return;
-      }
-
-      const data = await response.json();
-      if (response.ok) {
-        setTeachers(data.data || []);
-      } else {
-        setError(data.message || 'Error loading teachers');
-      }
+      const response = await apiClient.get('/teachers');
+      setTeachers((response as any) || []);
     } catch (err) {
       console.error('Error fetching teachers:', err);
       setError('Error loading teachers');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchSubjects = async () => {
+    try {
+      const response = await apiClient.get('/subjects');
+      setSubjects((response as any) || []);
+    } catch (err) {
+      console.error('Error fetching subjects:', err);
+    }
+  };
+
+  const fetchClasses = async () => {
+    try {
+      const response = await apiClient.get('/classes');
+      setClasses((response as any) || []);
+    } catch (err) {
+      console.error('Error fetching classes:', err);
+    }
+  };
+
+  const handleManageSubjects = (teacher: Teacher) => {
+    setSelectedTeacher(teacher);
+    setShowSubjectModal(true);
+    setSelectedClassFilter('');
+    setError('');
+    setSuccess('');
+  };
+
+  const handleDeleteTeacher = async (teacherId: string) => {
+    if (!confirm('Are you sure you want to delete this teacher? This action cannot be undone.')) {
+      return;
+    }
+
+    try {
+      setLoading(true);
+      await apiClient.delete(`/users/${teacherId}`);
+      setSuccess('Teacher deleted successfully!');
+      await fetchTeachers();
+      setTimeout(() => setSuccess(''), 3000);
+    } catch (err: any) {
+      console.error('Error deleting teacher:', err);
+      setError(err.response?.data?.message || 'Error deleting teacher');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleAssignSubject = async (subjectId: string) => {
+    if (!selectedTeacher?.teacher?.id) return;
+    
+    // Find the subject to show class selection
+    const subject = subjects.find(s => s.id === subjectId);
+    if (!subject) return;
+
+    setSelectedSubjectForAssignment(subject);
+    setShowClassSelection(true);
+  };
+
+  const handleOpenAssignmentModal = () => {
+    setShowAssignmentModal(true);
+    setSelectedSubjectId('');
+    setSelectedClassId('');
+    setError('');
+    setSuccess('');
+  };
+
+  const handleConfirmAssignment = async () => {
+    if (!selectedTeacher || !selectedSubjectId || !selectedClassId) {
+      setError('Please select both a subject and a class');
+      return;
+    }
+
+    try {
+      setAssigningSubject(true);
+      setError('');
+      await apiClient.post(`/subjects/${selectedSubjectId}/assign-teacher`, {
+        teacherId: selectedTeacher.id,
+        classId: selectedClassId,
+      });
+      setSuccess('Subject assigned successfully!');
+
+      // Refresh teachers data
+      await fetchTeachers();
+
+      // Update the selected teacher with fresh data
+      const updatedTeachersResponse = await apiClient.get('/teachers');
+      const updatedTeacher = ((updatedTeachersResponse as any) || []).find(
+        (t: Teacher) => t.id === selectedTeacher.id
+      );
+      if (updatedTeacher) {
+        setSelectedTeacher(updatedTeacher);
+      }
+
+      // Close assignment modal
+      setShowAssignmentModal(false);
+      setSelectedSubjectId('');
+      setSelectedClassId('');
+
+      setTimeout(() => setSuccess(''), 3000);
+    } catch (err: any) {
+      console.error('Error assigning subject:', err);
+      const errorMessage = err.response?.data?.message || 'Error assigning subject';
+
+      // Handle specific error cases
+      if (err.response?.status === 409) {
+        setError('This subject is already assigned to this teacher');
+      } else {
+        setError(errorMessage);
+      }
+
+      // Refresh data to sync UI with backend
+      await fetchTeachers();
+      const updatedTeachersResponse = await apiClient.get('/teachers');
+      const updatedTeacher = ((updatedTeachersResponse as any) || []).find(
+        (t: Teacher) => t.id === selectedTeacher.id
+      );
+      if (updatedTeacher) {
+        setSelectedTeacher(updatedTeacher);
+      }
+    } finally {
+      setAssigningSubject(false);
+    }
+  };
+
+  const handleConfirmClassAssignment = async (classId: string) => {
+    if (!selectedTeacher?.teacher?.id || !selectedSubjectForAssignment) return;
+    
+    try {
+      setAssigningSubject(true);
+      setError('');
+      await apiClient.post(`/subjects/${selectedSubjectForAssignment.id}/assign-teacher`, {
+        teacherId: selectedTeacher.teacher.id,
+        classId: classId,
+      });
+      setSuccess('Subject assigned successfully!');
+
+      // Refresh teachers data
+      await fetchTeachers();
+
+      // Update the selected teacher with fresh data
+      const updatedTeachersResponse = await apiClient.get('/teachers');
+      const updatedTeacher = ((updatedTeachersResponse as any) || []).find(
+        (t: Teacher) => t.id === selectedTeacher.id
+      );
+      if (updatedTeacher) {
+        setSelectedTeacher(updatedTeacher);
+      }
+
+      // Close class selection modal
+      setShowClassSelection(false);
+      setSelectedSubjectForAssignment(null);
+
+      setTimeout(() => setSuccess(''), 3000);
+    } catch (err: any) {
+      console.error('Error assigning subject:', err);
+      const errorMessage = err.response?.data?.message || 'Error assigning subject';
+
+      // Handle specific error cases
+      if (err.response?.status === 409) {
+        setError('This subject is already assigned to this teacher');
+      } else {
+        setError(errorMessage);
+      }
+
+      // Refresh data to sync UI with backend
+      await fetchTeachers();
+      const updatedTeachersResponse = await apiClient.get('/teachers');
+      const updatedTeacher = ((updatedTeachersResponse as any) || []).find(
+        (t: Teacher) => t.id === selectedTeacher.id
+      );
+      if (updatedTeacher) {
+        setSelectedTeacher(updatedTeacher);
+      }
+    } finally {
+      setAssigningSubject(false);
+    }
+  };
+
+  const handleUnassignSubject = async (subjectId: string) => {
+    if (!selectedTeacher?.teacher?.id) return;
+    
+    if (!confirm('Are you sure you want to unassign this subject?')) {
+      return;
+    }
+    
+    try {
+      setError('');
+      await apiClient.delete(`/subjects/${subjectId}/unassign-teacher/${selectedTeacher.teacher.id}`);
+      setSuccess('Subject unassigned successfully!');
+      
+      // Refresh teachers data
+      await fetchTeachers();
+      
+      // Update the selected teacher with fresh data
+      const updatedTeachersResponse = await apiClient.get('/teachers');
+      const updatedTeacher = ((updatedTeachersResponse as any) || []).find(
+        (t: Teacher) => t.id === selectedTeacher.id
+      );
+      if (updatedTeacher) {
+        setSelectedTeacher(updatedTeacher);
+      }
+      
+      setTimeout(() => setSuccess(''), 3000);
+    } catch (err: any) {
+      console.error('Error unassigning subject:', err);
+      setError(err.response?.data?.message || 'Error unassigning subject');
+      
+      // Refresh data to sync UI with backend
+      await fetchTeachers();
+      const updatedTeachersResponse = await apiClient.get('/teachers');
+      const updatedTeacher = ((updatedTeachersResponse as any) || []).find(
+        (t: Teacher) => t.id === selectedTeacher.id
+      );
+      if (updatedTeacher) {
+        setSelectedTeacher(updatedTeacher);
+      }
+    }
+  };
+
+  const handleEditAssignment = (assignment: any) => {
+    setEditingAssignment(assignment);
+    setShowEditModal(true);
+  };
+
+  const handleUpdateAssignment = async (newClassId: string) => {
+    if (!editingAssignment || !selectedTeacher?.teacher?.id) return;
+
+    try {
+      setAssigningSubject(true);
+      setError('');
+      
+      // First unassign the subject
+      await apiClient.delete(`/subjects/${editingAssignment.subject.id}/unassign-teacher/${selectedTeacher.teacher.id}`);
+      
+      // Then reassign with new class
+      await apiClient.post(`/subjects/${editingAssignment.subject.id}/assign-teacher`, {
+        teacherId: selectedTeacher.teacher.id,
+        classId: newClassId,
+      });
+      
+      setSuccess('Assignment updated successfully!');
+
+      // Refresh teachers data
+      await fetchTeachers();
+
+      // Update the selected teacher with fresh data
+      const updatedTeachersResponse = await apiClient.get('/teachers');
+      const updatedTeacher = ((updatedTeachersResponse as any) || []).find(
+        (t: Teacher) => t.id === selectedTeacher.id
+      );
+      if (updatedTeacher) {
+        setSelectedTeacher(updatedTeacher);
+      }
+
+      // Close edit modal
+      setShowEditModal(false);
+      setEditingAssignment(null);
+
+      setTimeout(() => setSuccess(''), 3000);
+    } catch (err: any) {
+      console.error('Error updating assignment:', err);
+      const errorMessage = err.response?.data?.message || 'Error updating assignment';
+      setError(errorMessage);
+    } finally {
+      setAssigningSubject(false);
     }
   };
 
@@ -81,8 +372,8 @@ export default function SupervisorTeachersPage() {
   };
 
   const filteredTeachers = teachers.filter((teacher) => {
-    const fullName = `${teacher.firstName} ${teacher.lastName}`.toLowerCase();
-    const email = teacher.email.toLowerCase();
+    const fullName = `${(teacher as any).user.firstName} ${(teacher as any).user.lastName}`.toLowerCase();
+    const email = (teacher as any).user.email.toLowerCase();
     const search = searchTerm.toLowerCase();
     return fullName.includes(search) || email.includes(search);
   });
@@ -90,14 +381,14 @@ export default function SupervisorTeachersPage() {
   return (
     <div className="min-h-screen gradient-bg">
       {/* Header */}
-      <nav className="gradient-secondary shadow-lg sticky top-0 z-40">
+      <nav className="gradient-primary shadow-lg sticky top-0 z-40">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center gap-3 min-w-0 flex-1">
               <button
-                onClick={() => router.push('/supervisor')}
+                onClick={() => router.push('/admin')}
                 className="w-10 h-10 bg-white/20 rounded-lg flex items-center justify-center backdrop-blur-sm hover:bg-white/30 transition-colors flex-shrink-0"
-                aria-label="Back to supervisor dashboard"
+                aria-label="Back to admin dashboard"
               >
                 <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
@@ -109,7 +400,7 @@ export default function SupervisorTeachersPage() {
                 </svg>
               </div>
               <h1 className="text-lg sm:text-xl font-bold text-white truncate">
-                Teachers
+                {t.admin.teachers}
               </h1>
             </div>
             <div className="flex items-center gap-2 sm:gap-4 flex-shrink-0">
@@ -128,17 +419,46 @@ export default function SupervisorTeachersPage() {
             </svg>
             <input
               type="text"
-              placeholder={t.users?.searchPlaceholder || 'Search teachers...'}
+              placeholder="Search teachers..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
             />
           </div>
         </div>
 
+        {/* Action Buttons */}
+        <div className="mb-6 flex justify-end">
+          <button
+            onClick={handleOpenAssignmentModal}
+            className="bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 transition-colors flex items-center gap-2"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+            </svg>
+            Assign Subject
+          </button>
+        </div>
+
         {error && (
-          <div className="mb-6 p-4 bg-red-50 border border-red-200 text-red-700 rounded-lg">
-            {error}
+          <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-xl">
+            <div className="flex items-center gap-3">
+              <svg className="w-5 h-5 text-red-500" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+              </svg>
+              <span className="text-red-700 font-medium">{error}</span>
+            </div>
+          </div>
+        )}
+
+        {success && (
+          <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-xl">
+            <div className="flex items-center gap-3">
+              <svg className="w-5 h-5 text-green-500" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+              </svg>
+              <span className="text-green-700 font-medium">{success}</span>
+            </div>
           </div>
         )}
 
@@ -150,7 +470,7 @@ export default function SupervisorTeachersPage() {
         ) : (
           <>
             <div className="mb-4 text-sm text-gray-600">
-              {t.users?.totalUsers || 'Total teachers'}: {filteredTeachers.length}
+              Total teachers: {filteredTeachers.length}
             </div>
 
             {/* Desktop Table View */}
@@ -159,16 +479,19 @@ export default function SupervisorTeachersPage() {
                 <thead className="bg-gradient-to-r from-purple-500 to-indigo-600">
                   <tr>
                     <th className="px-6 py-4 text-left text-xs font-medium text-white uppercase tracking-wider">
-                      {t.users?.name || 'Name'}
+                      Name
                     </th>
                     <th className="px-6 py-4 text-left text-xs font-medium text-white uppercase tracking-wider">
-                      {t.users?.email || 'Email'}
+                      Email
                     </th>
                     <th className="px-6 py-4 text-left text-xs font-medium text-white uppercase tracking-wider">
-                      {t.users?.status || 'Status'}
+                      Subjects
                     </th>
                     <th className="px-6 py-4 text-left text-xs font-medium text-white uppercase tracking-wider">
-                      Joined
+                      Status
+                    </th>
+                    <th className="px-6 py-4 text-center text-xs font-medium text-white uppercase tracking-wider">
+                      Actions
                     </th>
                   </tr>
                 </thead>
@@ -179,18 +502,35 @@ export default function SupervisorTeachersPage() {
                         <div className="flex items-center">
                           <div className="flex-shrink-0 h-10 w-10 bg-gradient-to-br from-purple-500 to-indigo-600 rounded-full flex items-center justify-center">
                             <span className="text-white font-semibold">
-                              {teacher.firstName[0]}{teacher.lastName[0]}
+                              {(teacher as any).user.firstName[0]}{(teacher as any).user.lastName[0]}
                             </span>
                           </div>
                           <div className="ml-4">
                             <div className="text-sm font-medium text-gray-900">
-                              {teacher.firstName} {teacher.lastName}
+                              {(teacher as any).user.firstName} {(teacher as any).user.lastName}
                             </div>
                           </div>
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm text-gray-900">{teacher.email}</div>
+                        <div className="text-sm text-gray-900">{(teacher as any).user.email}</div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="flex flex-wrap gap-1 max-w-xs">
+                          {teacher.teacher?.subjects && teacher.teacher.subjects.length > 0 ? (
+                            teacher.teacher.subjects.map((ts) => (
+                              <span
+                                key={ts.subject.id}
+                                className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-teal-100 text-teal-800"
+                                title={ts.subject.class ? `${ts.subject.class.name}${ts.subject.class.grade ? ' - ' + ts.subject.class.grade : ''}` : 'No class'}
+                              >
+                                {ts.subject.name}
+                              </span>
+                            ))
+                          ) : (
+                            <span className="text-xs text-gray-400 italic">No subjects assigned</span>
+                          )}
+                        </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <span
@@ -203,12 +543,27 @@ export default function SupervisorTeachersPage() {
                           {teacher.isActive ? t.users?.active || 'Active' : t.users?.inactive || 'Inactive'}
                         </span>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {new Date(teacher.createdAt).toLocaleDateString('en-US', { 
-                          year: 'numeric', 
-                          month: 'short', 
-                          day: 'numeric' 
-                        })}
+                      <td className="px-6 py-4 whitespace-nowrap text-center">
+                        <div className="flex items-center justify-center gap-2">
+                          <button
+                            onClick={() => handleManageSubjects(teacher)}
+                            className="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                          >
+                            <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                            </svg>
+                            Edit
+                          </button>
+                          <button
+                            onClick={() => handleDeleteTeacher(teacher.id)}
+                            className="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+                          >
+                            <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                            </svg>
+                            Delete
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -224,14 +579,14 @@ export default function SupervisorTeachersPage() {
                     <div className="flex items-center gap-3">
                       <div className="flex-shrink-0 h-12 w-12 bg-gradient-to-br from-purple-500 to-indigo-600 rounded-full flex items-center justify-center">
                         <span className="text-white font-semibold text-lg">
-                          {teacher.firstName[0]}{teacher.lastName[0]}
+                          {(teacher as any).user.firstName[0]}{(teacher as any).user.lastName[0]}
                         </span>
                       </div>
                       <div>
                         <div className="font-semibold text-gray-900">
-                          {teacher.firstName} {teacher.lastName}
+                          {(teacher as any).user.firstName} {(teacher as any).user.lastName}
                         </div>
-                        <div className="text-sm text-gray-600">{teacher.email}</div>
+                        <div className="text-sm text-gray-600">{(teacher as any).user.email}</div>
                       </div>
                     </div>
                     <span
@@ -244,12 +599,54 @@ export default function SupervisorTeachersPage() {
                       {teacher.isActive ? t.users?.active || 'Active' : t.users?.inactive || 'Inactive'}
                     </span>
                   </div>
-                  <div className="text-sm text-gray-500">
-                    Joined: {new Date(teacher.createdAt).toLocaleDateString('en-US', { 
-                      year: 'numeric', 
-                      month: 'short', 
-                      day: 'numeric' 
-                    })}
+                  
+                  {/* Subjects */}
+                  <div className="mb-3">
+                    <div className="text-xs font-semibold text-gray-700 mb-1">Subjects:</div>
+                    <div className="flex flex-wrap gap-1">
+                      {teacher.teacher?.subjects && teacher.teacher.subjects.length > 0 ? (
+                        teacher.teacher.subjects.map((ts) => (
+                          <span
+                            key={ts.subject.id}
+                            className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-teal-100 text-teal-800"
+                          >
+                            {ts.subject.name}
+                          </span>
+                        ))
+                      ) : (
+                        <span className="text-xs text-gray-400 italic">No subjects assigned</span>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between">
+                    <div className="text-sm text-gray-500">
+                      Joined: {new Date(teacher.createdAt).toLocaleDateString('en-US', { 
+                        year: 'numeric', 
+                        month: 'short', 
+                        day: 'numeric' 
+                      })}
+                    </div>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => handleManageSubjects(teacher)}
+                        className="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700"
+                      >
+                        <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                        </svg>
+                        Edit
+                      </button>
+                      <button
+                        onClick={() => handleDeleteTeacher(teacher.id)}
+                        className="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md text-white bg-red-600 hover:bg-red-700"
+                      >
+                        <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        </svg>
+                        Delete
+                      </button>
+                    </div>
                   </div>
                 </div>
               ))}
@@ -269,6 +666,541 @@ export default function SupervisorTeachersPage() {
           </>
         )}
       </main>
+
+      {/* Subject Management Modal */}
+      {showSubjectModal && selectedTeacher && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-2xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-6">
+              {/* Modal Header */}
+              <div className="flex items-center justify-between mb-6">
+                <div>
+                  <h3 className="text-2xl font-bold text-gray-900">
+                    Manage Subjects
+                  </h3>
+                  <p className="text-sm text-gray-600 mt-1">
+                    {selectedTeacher.firstName} {selectedTeacher.lastName}
+                  </p>
+                </div>
+                <button
+                  onClick={() => {
+                    setShowSubjectModal(false);
+                    setError('');
+                    setSuccess('');
+                  }}
+                  className="text-gray-400 hover:text-gray-600"
+                >
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+
+              {/* Modal Messages */}
+              {error && (
+                <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
+                  <div className="flex items-center gap-2">
+                    <svg className="w-4 h-4 text-red-500" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                    </svg>
+                    <span className="text-red-700 text-sm font-medium">{error}</span>
+                  </div>
+                </div>
+              )}
+
+              {success && (
+                <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg">
+                  <div className="flex items-center gap-2">
+                    <svg className="w-4 h-4 text-green-500" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                    </svg>
+                    <span className="text-green-700 text-sm font-medium">{success}</span>
+                  </div>
+                </div>
+              )}
+
+              {/* Assigned Subjects */}
+              <div className="mb-6">
+                <h4 className="font-semibold text-gray-900 mb-3">Currently Assigned Subjects</h4>
+                {selectedTeacher.teacher?.subjects && selectedTeacher.teacher.subjects.length > 0 ? (
+                  <div className="space-y-2">
+                    {selectedTeacher.teacher.subjects.map((ts) => (
+                      <div key={ts.subject.id} className="flex items-center justify-between bg-teal-50 p-3 rounded-lg border border-teal-200">
+                        <div className="flex-1">
+                          <div className="font-medium text-gray-900">{ts.subject.name}</div>
+                          {ts.subject.code && (
+                            <div className="text-xs text-gray-600">Code: {ts.subject.code}</div>
+                          )}
+                          {ts.subject.class ? (
+                            <div className="flex items-center gap-1 text-xs text-gray-600 mt-1">
+                              <svg className="w-3 h-3 text-cyan-500" fill="currentColor" viewBox="0 0 20 20">
+                                <path d="M10.394 2.08a1 1 0 00-.788 0l-7 3a1 1 0 000 1.84L5.25 8.051a.999.999 0 01.356-.257l4-1.714a1 1 0 11.788 1.838L7.667 9.088l1.94.831a1 1 0 00.787 0l7-3a1 1 0 000-1.838l-7-3z" />
+                              </svg>
+                              <span className="font-medium">Class: {ts.subject.class.name}</span>
+                              {ts.subject.class.grade && ` - ${ts.subject.class.grade}`}
+                            </div>
+                          ) : (
+                            <div className="flex items-center gap-1 text-xs text-amber-600 mt-1">
+                              <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                                <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                              </svg>
+                              <span className="italic">No class assigned</span>
+                            </div>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => handleEditAssignment(ts)}
+                            className="px-3 py-1.5 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 text-sm font-medium transition-colors"
+                            title="Edit assignment"
+                          >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                            </svg>
+                          </button>
+                          <button
+                            onClick={() => handleUnassignSubject(ts.subject.id)}
+                            className="px-3 py-1.5 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 text-sm font-medium transition-colors"
+                            title="Delete assignment"
+                          >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                            </svg>
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-gray-500 text-sm italic">No subjects currently assigned</p>
+                )}
+              </div>
+
+              {/* Available Subjects */}
+              <div>
+                <div className="flex items-center justify-between mb-3">
+                  <h4 className="font-semibold text-gray-900">Available Subjects</h4>
+                  <select
+                    value={selectedClassFilter}
+                    onChange={(e) => setSelectedClassFilter(e.target.value)}
+                    className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                  >
+                    <option value="">All Classes</option>
+                    {classes.map((cls) => (
+                      <option key={cls.id} value={cls.id}>
+                        {cls.name}{cls.grade ? ` - ${cls.grade}` : ''}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="space-y-2 max-h-60 overflow-y-auto">
+                  {subjects
+                    .filter(
+                      (subject) =>
+                        !selectedTeacher.teacher?.subjects?.some((ts) => ts.subject.id === subject.id) &&
+                        (!selectedClassFilter || subject.class?.id === selectedClassFilter)
+                    )
+                    .map((subject) => (
+                      <div key={subject.id} className="flex items-center justify-between bg-gray-50 p-3 rounded-lg border border-gray-200 hover:border-purple-300 transition-colors">
+                        <div className="flex-1">
+                          <div className="font-medium text-gray-900">{subject.name}</div>
+                          {subject.code && (
+                            <div className="text-xs text-gray-600">Code: {subject.code}</div>
+                          )}
+                          {subject.class ? (
+                            <div className="flex items-center gap-1 text-xs text-gray-600 mt-1">
+                              <svg className="w-3 h-3 text-cyan-500" fill="currentColor" viewBox="0 0 20 20">
+                                <path d="M10.394 2.08a1 1 0 00-.788 0l-7 3a1 1 0 000 1.84L5.25 8.051a.999.999 0 01.356-.257l4-1.714a1 1 0 11.788 1.838L7.667 9.088l1.94.831a1 1 0 00.787 0l7-3a1 1 0 000-1.838l-7-3z" />
+                              </svg>
+                              <span className="font-medium">Class: {subject.class.name}</span>
+                              {subject.class.grade && ` - ${subject.class.grade}`}
+                            </div>
+                          ) : (
+                            <div className="flex items-center gap-1 text-xs text-amber-600 mt-1">
+                              <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                                <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                              </svg>
+                              <span className="italic">No class assigned</span>
+                            </div>
+                          )}
+                        </div>
+                        <button
+                          onClick={() => handleAssignSubject(subject.id)}
+                          disabled={assigningSubject}
+                          className="ml-3 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                        >
+                          {assigningSubject ? 'Assigning...' : 'Assign'}
+                        </button>
+                      </div>
+                    ))}
+                  {subjects.filter(
+                    (subject) =>
+                      !selectedTeacher.teacher?.subjects?.some((ts) => ts.subject.id === subject.id) &&
+                      (!selectedClassFilter || subject.class?.id === selectedClassFilter)
+                  ).length === 0 && (
+                    <div className="text-center py-8">
+                      <svg className="mx-auto h-10 w-10 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                      </svg>
+                      <p className="text-gray-500 text-sm italic mt-2">
+                        {selectedClassFilter ? 'No subjects available for this class' : 'All subjects have been assigned'}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Close Button */}
+              <div className="mt-6 flex justify-end">
+                <button
+                  onClick={() => {
+                    setShowSubjectModal(false);
+                    setError('');
+                    setSuccess('');
+                  }}
+                  className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 font-medium"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Class Selection Modal */}
+      {showClassSelection && selectedSubjectForAssignment && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-2xl max-w-md w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold text-gray-900">Select Class for Subject</h3>
+                <button
+                  onClick={() => {
+                    setShowClassSelection(false);
+                    setSelectedSubjectForAssignment(null);
+                  }}
+                  className="text-gray-400 hover:text-gray-600 transition-colors"
+                >
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+
+              <div className="mb-4">
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
+                      <svg className="w-6 h-6 text-blue-600" fill="currentColor" viewBox="0 0 20 20">
+                        <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                    </div>
+                    <div>
+                      <h4 className="font-medium text-blue-900">Subject to Assign</h4>
+                      <p className="text-blue-700 text-sm">{selectedSubjectForAssignment.name}</p>
+                      {selectedSubjectForAssignment.code && (
+                        <p className="text-blue-600 text-xs">Code: {selectedSubjectForAssignment.code}</p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="mb-6">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Select the class for this subject:
+                </label>
+                <div className="space-y-2 max-h-60 overflow-y-auto">
+                  {classes.map((cls) => (
+                    <button
+                      key={cls.id}
+                      onClick={() => handleConfirmClassAssignment(cls.id)}
+                      disabled={assigningSubject}
+                      className="w-full p-4 text-left border border-gray-200 rounded-lg hover:border-blue-300 hover:bg-blue-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <div className="font-medium text-gray-900">{cls.name}</div>
+                          {cls.grade && (
+                            <div className="text-sm text-gray-600">Grade: {cls.grade}</div>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <svg className="w-5 h-5 text-blue-500" fill="currentColor" viewBox="0 0 20 20">
+                            <path fillRule="evenodd" d="M10.293 3.293a1 1 0 011.414 0l6 6a1 1 0 010 1.414l-6 6a1 1 0 01-1.414-1.414L14.586 11H3a1 1 0 110-2h11.586l-4.293-4.293a1 1 0 010-1.414z" clipRule="evenodd" />
+                          </svg>
+                        </div>
+                      </div>
+                    </button>
+                  ))}
+                  {classes.length === 0 && (
+                    <div className="text-center py-8">
+                      <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                      </svg>
+                      <p className="text-gray-500 text-sm mt-2">No classes available</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-3">
+                <button
+                  onClick={() => {
+                    setShowClassSelection(false);
+                    setSelectedSubjectForAssignment(null);
+                  }}
+                  className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Assignment Modal */}
+      {showEditModal && editingAssignment && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-2xl max-w-md w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold text-gray-900">Edit Assignment</h3>
+                <button
+                  onClick={() => {
+                    setShowEditModal(false);
+                    setEditingAssignment(null);
+                  }}
+                  className="text-gray-400 hover:text-gray-600 transition-colors"
+                >
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+
+              <div className="mb-4">
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
+                      <svg className="w-6 h-6 text-blue-600" fill="currentColor" viewBox="0 0 20 20">
+                        <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                    </div>
+                    <div>
+                      <h4 className="font-medium text-blue-900">Subject to Reassign</h4>
+                      <p className="text-blue-700 text-sm">{editingAssignment.subject.name}</p>
+                      {editingAssignment.subject.code && (
+                        <p className="text-blue-600 text-xs">Code: {editingAssignment.subject.code}</p>
+                      )}
+                      {editingAssignment.subject.class && (
+                        <p className="text-blue-600 text-xs">
+                          Current Class: {editingAssignment.subject.class.name}
+                          {editingAssignment.subject.class.grade && ` - ${editingAssignment.subject.class.grade}`}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="mb-6">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Select new class for this subject:
+                </label>
+                <div className="space-y-2 max-h-60 overflow-y-auto">
+                  {classes.map((cls) => (
+                    <button
+                      key={cls.id}
+                      onClick={() => handleUpdateAssignment(cls.id)}
+                      disabled={assigningSubject}
+                      className="w-full p-4 text-left border border-gray-200 rounded-lg hover:border-blue-300 hover:bg-blue-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <div className="font-medium text-gray-900">{cls.name}</div>
+                          {cls.grade && (
+                            <div className="text-sm text-gray-600">Grade: {cls.grade}</div>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <svg className="w-5 h-5 text-blue-500" fill="currentColor" viewBox="0 0 20 20">
+                            <path fillRule="evenodd" d="M10.293 3.293a1 1 0 011.414 0l6 6a1 1 0 010 1.414l-6 6a1 1 0 01-1.414-1.414L14.586 11H3a1 1 0 110-2h11.586l-4.293-4.293a1 1 0 010-1.414z" clipRule="evenodd" />
+                          </svg>
+                        </div>
+                      </div>
+                    </button>
+                  ))}
+                  {classes.length === 0 && (
+                    <div className="text-center py-8">
+                      <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                      </svg>
+                      <p className="text-gray-500 text-sm mt-2">No classes available</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-3">
+                <button
+                  onClick={() => {
+                    setShowEditModal(false);
+                    setEditingAssignment(null);
+                  }}
+                  className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Comprehensive Assignment Modal */}
+      {showAssignmentModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-2xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-6">
+              {/* Modal Header */}
+              <div className="flex items-center justify-between mb-6">
+                <div>
+                  <h3 className="text-2xl font-bold text-gray-900">
+                    Assign Subject to Teacher
+                  </h3>
+                  <p className="text-sm text-gray-600 mt-1">
+                    Select both a subject and a class for assignment
+                  </p>
+                </div>
+                <button
+                  onClick={() => setShowAssignmentModal(false)}
+                  className="text-gray-400 hover:text-gray-600 transition-colors"
+                >
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+
+              {/* Teacher Selection */}
+              <div className="mb-6">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Select Teacher
+                </label>
+                <select
+                  value={selectedTeacher?.id || ''}
+                  onChange={(e) => {
+                    const teacher = teachers.find(t => t.id === e.target.value);
+                    setSelectedTeacher(teacher || null);
+                  }}
+                  className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                >
+                  <option value="">Choose a teacher...</option>
+                  {teachers.map((teacher) => (
+                    <option key={teacher.id} value={teacher.id}>
+                      {(teacher as any).user.firstName} {(teacher as any).user.lastName} ({(teacher as any).user.email})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Subject Selection */}
+              <div className="mb-6">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Select Subject
+                </label>
+                <select
+                  value={selectedSubjectId}
+                  onChange={(e) => setSelectedSubjectId(e.target.value)}
+                  className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                >
+                  <option value="">Choose a subject...</option>
+                  {subjects.map((subject) => (
+                    <option key={subject.id} value={subject.id}>
+                      {subject.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Class Selection */}
+              <div className="mb-6">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Select Class
+                </label>
+                <select
+                  value={selectedClassId}
+                  onChange={(e) => setSelectedClassId(e.target.value)}
+                  className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                >
+                  <option value="">Choose a class...</option>
+                  {classes.map((cls) => (
+                    <option key={cls.id} value={cls.id}>
+                      {cls.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Error Message */}
+              {error && (
+                <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
+                  <div className="flex items-center gap-2">
+                    <svg className="w-4 h-4 text-red-500" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                    </svg>
+                    <span className="text-red-700 text-sm">{error}</span>
+                  </div>
+                </div>
+              )}
+
+              {/* Success Message */}
+              {success && (
+                <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg">
+                  <div className="flex items-center gap-2">
+                    <svg className="w-4 h-4 text-green-500" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                    </svg>
+                    <span className="text-green-700 text-sm">{success}</span>
+                  </div>
+                </div>
+              )}
+
+              {/* Modal Actions */}
+              <div className="flex justify-end gap-3">
+                <button
+                  onClick={() => setShowAssignmentModal(false)}
+                  className="px-6 py-3 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleConfirmAssignment}
+                  disabled={assigningSubject || !selectedTeacher || !selectedSubjectId || !selectedClassId}
+                  className="px-6 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                >
+                  {assigningSubject ? (
+                    <>
+                      <LoadingSpinner size="sm" />
+                      Assigning...
+                    </>
+                  ) : (
+                    <>
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                      </svg>
+                      Assign Subject
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

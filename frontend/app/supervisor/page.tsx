@@ -133,6 +133,49 @@ export default function SupervisorDashboard() {
               </div>
             </button>
 
+            {/* Subjects Card - Clickable */}
+            <button
+              onClick={() => router.push('/supervisor/subjects')}
+              className={`bg-white overflow-hidden rounded-xl hover-lift p-6 sm:p-7 border-2 border-teal-100 hover:border-teal-300 text-start group ${mounted ? 'animate-slide-up stagger-3' : 'opacity-0'}`}
+            >
+              <div className="flex items-start justify-between">
+                <div className="flex-1">
+                  <div className="w-12 h-12 bg-gradient-to-br from-teal-500 to-green-600 rounded-lg flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+                    <svg className="w-7 h-7 text-white" fill="currentColor" viewBox="0 0 20 20">
+                      <path d="M9 4.804A7.968 7.968 0 005.5 4c-1.255 0-2.443.29-3.5.804v10A7.969 7.969 0 015.5 14c1.669 0 3.218.51 4.5 1.385A7.962 7.962 0 0114.5 14c1.255 0 2.443.29 3.5.804v-10A7.968 7.968 0 0014.5 4c-1.255 0-2.443.29-3.5.804V12a1 1 0 11-2 0V4.804z" />
+                    </svg>
+                  </div>
+                  <h3 className="text-xl font-bold text-gray-900 mb-2">Subjects</h3>
+                  <p className="text-sm text-gray-600">Manage subjects</p>
+                </div>
+                <svg className="w-6 h-6 text-teal-500 flex-shrink-0 ms-2 rtl:rotate-180 group-hover:translate-x-1 rtl:group-hover:-translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                </svg>
+              </div>
+            </button>
+
+            {/* Classes Card - Clickable */}
+            <button
+              onClick={() => router.push('/supervisor/classes')}
+              className={`bg-white overflow-hidden rounded-xl hover-lift p-6 sm:p-7 border-2 border-cyan-100 hover:border-cyan-300 text-start group ${mounted ? 'animate-slide-up stagger-4' : 'opacity-0'}`}
+            >
+              <div className="flex items-start justify-between">
+                <div className="flex-1">
+                  <div className="w-12 h-12 bg-gradient-to-br from-cyan-500 to-blue-600 rounded-lg flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+                    <svg className="w-7 h-7 text-white" fill="currentColor" viewBox="0 0 20 20">
+                      <path d="M10.394 2.08a1 1 0 00-.788 0l-7 3a1 1 0 000 1.84L5.25 8.051a.999.999 0 01.356-.257l4-1.714a1 1 0 11.788 1.838L7.667 9.088l1.94.831a1 1 0 00.787 0l7-3a1 1 0 000-1.838l-7-3z" />
+                      <path d="M3.5 9.289l6.106 2.617a1 1 0 00.788 0L16.5 9.29V13.5a1.5 1.5 0 01-1.5 1.5h-10A1.5 1.5 0 013.5 13.5V9.289z" />
+                    </svg>
+                  </div>
+                  <h3 className="text-xl font-bold text-gray-900 mb-2">Classes</h3>
+                  <p className="text-sm text-gray-600">Manage classes</p>
+                </div>
+                <svg className="w-6 h-6 text-cyan-500 flex-shrink-0 ms-2 rtl:rotate-180 group-hover:translate-x-1 rtl:group-hover:-translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                </svg>
+              </div>
+            </button>
+
             {/* Evaluations Card */}
             <div className={`bg-white overflow-hidden rounded-xl hover-lift p-6 sm:p-7 border-2 border-amber-100 hover:border-amber-300 group ${mounted ? 'animate-slide-up stagger-3' : 'opacity-0'}`}>
               <div className="w-12 h-12 bg-gradient-to-br from-amber-500 to-orange-500 rounded-lg flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">

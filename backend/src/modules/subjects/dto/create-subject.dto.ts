@@ -6,15 +6,15 @@ export class CreateSubjectDto {
   name: string;
 
   @IsString()
-  @IsNotEmpty()
-  code: string;
+  @IsOptional()
+  code?: string;
 
   @IsString()
   @IsOptional()
   description?: string;
 
   @IsString()
-  @IsNotEmpty()
-  classId: string;
+  @IsOptional()
+  classId?: string;
 }
 

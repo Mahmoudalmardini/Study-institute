@@ -131,8 +131,8 @@ model Teacher {
 model Class {
   id           String   @id @default(uuid())
   name         String
-  grade        String
-  academicYear String
+  grade        String?
+  academicYear String?
   teacherId    String?
   teacher      Teacher? @relation(fields: [teacherId], references: [id], onDelete: SetNull)
   createdAt    DateTime @default(now())
@@ -150,7 +150,7 @@ model Class {
 model Subject {
   id          String   @id @default(uuid())
   name        String
-  code        String   @unique
+  code        String?
   description String?
   classId     String?
   class       Class?   @relation(fields: [classId], references: [id], onDelete: SetNull)
@@ -163,6 +163,7 @@ model Subject {
   students  StudentSubject[]
 
   @@index([classId])
+  @@index([code])
   @@map("subjects")
 }
 

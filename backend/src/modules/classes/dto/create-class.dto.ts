@@ -6,12 +6,12 @@ export class CreateClassDto {
   name: string;
 
   @IsString()
-  @IsNotEmpty()
-  grade: string;
+  @IsOptional()
+  grade?: string;
 
   @IsString()
-  @IsNotEmpty()
-  academicYear: string;
+  @IsOptional()
+  academicYear?: string;
 
   @IsString()
   @IsOptional()

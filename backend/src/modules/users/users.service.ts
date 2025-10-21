@@ -29,6 +29,23 @@ export class UsersService {
       },
     });
 
+    // Create Teacher or Student record based on role
+    if (dto.role === 'TEACHER') {
+      await this.prisma.teacher.create({
+        data: {
+          userId: user.id,
+          hireDate: new Date(),
+        },
+      });
+    } else if (dto.role === 'STUDENT') {
+      await this.prisma.student.create({
+        data: {
+          userId: user.id,
+          enrollmentDate: new Date(),
+        },
+      });
+    }
+
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { password, ...userWithoutPassword } = user;
     return userWithoutPassword;
@@ -47,6 +64,39 @@ export class UsersService {
         isActive: true,
         createdAt: true,
         updatedAt: true,
+        teacher: {
+          select: {
+            id: true,
+            subjects: {
+              include: {
+                subject: {
+                  include: {
+                    class: {
+                      select: {
+                        id: true,
+                        name: true,
+                        grade: true,
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+        student: {
+          select: {
+            id: true,
+            classId: true,
+            class: {
+              select: {
+                id: true,
+                name: true,
+                grade: true,
+              },
+            },
+          },
+        },
       },
       orderBy: { createdAt: 'desc' },
     });
@@ -82,6 +132,10 @@ export class UsersService {
   async update(id: string, dto: UpdateUserDto) {
     const existingUser = await this.prisma.user.findUnique({
       where: { id },
+      include: {
+        teacher: true,
+        student: true,
+      },
     });
 
     if (!existingUser) {
@@ -108,6 +162,23 @@ export class UsersService {
       where: { id },
       data: updateData,
     });
+
+    // Handle role changes - create Teacher/Student records if needed
+    if (dto.role === 'TEACHER' && !existingUser.teacher) {
+      await this.prisma.teacher.create({
+        data: {
+          userId: user.id,
+          hireDate: new Date(),
+        },
+      });
+    } else if (dto.role === 'STUDENT' && !existingUser.student) {
+      await this.prisma.student.create({
+        data: {
+          userId: user.id,
+          enrollmentDate: new Date(),
+        },
+      });
+    }
 
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { password, ...userWithoutPassword } = user;

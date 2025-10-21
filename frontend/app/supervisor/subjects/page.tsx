@@ -256,7 +256,7 @@ export default function SubjectsPage() {
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center min-w-0 flex-1 gap-3">
               <button
-                onClick={() => router.push('/admin')}
+                onClick={() => router.push('/supervisor')}
                 className="w-10 h-10 bg-white/20 rounded-lg flex items-center justify-center backdrop-blur-sm flex-shrink-0 hover:bg-white/30 transition-colors"
               >
                 <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
