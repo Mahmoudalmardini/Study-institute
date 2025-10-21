@@ -150,7 +150,7 @@ export class HomeworkService {
     }
 
     // Check if the teacher owns this homework
-    if (homework.teacher.userId !== teacherId) {
+    if (homework.teacher && homework.teacher.userId !== teacherId) {
       throw new ForbiddenException('You can only update your own homework');
     }
 
@@ -186,7 +186,7 @@ export class HomeworkService {
     }
 
     // Check if the teacher owns this homework
-    if (homework.teacher.userId !== teacherId) {
+    if (homework.teacher && homework.teacher.userId !== teacherId) {
       throw new ForbiddenException('You can only delete your own homework');
     }
 
@@ -216,12 +216,10 @@ export class HomeworkService {
     }
 
     // Check if student already submitted
-    const existingSubmission = await this.prisma.submission.findUnique({
+    const existingSubmission = await this.prisma.submission.findFirst({
       where: {
-        homeworkId_studentId: {
-          homeworkId: dto.homeworkId,
-          studentId: student.id,
-        },
+        homeworkId: dto.homeworkId,
+        studentId: student.id,
       },
     });
 
@@ -229,7 +227,7 @@ export class HomeworkService {
       throw new BadRequestException('You have already submitted this homework');
     }
 
-    const isLate = new Date() > new Date(homework.dueDate);
+    const isLate = homework.dueDate ? new Date() > new Date(homework.dueDate) : false;
 
     const submission = await this.prisma.submission.create({
       data: {
@@ -320,7 +318,7 @@ export class HomeworkService {
     }
 
     // Check if the teacher owns this homework
-    if (submission.homework.teacher.userId !== teacherId) {
+    if (submission.homework && submission.homework.teacher && submission.homework.teacher.userId !== teacherId) {
       throw new ForbiddenException(
         'You can only grade submissions for your homework',
       );
@@ -363,7 +361,7 @@ export class HomeworkService {
     }
 
     // If teacher ID is provided, verify ownership
-    if (teacherId && homework.teacher.userId !== teacherId) {
+    if (teacherId && homework.teacher && homework.teacher.userId !== teacherId) {
       throw new ForbiddenException(
         'You can only view submissions for your homework',
       );
@@ -562,7 +560,7 @@ export class HomeworkService {
     }
 
     // Check if the teacher owns this homework
-    if (submission.homework.teacher.userId !== teacherId) {
+    if (submission.homework && submission.homework.teacher && submission.homework.teacher.userId !== teacherId) {
       throw new ForbiddenException(
         'You can only evaluate submissions for your homework',
       );
@@ -715,13 +713,194 @@ export class HomeworkService {
     // Format the results for the student
     return submissions.map((submission) => ({
       id: submission.id,
-      homeworkId: submission.homework.id,
-      homeworkTitle: submission.homework.title,
-      homeworkDescription: submission.homework.description,
+      homeworkId: submission.homework?.id,
+      homeworkTitle: submission.homework?.title || submission.title,
+      homeworkDescription: submission.homework?.description || submission.description,
       submittedAt: submission.submittedAt,
       result: submission.adminEvaluation,
       feedback: submission.adminFeedback,
       reviewedAt: submission.adminReviewedAt,
     }));
+  }
+
+  // Submit homework directly to a subject (no assignment required)
+  async submitToSubject(
+    studentUserId: string,
+    dto: any,
+    files?: Express.Multer.File[],
+  ) {
+    console.log('[submitToSubject] Student user ID:', studentUserId);
+    console.log('[submitToSubject] DTO:', dto);
+    console.log('[submitToSubject] Files received:', files?.length || 0);
+
+    // Find student profile
+    let student = await this.prisma.student.findUnique({
+      where: { userId: studentUserId },
+    });
+
+    if (!student) {
+      // Auto-create student profile if it doesn't exist
+      student = await this.prisma.student.create({
+        data: { userId: studentUserId },
+      });
+    }
+
+    // Verify subject exists
+    const subject = await this.prisma.subject.findUnique({
+      where: { id: dto.subjectId },
+      include: {
+        class: true,
+      },
+    });
+
+    if (!subject) {
+      throw new NotFoundException('Subject not found');
+    }
+
+    // Verify student is enrolled in this subject
+    const enrollment = await this.prisma.studentSubject.findUnique({
+      where: {
+        studentId_subjectId: {
+          studentId: student.id,
+          subjectId: subject.id,
+        },
+      },
+    });
+
+    if (!enrollment) {
+      throw new ForbiddenException(
+        'You are not enrolled in this subject',
+      );
+    }
+
+    // Build file URLs from uploaded files
+    const fileUrls = files ? files.map((f) => f.path) : [];
+
+    // Create submission directly to subject (without homework assignment)
+    const submission = await this.prisma.submission.create({
+      data: {
+        title: dto.title,
+        description: dto.description,
+        subjectId: subject.id,
+        studentId: student.id,
+        submittedAt: new Date(),
+        status: 'PENDING',
+        fileUrls: fileUrls,
+      },
+      include: {
+        student: {
+          include: {
+            user: {
+              select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+                email: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    console.log('[submitToSubject] Created submission:', submission);
+    return submission;
+  }
+
+  // Get submissions by subject
+  async getSubmissionsBySubject(subjectId: string, teacherUserId?: string) {
+    const subject = await this.prisma.subject.findUnique({
+      where: { id: subjectId },
+    });
+
+    if (!subject) {
+      throw new NotFoundException('Subject not found');
+    }
+
+    // If teacher is specified, verify they teach this subject
+    if (teacherUserId) {
+      const teacher = await this.prisma.teacher.findUnique({
+        where: { userId: teacherUserId },
+      });
+
+      if (teacher) {
+        const teacherSubject = await this.prisma.teacherSubject.findUnique({
+          where: {
+            teacherId_subjectId: {
+              teacherId: teacher.id,
+              subjectId: subjectId,
+            },
+          },
+        });
+
+        if (!teacherSubject) {
+          throw new ForbiddenException(
+            'You do not teach this subject',
+          );
+        }
+      }
+    }
+
+    const submissions = await this.prisma.submission.findMany({
+      where: { subjectId },
+      include: {
+        student: {
+          include: {
+            user: {
+              select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+                email: true,
+              },
+            },
+          },
+        },
+      },
+      orderBy: { submittedAt: 'desc' },
+    });
+
+    return submissions;
+  }
+
+  // Get student's subjects for homework submission
+  async getStudentSubjects(studentUserId: string) {
+    let student = await this.prisma.student.findUnique({
+      where: { userId: studentUserId },
+    });
+
+    if (!student) {
+      // Auto-create student profile if it doesn't exist
+      student = await this.prisma.student.create({
+        data: { userId: studentUserId },
+      });
+    }
+
+    return this.prisma.studentSubject.findMany({
+      where: { studentId: student.id },
+      include: {
+        subject: {
+          include: {
+            class: true,
+            teachers: {
+              include: {
+                teacher: {
+                  include: {
+                    user: {
+                      select: {
+                        id: true,
+                        firstName: true,
+                        lastName: true,
+                        email: true,
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    });
   }
 }

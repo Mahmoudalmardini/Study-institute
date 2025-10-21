@@ -16,6 +16,9 @@ import { GradesModule } from './modules/grades/grades.module';
 import { AnnouncementsModule } from './modules/announcements/announcements.module';
 import { EvaluationsModule } from './modules/evaluations/evaluations.module';
 import { StudentTeachersModule } from './modules/student-teachers/student-teachers.module';
+import { ClassesModule } from './modules/classes/classes.module';
+import { SubjectsModule } from './modules/subjects/subjects.module';
+import { TeachersModule } from './modules/teachers/teachers.module';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import { AllExceptionsFilter } from './common/filters/http-exception.filter';
 import { TransformInterceptor } from './common/interceptors/transform.interceptor';
@@ -46,6 +49,9 @@ import { TransformInterceptor } from './common/interceptors/transform.intercepto
     AnnouncementsModule,
     EvaluationsModule,
     StudentTeachersModule,
+    ClassesModule,
+    SubjectsModule,
+    TeachersModule,
   ],
   controllers: [AppController],
   providers: [

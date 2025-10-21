@@ -12,6 +12,7 @@ import {
 import { StudentsService } from './students.service';
 import { CreateStudentDto } from './dto/create-student.dto';
 import { UpdateStudentDto } from './dto/update-student.dto';
+import { EnrollSubjectsDto } from './dto/enroll-subjects.dto';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { Role } from '@prisma/client';
@@ -57,5 +58,25 @@ export class StudentsController {
   @Roles(Role.ADMIN)
   remove(@Param('id') id: string) {
     return this.studentsService.remove(id);
+  }
+
+  @Post(':id/enroll-subjects')
+  @Roles(Role.ADMIN, Role.SUPERVISOR)
+  enrollSubjects(
+    @Param('id') id: string,
+    @Body() enrollSubjectsDto: EnrollSubjectsDto,
+    @CurrentUser() user: CurrentUserData,
+  ) {
+    return this.studentsService.enrollSubjects(
+      id,
+      enrollSubjectsDto.subjectIds,
+      user.id,
+    );
+  }
+
+  @Get(':id/subjects')
+  @Roles(Role.ADMIN, Role.SUPERVISOR, Role.TEACHER, Role.STUDENT)
+  getStudentSubjects(@Param('id') id: string) {
+    return this.studentsService.getStudentSubjects(id);
   }
 }

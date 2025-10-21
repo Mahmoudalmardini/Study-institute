@@ -30,8 +30,30 @@ export class StudentsService {
       );
     }
 
+    // Validate class exists if provided
+    if (dto.classId) {
+      const classExists = await this.prisma.class.findUnique({
+        where: { id: dto.classId },
+      });
+      if (!classExists) {
+        throw new NotFoundException('Class not found');
+      }
+    }
+
+    // Validate subjects exist if provided
+    if (dto.subjectIds && dto.subjectIds.length > 0) {
+      const subjects = await this.prisma.subject.findMany({
+        where: { id: { in: dto.subjectIds } },
+      });
+      if (subjects.length !== dto.subjectIds.length) {
+        throw new NotFoundException('One or more subjects not found');
+      }
+    }
+
+    const { subjectIds, ...studentData } = dto;
+
     const student = await this.prisma.student.create({
-      data: dto,
+      data: studentData,
       include: {
         user: {
           select: {
@@ -43,10 +65,20 @@ export class StudentsService {
           },
         },
         class: true,
+        subjects: {
+          include: {
+            subject: true,
+          },
+        },
       },
     });
 
-    return student;
+    // Enroll student in subjects if provided
+    if (subjectIds && subjectIds.length > 0) {
+      await this.enrollSubjects(student.id, subjectIds, user.id);
+    }
+
+    return this.findOne(student.id);
   }
 
   async findAll(classId?: string) {
@@ -63,6 +95,11 @@ export class StudentsService {
           },
         },
         class: true,
+        _count: {
+          select: {
+            subjects: true,
+          },
+        },
       },
       orderBy: { enrollmentDate: 'desc' },
     });
@@ -84,6 +121,15 @@ export class StudentsService {
           },
         },
         class: true,
+        subjects: {
+          include: {
+            subject: {
+              include: {
+                class: true,
+              },
+            },
+          },
+        },
         grades: {
           include: {
             subject: true,
@@ -226,5 +272,92 @@ export class StudentsService {
     });
 
     return { message: 'Student deleted successfully' };
+  }
+
+  async enrollSubjects(
+    studentId: string,
+    subjectIds: string[],
+    enrolledBy: string,
+  ) {
+    await this.findOne(studentId); // Validate student exists
+
+    // Validate all subjects exist
+    const subjects = await this.prisma.subject.findMany({
+      where: { id: { in: subjectIds } },
+    });
+
+    if (subjects.length !== subjectIds.length) {
+      throw new NotFoundException('One or more subjects not found');
+    }
+
+    // Remove existing enrollments not in the new list
+    await this.prisma.studentSubject.deleteMany({
+      where: {
+        studentId,
+        subjectId: { notIn: subjectIds },
+      },
+    });
+
+    // Create new enrollments (skip if already exists)
+    const enrollments = await Promise.all(
+      subjectIds.map(async (subjectId) => {
+        const existing = await this.prisma.studentSubject.findUnique({
+          where: {
+            studentId_subjectId: {
+              studentId,
+              subjectId,
+            },
+          },
+        });
+
+        if (existing) {
+          return existing;
+        }
+
+        return this.prisma.studentSubject.create({
+          data: {
+            studentId,
+            subjectId,
+            enrolledBy,
+          },
+          include: {
+            subject: true,
+          },
+        });
+      }),
+    );
+
+    return enrollments;
+  }
+
+  async getStudentSubjects(studentId: string) {
+    await this.findOne(studentId); // Validate student exists
+
+    return this.prisma.studentSubject.findMany({
+      where: { studentId },
+      include: {
+        subject: {
+          include: {
+            class: true,
+            teachers: {
+              include: {
+                teacher: {
+                  include: {
+                    user: {
+                      select: {
+                        id: true,
+                        firstName: true,
+                        lastName: true,
+                        email: true,
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    });
   }
 }

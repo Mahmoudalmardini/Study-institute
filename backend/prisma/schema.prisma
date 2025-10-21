@@ -102,6 +102,7 @@ model Student {
   grades        Grade[]
   evaluations   Evaluation[]
   teachers      StudentTeacher[]
+  subjects      StudentSubject[]
 
   @@index([userId])
   @@index([classId])
@@ -121,6 +122,7 @@ model Teacher {
   grades      Grade[]
   evaluations Evaluation[]
   students    StudentTeacher[]
+  subjects    TeacherSubject[]
 
   @@index([userId])
   @@map("teachers")
@@ -155,7 +157,10 @@ model Subject {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  grades Grade[]
+  grades    Grade[]
+  homework  Homework[]
+  teachers  TeacherSubject[]
+  students  StudentSubject[]
 
   @@index([classId])
   @@map("subjects")
@@ -165,11 +170,13 @@ model Homework {
   id          String   @id @default(uuid())
   title       String
   description String
-  dueDate     DateTime
+  dueDate     DateTime?
   classId     String?
   class       Class?   @relation(fields: [classId], references: [id], onDelete: SetNull)
-  teacherId   String
-  teacher     Teacher  @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+  subjectId   String?
+  subject     Subject? @relation(fields: [subjectId], references: [id], onDelete: SetNull)
+  teacherId   String?
+  teacher     Teacher? @relation(fields: [teacherId], references: [id], onDelete: Cascade)
   fileUrls    String[]
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
@@ -178,6 +185,7 @@ model Homework {
   files       File[]
 
   @@index([classId])
+  @@index([subjectId])
   @@index([teacherId])
   @@index([dueDate])
   @@map("homework")
@@ -185,8 +193,11 @@ model Homework {
 
 model Submission {
   id          String           @id @default(uuid())
-  homeworkId  String
-  homework    Homework         @relation(fields: [homeworkId], references: [id], onDelete: Cascade)
+  title       String?
+  description String?
+  homeworkId  String?
+  homework    Homework?        @relation(fields: [homeworkId], references: [id], onDelete: Cascade)
+  subjectId   String?
   studentId   String
   student     Student          @relation(fields: [studentId], references: [id], onDelete: Cascade)
   submittedAt DateTime?
@@ -212,8 +223,8 @@ model Submission {
 
   files File[]
 
-  @@unique([homeworkId, studentId])
   @@index([homeworkId])
+  @@index([subjectId])
   @@index([studentId])
   @@index([status])
   @@index([reviewStatus])
@@ -325,4 +336,40 @@ model StudentTeacher {
   @@index([teacherId])
   @@index([assignedBy])
   @@map("student_teachers")
+}
+
+model TeacherSubject {
+  id          String   @id @default(uuid())
+  teacherId   String
+  teacher     Teacher  @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+  subjectId   String
+  subject     Subject  @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  assignedBy  String   // User ID of admin/supervisor who made the assignment
+  assignedAt  DateTime @default(now())
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([teacherId, subjectId])
+  @@index([teacherId])
+  @@index([subjectId])
+  @@index([assignedBy])
+  @@map("teacher_subjects")
+}
+
+model StudentSubject {
+  id          String   @id @default(uuid())
+  studentId   String
+  student     Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  subjectId   String
+  subject     Subject  @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  enrolledBy  String   // User ID of admin/supervisor who made the enrollment
+  enrolledAt  DateTime @default(now())
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([studentId, subjectId])
+  @@index([studentId])
+  @@index([subjectId])
+  @@index([enrolledBy])
+  @@map("student_subjects")
 }

@@ -197,4 +197,35 @@ export class HomeworkController {
     const teacherId = user.role === Role.TEACHER ? user.id : undefined;
     return this.homeworkService.getSubmissions(homeworkId, teacherId);
   }
+
+  // Subject-based submission endpoints
+  @Post('submit-to-subject')
+  @Roles(Role.STUDENT)
+  @UseInterceptors(FilesInterceptor('files', 10))
+  submitToSubject(
+    @CurrentUser() user: CurrentUserData,
+    @Body() dto: any,
+    @UploadedFiles() files: Express.Multer.File[],
+  ) {
+    console.log('[Controller] submitToSubject called by user:', user.id);
+    console.log('[Controller] submitToSubject dto:', dto);
+    console.log('[Controller] submitToSubject files:', files);
+    return this.homeworkService.submitToSubject(user.id, dto, files);
+  }
+
+  @Get('submissions/by-subject/:subjectId')
+  @Roles(Role.TEACHER, Role.ADMIN, Role.SUPERVISOR)
+  getSubmissionsBySubject(
+    @CurrentUser() user: CurrentUserData,
+    @Param('subjectId') subjectId: string,
+  ) {
+    const teacherId = user.role === Role.TEACHER ? user.id : undefined;
+    return this.homeworkService.getSubmissionsBySubject(subjectId, teacherId);
+  }
+
+  @Get('my-subjects')
+  @Roles(Role.STUDENT)
+  getMySubjects(@CurrentUser() user: CurrentUserData) {
+    return this.homeworkService.getStudentSubjects(user.id);
+  }
 }

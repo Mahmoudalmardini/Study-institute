@@ -4,6 +4,7 @@ import {
   IsEmail,
   IsOptional,
   IsUUID,
+  IsArray,
 } from 'class-validator';
 
 export class CreateStudentDto {
@@ -22,4 +23,9 @@ export class CreateStudentDto {
   @IsUUID()
   @IsOptional()
   classId?: string;
+
+  @IsArray()
+  @IsUUID('4', { each: true })
+  @IsOptional()
+  subjectIds?: string[];
 }
