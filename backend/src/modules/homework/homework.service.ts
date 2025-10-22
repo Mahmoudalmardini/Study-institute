@@ -824,12 +824,10 @@ export class HomeworkService {
       });
 
       if (teacher) {
-        const teacherSubject = await this.prisma.teacherSubject.findUnique({
+        const teacherSubject = await this.prisma.teacherSubject.findFirst({
           where: {
-            teacherId_subjectId: {
-              teacherId: teacher.id,
-              subjectId: subjectId,
-            },
+            teacherId: teacher.id,
+            subjectId: subjectId,
           },
         });
 

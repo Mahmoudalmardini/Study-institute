@@ -255,18 +255,20 @@ export class SubjectsService {
       throw new NotFoundException(`Class with ID ${classId} not found`);
     }
 
-    // Check if already assigned to this subject
-    const existing = await this.prisma.teacherSubject.findUnique({
+    // Check if teacher is already assigned to this subject
+    const existing = await this.prisma.teacherSubject.findFirst({
       where: {
-        teacherId_subjectId: {
-          teacherId,
-          subjectId,
-        },
+        teacherId,
+        subjectId,
+      },
+      include: {
+        subject: true,
       },
     });
 
+    // If teacher is already assigned to this subject, prevent duplicate assignment
     if (existing) {
-      throw new ConflictException('Teacher is already assigned to this subject');
+      throw new ConflictException('Teacher is already assigned to this subject. Please unassign the teacher first if you want to change the class assignment.');
     }
 
     // Update subject to be assigned to the class if not already assigned
@@ -310,12 +312,10 @@ export class SubjectsService {
     await this.findOne(subjectId);
 
     // Check if assignment exists
-    const assignment = await this.prisma.teacherSubject.findUnique({
+    const assignment = await this.prisma.teacherSubject.findFirst({
       where: {
-        teacherId_subjectId: {
-          teacherId,
-          subjectId,
-        },
+        teacherId,
+        subjectId,
       },
     });
 
@@ -325,10 +325,7 @@ export class SubjectsService {
 
     return this.prisma.teacherSubject.delete({
       where: {
-        teacherId_subjectId: {
-          teacherId,
-          subjectId,
-        },
+        id: assignment.id,
       },
     });
   }

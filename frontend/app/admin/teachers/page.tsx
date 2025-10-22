@@ -19,21 +19,20 @@ interface Subject {
 }
 
 interface TeacherSubject {
+  id: string;
   subject: Subject;
 }
 
 interface Teacher {
   id: string;
-  email: string;
-  firstName: string;
-  lastName: string;
-  role: string;
-  isActive: boolean;
-  createdAt: string;
-  teacher?: {
+  user: {
     id: string;
-    subjects?: TeacherSubject[];
+    email: string;
+    firstName: string;
+    lastName: string;
   };
+  subjects?: TeacherSubject[];
+  hireDate: string;
 }
 
 interface Class {
@@ -63,6 +62,8 @@ export default function TeachersPage() {
   const [showAssignmentModal, setShowAssignmentModal] = useState(false);
   const [selectedSubjectId, setSelectedSubjectId] = useState<string>('');
   const [selectedClassId, setSelectedClassId] = useState<string>('');
+  const [editSubjectId, setEditSubjectId] = useState<string>('');
+  const [editClassId, setEditClassId] = useState<string>('');
 
 
   useEffect(() => {
@@ -83,14 +84,17 @@ export default function TeachersPage() {
       
       if (!token) {
         router.push('/login');
-        return;
+        return [];
       }
 
       const response = await apiClient.get('/teachers');
-      setTeachers((response as any) || []);
+      const teachersData = (response as any) || [];
+      setTeachers(teachersData);
+      return teachersData;
     } catch (err) {
       console.error('Error fetching teachers:', err);
       setError('Error loading teachers');
+      return [];
     } finally {
       setLoading(false);
     }
@@ -122,27 +126,29 @@ export default function TeachersPage() {
     setSuccess('');
   };
 
-  const handleDeleteTeacher = async (teacherId: string) => {
-    if (!confirm('Are you sure you want to delete this teacher? This action cannot be undone.')) {
+  const handleDeleteTeacher = async (userId: string, teacherName: string) => {
+    if (!confirm(`Are you sure you want to permanently delete the teacher account for ${teacherName}?\n\nThis will:\n- Delete the teacher's user account\n- Remove all subject assignments\n- Delete all related data\n\nThis action CANNOT be undone.`)) {
       return;
     }
 
     try {
       setLoading(true);
-      await apiClient.delete(`/users/${teacherId}`);
-      setSuccess('Teacher deleted successfully!');
+      await apiClient.delete(`/users/${userId}`);
+      setSuccess(`Teacher account for ${teacherName} has been permanently deleted!`);
       await fetchTeachers();
-      setTimeout(() => setSuccess(''), 3000);
+      setTimeout(() => setSuccess(''), 5000);
     } catch (err: any) {
       console.error('Error deleting teacher:', err);
-      setError(err.response?.data?.message || 'Error deleting teacher');
+      const errorMsg = err.response?.data?.message || 'Error deleting teacher account';
+      setError(`Failed to delete teacher: ${errorMsg}`);
+      setTimeout(() => setError(''), 5000);
     } finally {
       setLoading(false);
     }
   };
 
   const handleAssignSubject = async (subjectId: string) => {
-    if (!selectedTeacher?.teacher?.id) return;
+    if (!selectedTeacher?.id) return;
     
     // Find the subject to show class selection
     const subject = subjects.find(s => s.id === subjectId);
@@ -166,23 +172,34 @@ export default function TeachersPage() {
       return;
     }
 
+    // Check if subject is already assigned to this teacher
+    const isAlreadyAssigned = selectedTeacher.subjects?.some(
+      (ts) => ts.subject.id === selectedSubjectId
+    );
+
+    if (isAlreadyAssigned) {
+      const subjectName = subjects.find(s => s.id === selectedSubjectId)?.name || 'This subject';
+      setError(`${subjectName} is already assigned to this teacher. Please use the Edit button to change the class instead.`);
+      return;
+    }
+
     try {
       setAssigningSubject(true);
       setError('');
+      
+      const subjectName = subjects.find(s => s.id === selectedSubjectId)?.name || 'Subject';
+      
       await apiClient.post(`/subjects/${selectedSubjectId}/assign-teacher`, {
         teacherId: selectedTeacher.id,
         classId: selectedClassId,
       });
-      setSuccess('Subject assigned successfully!');
+      setSuccess(`${subjectName} assigned successfully!`);
 
       // Refresh teachers data
-      await fetchTeachers();
+      const refreshedTeachers = await fetchTeachers();
 
-      // Update the selected teacher with fresh data
-      const updatedTeachersResponse = await apiClient.get('/teachers');
-      const updatedTeacher = ((updatedTeachersResponse as any) || []).find(
-        (t: Teacher) => t.id === selectedTeacher.id
-      );
+      // Update selected teacher from refreshed data
+      const updatedTeacher = refreshedTeachers.find((t: Teacher) => t.id === selectedTeacher.id);
       if (updatedTeacher) {
         setSelectedTeacher(updatedTeacher);
       }
@@ -199,19 +216,24 @@ export default function TeachersPage() {
 
       // Handle specific error cases
       if (err.response?.status === 409) {
-        setError('This subject is already assigned to this teacher');
+        setError('Cannot assign: This subject is already assigned to this teacher. Refreshing data...');
+        
+        // Force refresh after showing error
+        setTimeout(async () => {
+          const refreshedTeachers = await fetchTeachers();
+          const updatedTeacher = refreshedTeachers.find((t: Teacher) => t.id === selectedTeacher.id);
+          if (updatedTeacher) {
+            setSelectedTeacher(updatedTeacher);
+          }
+          setShowAssignmentModal(false);
+          setSelectedSubjectId('');
+          setSelectedClassId('');
+          setError('');
+        }, 2000);
       } else {
         setError(errorMessage);
-      }
-
-      // Refresh data to sync UI with backend
-      await fetchTeachers();
-      const updatedTeachersResponse = await apiClient.get('/teachers');
-      const updatedTeacher = ((updatedTeachersResponse as any) || []).find(
-        (t: Teacher) => t.id === selectedTeacher.id
-      );
-      if (updatedTeacher) {
-        setSelectedTeacher(updatedTeacher);
+        // Refresh data on any error
+        await fetchTeachers();
       }
     } finally {
       setAssigningSubject(false);
@@ -219,25 +241,34 @@ export default function TeachersPage() {
   };
 
   const handleConfirmClassAssignment = async (classId: string) => {
-    if (!selectedTeacher?.teacher?.id || !selectedSubjectForAssignment) return;
+    if (!selectedTeacher?.id || !selectedSubjectForAssignment) return;
+    
+    // Check if subject is already assigned to this teacher
+    const isAlreadyAssigned = selectedTeacher.subjects?.some(
+      (ts) => ts.subject.id === selectedSubjectForAssignment.id
+    );
+
+    if (isAlreadyAssigned) {
+      setError(`The subject "${selectedSubjectForAssignment.name}" is already assigned to this teacher. Please use the Edit button to change the class.`);
+      setShowClassSelection(false);
+      setSelectedSubjectForAssignment(null);
+      return;
+    }
     
     try {
       setAssigningSubject(true);
       setError('');
       await apiClient.post(`/subjects/${selectedSubjectForAssignment.id}/assign-teacher`, {
-        teacherId: selectedTeacher.teacher.id,
+        teacherId: selectedTeacher.id,
         classId: classId,
       });
-      setSuccess('Subject assigned successfully!');
+      setSuccess(`Subject "${selectedSubjectForAssignment.name}" assigned successfully!`);
 
       // Refresh teachers data
-      await fetchTeachers();
+      const refreshedTeachers = await fetchTeachers();
 
-      // Update the selected teacher with fresh data
-      const updatedTeachersResponse = await apiClient.get('/teachers');
-      const updatedTeacher = ((updatedTeachersResponse as any) || []).find(
-        (t: Teacher) => t.id === selectedTeacher.id
-      );
+      // Update selected teacher from refreshed data
+      const updatedTeacher = refreshedTeachers.find((t: Teacher) => t.id === selectedTeacher.id);
       if (updatedTeacher) {
         setSelectedTeacher(updatedTeacher);
       }
@@ -251,47 +282,50 @@ export default function TeachersPage() {
       console.error('Error assigning subject:', err);
       const errorMessage = err.response?.data?.message || 'Error assigning subject';
 
+      // Close modal on error
+      setShowClassSelection(false);
+      setSelectedSubjectForAssignment(null);
+
       // Handle specific error cases
       if (err.response?.status === 409) {
-        setError('This subject is already assigned to this teacher');
+        setError(`Cannot assign: This subject is already assigned. Refreshing data...`);
+        
+        // Force refresh to sync with backend
+        setTimeout(async () => {
+          const refreshedTeachers = await fetchTeachers();
+          const updatedTeacher = refreshedTeachers.find((t: Teacher) => t.id === selectedTeacher.id);
+          if (updatedTeacher) {
+            setSelectedTeacher(updatedTeacher);
+          }
+          setError('');
+        }, 2000);
       } else {
         setError(errorMessage);
-      }
-
-      // Refresh data to sync UI with backend
-      await fetchTeachers();
-      const updatedTeachersResponse = await apiClient.get('/teachers');
-      const updatedTeacher = ((updatedTeachersResponse as any) || []).find(
-        (t: Teacher) => t.id === selectedTeacher.id
-      );
-      if (updatedTeacher) {
-        setSelectedTeacher(updatedTeacher);
+        // Refresh data on any error
+        await fetchTeachers();
       }
     } finally {
       setAssigningSubject(false);
     }
   };
 
-  const handleUnassignSubject = async (subjectId: string) => {
-    if (!selectedTeacher?.teacher?.id) return;
+  const handleUnassignSubject = async (subjectId: string, subjectName: string) => {
+    if (!selectedTeacher?.id) return;
     
-    if (!confirm('Are you sure you want to unassign this subject?')) {
+    if (!confirm(`Are you sure you want to remove the subject "${subjectName}" from this teacher?\n\nNote: This will only unassign the subject. The teacher account will remain active.`)) {
       return;
     }
     
     try {
       setError('');
-      await apiClient.delete(`/subjects/${subjectId}/unassign-teacher/${selectedTeacher.teacher.id}`);
-      setSuccess('Subject unassigned successfully!');
+      await apiClient.delete(`/subjects/${subjectId}/unassign-teacher/${selectedTeacher.id}`);
+      setSuccess(`Subject "${subjectName}" has been unassigned successfully!`);
       
       // Refresh teachers data
-      await fetchTeachers();
+      const refreshedTeachers = await fetchTeachers();
       
-      // Update the selected teacher with fresh data
-      const updatedTeachersResponse = await apiClient.get('/teachers');
-      const updatedTeacher = ((updatedTeachersResponse as any) || []).find(
-        (t: Teacher) => t.id === selectedTeacher.id
-      );
+      // Update selected teacher from refreshed data
+      const updatedTeacher = refreshedTeachers.find((t: Teacher) => t.id === selectedTeacher.id);
       if (updatedTeacher) {
         setSelectedTeacher(updatedTeacher);
       }
@@ -302,48 +336,135 @@ export default function TeachersPage() {
       setError(err.response?.data?.message || 'Error unassigning subject');
       
       // Refresh data to sync UI with backend
-      await fetchTeachers();
-      const updatedTeachersResponse = await apiClient.get('/teachers');
-      const updatedTeacher = ((updatedTeachersResponse as any) || []).find(
-        (t: Teacher) => t.id === selectedTeacher.id
-      );
+      const refreshedTeachers = await fetchTeachers();
+      const updatedTeacher = refreshedTeachers.find((t: Teacher) => t.id === selectedTeacher.id);
       if (updatedTeacher) {
         setSelectedTeacher(updatedTeacher);
       }
     }
   };
 
+  const handleRemoveAllAssignments = async (teacherId: string, teacherName: string) => {
+    if (!confirm(`Remove all subject-class assignments for ${teacherName}?\n\nThis will:\n- Remove ALL assigned subjects and classes\n- Keep the teacher account active\n\nThis action cannot be undone.`)) {
+      return;
+    }
+
+    try {
+      setLoading(true);
+      const teacher = teachers.find(t => t.id === teacherId);
+      if (!teacher || !teacher.subjects || teacher.subjects.length === 0) {
+        setError('No assignments to remove');
+        setLoading(false);
+        return;
+      }
+
+      // Remove all assignments one by one
+      for (const ts of teacher.subjects) {
+        await apiClient.delete(`/subjects/${ts.subject.id}/unassign-teacher/${teacherId}`);
+      }
+
+      setSuccess(`All assignments removed for ${teacherName}!`);
+      const refreshedTeachers = await fetchTeachers();
+      const updatedTeacher = refreshedTeachers.find((t: Teacher) => t.id === teacherId);
+      if (updatedTeacher && selectedTeacher?.id === teacherId) {
+        setSelectedTeacher(updatedTeacher);
+      }
+      setTimeout(() => setSuccess(''), 3000);
+    } catch (err: any) {
+      console.error('Error removing assignments:', err);
+      setError(err.response?.data?.message || 'Error removing assignments');
+      setTimeout(() => setError(''), 3000);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDeleteAssignment = async (teacherId: string, teacherSubjectId: string, subjectName: string, teacherName: string) => {
+    if (!confirm(`Remove "${subjectName}" assignment from ${teacherName}?\n\nThis will only remove this specific subject-class assignment.\nThe teacher account will remain active.`)) {
+      return;
+    }
+
+    try {
+      setLoading(true);
+      // Find the teacher subject record to get the subject ID
+      const teacher = teachers.find(t => t.id === teacherId);
+      const teacherSubject = teacher?.subjects?.find(ts => ts.id === teacherSubjectId);
+      
+      if (!teacherSubject) {
+        setError('Assignment not found');
+        return;
+      }
+
+      await apiClient.delete(`/subjects/${teacherSubject.subject.id}/unassign-teacher/${teacherId}`);
+      setSuccess(`Assignment "${subjectName}" removed from ${teacherName}!`);
+      
+      const refreshedTeachers = await fetchTeachers();
+      const updatedTeacher = refreshedTeachers.find((t: Teacher) => t.id === teacherId);
+      if (updatedTeacher && selectedTeacher?.id === teacherId) {
+        setSelectedTeacher(updatedTeacher);
+      }
+      setTimeout(() => setSuccess(''), 3000);
+    } catch (err: any) {
+      console.error('Error removing assignment:', err);
+      setError(err.response?.data?.message || 'Error removing assignment');
+      setTimeout(() => setError(''), 3000);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleEditAssignment = (assignment: any) => {
     setEditingAssignment(assignment);
+    setEditSubjectId(assignment.subject.id);
+    setEditClassId(assignment.subject.class?.id || '');
     setShowEditModal(true);
   };
 
-  const handleUpdateAssignment = async (newClassId: string) => {
-    if (!editingAssignment || !selectedTeacher?.teacher?.id) return;
+  const handleUpdateAssignment = async () => {
+    if (!editingAssignment || !selectedTeacher?.id || !editSubjectId || !editClassId) {
+      setError('Please select both a subject and a class');
+      return;
+    }
+
+    const newSubjectName = subjects.find(s => s.id === editSubjectId)?.name || 'Subject';
+    const oldSubjectId = editingAssignment.subject.id;
 
     try {
       setAssigningSubject(true);
       setError('');
       
-      // First unassign the subject
-      await apiClient.delete(`/subjects/${editingAssignment.subject.id}/unassign-teacher/${selectedTeacher.teacher.id}`);
+      // If changing to a different subject, check if it's already assigned
+      if (oldSubjectId !== editSubjectId) {
+        const isNewSubjectAssigned = selectedTeacher.subjects?.some(
+          (ts) => ts.subject.id === editSubjectId
+        );
+
+        if (isNewSubjectAssigned) {
+          setError(`Cannot update: The subject "${newSubjectName}" is already assigned to this teacher. Please choose a different subject or edit that assignment instead.`);
+          setAssigningSubject(false);
+          return;
+        }
+      }
       
-      // Then reassign with new class
-      await apiClient.post(`/subjects/${editingAssignment.subject.id}/assign-teacher`, {
-        teacherId: selectedTeacher.teacher.id,
-        classId: newClassId,
+      // First unassign the old subject
+      await apiClient.delete(`/subjects/${oldSubjectId}/unassign-teacher/${selectedTeacher.id}`);
+      
+      // Small delay to ensure backend processes the deletion
+      await new Promise(resolve => setTimeout(resolve, 200));
+      
+      // Then reassign with new subject and class
+      await apiClient.post(`/subjects/${editSubjectId}/assign-teacher`, {
+        teacherId: selectedTeacher.id,
+        classId: editClassId,
       });
       
-      setSuccess('Assignment updated successfully!');
+      setSuccess(`Assignment updated successfully to "${newSubjectName}"!`);
 
       // Refresh teachers data
-      await fetchTeachers();
+      const refreshedTeachers = await fetchTeachers();
 
-      // Update the selected teacher with fresh data
-      const updatedTeachersResponse = await apiClient.get('/teachers');
-      const updatedTeacher = ((updatedTeachersResponse as any) || []).find(
-        (t: Teacher) => t.id === selectedTeacher.id
-      );
+      // Update selected teacher from refreshed data
+      const updatedTeacher = refreshedTeachers.find((t: Teacher) => t.id === selectedTeacher.id);
       if (updatedTeacher) {
         setSelectedTeacher(updatedTeacher);
       }
@@ -351,12 +472,35 @@ export default function TeachersPage() {
       // Close edit modal
       setShowEditModal(false);
       setEditingAssignment(null);
+      setEditSubjectId('');
+      setEditClassId('');
 
       setTimeout(() => setSuccess(''), 3000);
     } catch (err: any) {
       console.error('Error updating assignment:', err);
       const errorMessage = err.response?.data?.message || 'Error updating assignment';
-      setError(errorMessage);
+      
+      if (err.response?.status === 409) {
+        setError(`Cannot update: There was a conflict. Refreshing data...`);
+        
+        // Force refresh after showing error
+        setTimeout(async () => {
+          const refreshedTeachers = await fetchTeachers();
+          const updatedTeacher = refreshedTeachers.find((t: Teacher) => t.id === selectedTeacher.id);
+          if (updatedTeacher) {
+            setSelectedTeacher(updatedTeacher);
+          }
+          setShowEditModal(false);
+          setEditingAssignment(null);
+          setEditSubjectId('');
+          setEditClassId('');
+          setError('');
+        }, 2000);
+      } else {
+        setError(errorMessage);
+        // Refresh data on any error
+        await fetchTeachers();
+      }
     } finally {
       setAssigningSubject(false);
     }
@@ -372,8 +516,8 @@ export default function TeachersPage() {
   };
 
   const filteredTeachers = teachers.filter((teacher) => {
-    const fullName = `${(teacher as any).user.firstName} ${(teacher as any).user.lastName}`.toLowerCase();
-    const email = (teacher as any).user.email.toLowerCase();
+    const fullName = `${teacher.user.firstName} ${teacher.user.lastName}`.toLowerCase();
+    const email = teacher.user.email.toLowerCase();
     const search = searchTerm.toLowerCase();
     return fullName.includes(search) || email.includes(search);
   });
@@ -502,30 +646,40 @@ export default function TeachersPage() {
                         <div className="flex items-center">
                           <div className="flex-shrink-0 h-10 w-10 bg-gradient-to-br from-purple-500 to-indigo-600 rounded-full flex items-center justify-center">
                             <span className="text-white font-semibold">
-                              {(teacher as any).user.firstName[0]}{(teacher as any).user.lastName[0]}
+                              {teacher.user.firstName[0]}{teacher.user.lastName[0]}
                             </span>
                           </div>
                           <div className="ml-4">
                             <div className="text-sm font-medium text-gray-900">
-                              {(teacher as any).user.firstName} {(teacher as any).user.lastName}
+                              {teacher.user.firstName} {teacher.user.lastName}
                             </div>
                           </div>
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm text-gray-900">{(teacher as any).user.email}</div>
+                        <div className="text-sm text-gray-900">{teacher.user.email}</div>
                       </td>
                       <td className="px-6 py-4">
                         <div className="flex flex-wrap gap-1 max-w-xs">
-                          {teacher.teacher?.subjects && teacher.teacher.subjects.length > 0 ? (
-                            teacher.teacher.subjects.map((ts) => (
-                              <span
-                                key={ts.subject.id}
-                                className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-teal-100 text-teal-800"
-                                title={ts.subject.class ? `${ts.subject.class.name}${ts.subject.class.grade ? ' - ' + ts.subject.class.grade : ''}` : 'No class'}
+                          {teacher.subjects && teacher.subjects.length > 0 ? (
+                            teacher.subjects.map((ts) => (
+                              <div
+                                key={ts.id}
+                                className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-teal-100 text-teal-800 group"
                               >
-                                {ts.subject.name}
-                              </span>
+                                <span title={ts.subject.class?.grade ? `Grade: ${ts.subject.class.grade}` : ''}>
+                                  {ts.subject.name} - {ts.subject.class?.name || 'No Class'}
+                                </span>
+                                <button
+                                  onClick={() => handleDeleteAssignment(teacher.id, ts.id, ts.subject.name, `${teacher.user.firstName} ${teacher.user.lastName}`)}
+                                  className="opacity-0 group-hover:opacity-100 transition-opacity duration-200 hover:bg-teal-200 rounded-full p-0.5"
+                                  title={`Remove ${ts.subject.name} assignment`}
+                                >
+                                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                  </svg>
+                                </button>
+                              </div>
                             ))
                           ) : (
                             <span className="text-xs text-gray-400 italic">No subjects assigned</span>
@@ -533,14 +687,8 @@ export default function TeachersPage() {
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <span
-                          className={`px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                            teacher.isActive
-                              ? 'bg-green-100 text-green-800'
-                              : 'bg-red-100 text-red-800'
-                          }`}
-                        >
-                          {teacher.isActive ? t.users?.active || 'Active' : t.users?.inactive || 'Inactive'}
+                        <span className="px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
+                          Active
                         </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-center">
@@ -555,13 +703,25 @@ export default function TeachersPage() {
                             Edit
                           </button>
                           <button
-                            onClick={() => handleDeleteTeacher(teacher.id)}
+                            onClick={() => handleRemoveAllAssignments(teacher.id, `${teacher.user.firstName} ${teacher.user.lastName}`)}
+                            disabled={!teacher.subjects || teacher.subjects.length === 0}
+                            className="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-white bg-orange-600 hover:bg-orange-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                            title="Remove all subject-class assignments (keeps account)"
+                          >
+                            <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                            Clear All
+                          </button>
+                          <button
+                            onClick={() => handleDeleteTeacher(teacher.user.id, `${teacher.user.firstName} ${teacher.user.lastName}`)}
                             className="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+                            title="Permanently delete this teacher's account"
                           >
                             <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                             </svg>
-                            Delete
+                            Delete Account
                           </button>
                         </div>
                       </td>
@@ -579,24 +739,18 @@ export default function TeachersPage() {
                     <div className="flex items-center gap-3">
                       <div className="flex-shrink-0 h-12 w-12 bg-gradient-to-br from-purple-500 to-indigo-600 rounded-full flex items-center justify-center">
                         <span className="text-white font-semibold text-lg">
-                          {(teacher as any).user.firstName[0]}{(teacher as any).user.lastName[0]}
+                          {teacher.user.firstName[0]}{teacher.user.lastName[0]}
                         </span>
                       </div>
                       <div>
                         <div className="font-semibold text-gray-900">
-                          {(teacher as any).user.firstName} {(teacher as any).user.lastName}
+                          {teacher.user.firstName} {teacher.user.lastName}
                         </div>
-                        <div className="text-sm text-gray-600">{(teacher as any).user.email}</div>
+                        <div className="text-sm text-gray-600">{teacher.user.email}</div>
                       </div>
                     </div>
-                    <span
-                      className={`px-3 py-1 text-xs font-semibold rounded-full ${
-                        teacher.isActive
-                          ? 'bg-green-100 text-green-800'
-                          : 'bg-red-100 text-red-800'
-                      }`}
-                    >
-                      {teacher.isActive ? t.users?.active || 'Active' : t.users?.inactive || 'Inactive'}
+                    <span className="px-3 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">
+                      Active
                     </span>
                   </div>
                   
@@ -604,14 +758,25 @@ export default function TeachersPage() {
                   <div className="mb-3">
                     <div className="text-xs font-semibold text-gray-700 mb-1">Subjects:</div>
                     <div className="flex flex-wrap gap-1">
-                      {teacher.teacher?.subjects && teacher.teacher.subjects.length > 0 ? (
-                        teacher.teacher.subjects.map((ts) => (
-                          <span
-                            key={ts.subject.id}
-                            className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-teal-100 text-teal-800"
+                      {teacher.subjects && teacher.subjects.length > 0 ? (
+                        teacher.subjects.map((ts) => (
+                          <div
+                            key={ts.id}
+                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-teal-100 text-teal-800 group"
                           >
-                            {ts.subject.name}
-                          </span>
+                            <span title={ts.subject.class?.grade ? `Grade: ${ts.subject.class.grade}` : ''}>
+                              {ts.subject.name} - {ts.subject.class?.name || 'No Class'}
+                            </span>
+                            <button
+                              onClick={() => handleDeleteAssignment(teacher.id, ts.id, ts.subject.name, `${teacher.user.firstName} ${teacher.user.lastName}`)}
+                              className="opacity-0 group-hover:opacity-100 transition-opacity duration-200 hover:bg-teal-200 rounded-full p-0.5"
+                              title={`Remove ${ts.subject.name} assignment`}
+                            >
+                              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                              </svg>
+                            </button>
+                          </div>
                         ))
                       ) : (
                         <span className="text-xs text-gray-400 italic">No subjects assigned</span>
@@ -621,7 +786,7 @@ export default function TeachersPage() {
 
                   <div className="flex items-center justify-between">
                     <div className="text-sm text-gray-500">
-                      Joined: {new Date(teacher.createdAt).toLocaleDateString('en-US', { 
+                      Joined: {new Date(teacher.hireDate).toLocaleDateString('en-US', { 
                         year: 'numeric', 
                         month: 'short', 
                         day: 'numeric' 
@@ -638,13 +803,25 @@ export default function TeachersPage() {
                         Edit
                       </button>
                       <button
-                        onClick={() => handleDeleteTeacher(teacher.id)}
+                        onClick={() => handleRemoveAllAssignments(teacher.id, `${teacher.user.firstName} ${teacher.user.lastName}`)}
+                        disabled={!teacher.subjects || teacher.subjects.length === 0}
+                        className="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md text-white bg-orange-600 hover:bg-orange-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                        title="Remove all subject-class assignments (keeps account)"
+                      >
+                        <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        Clear All
+                      </button>
+                      <button
+                        onClick={() => handleDeleteTeacher(teacher.user.id, `${teacher.user.firstName} ${teacher.user.lastName}`)}
                         className="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md text-white bg-red-600 hover:bg-red-700"
+                        title="Permanently delete this teacher's account"
                       >
                         <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                         </svg>
-                        Delete
+                        Delete Account
                       </button>
                     </div>
                   </div>
@@ -679,7 +856,7 @@ export default function TeachersPage() {
                     Manage Subjects
                   </h3>
                   <p className="text-sm text-gray-600 mt-1">
-                    {selectedTeacher.firstName} {selectedTeacher.lastName}
+                    {selectedTeacher.user.firstName} {selectedTeacher.user.lastName}
                   </p>
                 </div>
                 <button
@@ -722,30 +899,19 @@ export default function TeachersPage() {
               {/* Assigned Subjects */}
               <div className="mb-6">
                 <h4 className="font-semibold text-gray-900 mb-3">Currently Assigned Subjects</h4>
-                {selectedTeacher.teacher?.subjects && selectedTeacher.teacher.subjects.length > 0 ? (
+                {selectedTeacher.subjects && selectedTeacher.subjects.length > 0 ? (
                   <div className="space-y-2">
-                    {selectedTeacher.teacher.subjects.map((ts) => (
-                      <div key={ts.subject.id} className="flex items-center justify-between bg-teal-50 p-3 rounded-lg border border-teal-200">
+                    {selectedTeacher.subjects.map((ts) => (
+                      <div key={ts.id} className="flex items-center justify-between bg-teal-50 p-3 rounded-lg border border-teal-200">
                         <div className="flex-1">
-                          <div className="font-medium text-gray-900">{ts.subject.name}</div>
+                          <div className="font-medium text-gray-900">
+                            {ts.subject.name} - {ts.subject.class?.name || 'No Class'}
+                          </div>
                           {ts.subject.code && (
                             <div className="text-xs text-gray-600">Code: {ts.subject.code}</div>
                           )}
-                          {ts.subject.class ? (
-                            <div className="flex items-center gap-1 text-xs text-gray-600 mt-1">
-                              <svg className="w-3 h-3 text-cyan-500" fill="currentColor" viewBox="0 0 20 20">
-                                <path d="M10.394 2.08a1 1 0 00-.788 0l-7 3a1 1 0 000 1.84L5.25 8.051a.999.999 0 01.356-.257l4-1.714a1 1 0 11.788 1.838L7.667 9.088l1.94.831a1 1 0 00.787 0l7-3a1 1 0 000-1.838l-7-3z" />
-                              </svg>
-                              <span className="font-medium">Class: {ts.subject.class.name}</span>
-                              {ts.subject.class.grade && ` - ${ts.subject.class.grade}`}
-                            </div>
-                          ) : (
-                            <div className="flex items-center gap-1 text-xs text-amber-600 mt-1">
-                              <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
-                                <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-                              </svg>
-                              <span className="italic">No class assigned</span>
-                            </div>
+                          {ts.subject.class?.grade && (
+                            <div className="text-xs text-gray-600">Grade: {ts.subject.class.grade}</div>
                           )}
                         </div>
                         <div className="flex items-center gap-2">
@@ -759,12 +925,12 @@ export default function TeachersPage() {
                             </svg>
                           </button>
                           <button
-                            onClick={() => handleUnassignSubject(ts.subject.id)}
+                            onClick={() => handleUnassignSubject(ts.subject.id, ts.subject.name)}
                             className="px-3 py-1.5 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 text-sm font-medium transition-colors"
-                            title="Delete assignment"
+                            title="Remove subject assignment (teacher account will remain)"
                           >
                             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                             </svg>
                           </button>
                         </div>
@@ -797,7 +963,7 @@ export default function TeachersPage() {
                   {subjects
                     .filter(
                       (subject) =>
-                        !selectedTeacher.teacher?.subjects?.some((ts) => ts.subject.id === subject.id) &&
+                        !selectedTeacher.subjects?.some((ts) => ts.subject.id === subject.id) &&
                         (!selectedClassFilter || subject.class?.id === selectedClassFilter)
                     )
                     .map((subject) => (
@@ -835,7 +1001,7 @@ export default function TeachersPage() {
                     ))}
                   {subjects.filter(
                     (subject) =>
-                      !selectedTeacher.teacher?.subjects?.some((ts) => ts.subject.id === subject.id) &&
+                      !selectedTeacher.subjects?.some((ts) => ts.subject.id === subject.id) &&
                       (!selectedClassFilter || subject.class?.id === selectedClassFilter)
                   ).length === 0 && (
                     <div className="text-center py-8">
@@ -967,11 +1133,13 @@ export default function TeachersPage() {
           <div className="bg-white rounded-xl shadow-2xl max-w-md w-full max-h-[90vh] overflow-y-auto">
             <div className="p-6">
               <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold text-gray-900">Edit Assignment</h3>
+                <h3 className="text-lg font-semibold text-gray-900">Edit Teacher Assignment</h3>
                 <button
                   onClick={() => {
                     setShowEditModal(false);
                     setEditingAssignment(null);
+                    setEditSubjectId('');
+                    setEditClassId('');
                   }}
                   className="text-gray-400 hover:text-gray-600 transition-colors"
                 >
@@ -990,14 +1158,11 @@ export default function TeachersPage() {
                       </svg>
                     </div>
                     <div>
-                      <h4 className="font-medium text-blue-900">Subject to Reassign</h4>
+                      <h4 className="font-medium text-blue-900">Current Assignment</h4>
                       <p className="text-blue-700 text-sm">{editingAssignment.subject.name}</p>
-                      {editingAssignment.subject.code && (
-                        <p className="text-blue-600 text-xs">Code: {editingAssignment.subject.code}</p>
-                      )}
                       {editingAssignment.subject.class && (
                         <p className="text-blue-600 text-xs">
-                          Current Class: {editingAssignment.subject.class.name}
+                          Class: {editingAssignment.subject.class.name}
                           {editingAssignment.subject.class.grade && ` - ${editingAssignment.subject.class.grade}`}
                         </p>
                       )}
@@ -1006,53 +1171,86 @@ export default function TeachersPage() {
                 </div>
               </div>
 
+              {/* Subject Selection */}
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Select New Subject
+                </label>
+                <select
+                  value={editSubjectId}
+                  onChange={(e) => setEditSubjectId(e.target.value)}
+                  className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                >
+                  <option value="">Choose a subject...</option>
+                  {subjects.map((subject) => (
+                    <option key={subject.id} value={subject.id}>
+                      {subject.name} {subject.code ? `(${subject.code})` : ''}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Class Selection */}
               <div className="mb-6">
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Select new class for this subject:
+                  Select New Class
                 </label>
-                <div className="space-y-2 max-h-60 overflow-y-auto">
+                <select
+                  value={editClassId}
+                  onChange={(e) => setEditClassId(e.target.value)}
+                  className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                >
+                  <option value="">Choose a class...</option>
                   {classes.map((cls) => (
-                    <button
-                      key={cls.id}
-                      onClick={() => handleUpdateAssignment(cls.id)}
-                      disabled={assigningSubject}
-                      className="w-full p-4 text-left border border-gray-200 rounded-lg hover:border-blue-300 hover:bg-blue-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <div className="font-medium text-gray-900">{cls.name}</div>
-                          {cls.grade && (
-                            <div className="text-sm text-gray-600">Grade: {cls.grade}</div>
-                          )}
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <svg className="w-5 h-5 text-blue-500" fill="currentColor" viewBox="0 0 20 20">
-                            <path fillRule="evenodd" d="M10.293 3.293a1 1 0 011.414 0l6 6a1 1 0 010 1.414l-6 6a1 1 0 01-1.414-1.414L14.586 11H3a1 1 0 110-2h11.586l-4.293-4.293a1 1 0 010-1.414z" clipRule="evenodd" />
-                          </svg>
-                        </div>
-                      </div>
-                    </button>
+                    <option key={cls.id} value={cls.id}>
+                      {cls.name} {cls.grade ? `- Grade ${cls.grade}` : ''}
+                    </option>
                   ))}
-                  {classes.length === 0 && (
-                    <div className="text-center py-8">
-                      <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-                      </svg>
-                      <p className="text-gray-500 text-sm mt-2">No classes available</p>
-                    </div>
-                  )}
-                </div>
+                </select>
               </div>
+
+              {/* Error Message */}
+              {error && (
+                <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
+                  <div className="flex items-center gap-2">
+                    <svg className="w-4 h-4 text-red-500" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                    </svg>
+                    <span className="text-red-700 text-sm">{error}</span>
+                  </div>
+                </div>
+              )}
 
               <div className="flex justify-end gap-3">
                 <button
                   onClick={() => {
                     setShowEditModal(false);
                     setEditingAssignment(null);
+                    setEditSubjectId('');
+                    setEditClassId('');
                   }}
                   className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
                 >
                   Cancel
+                </button>
+                <button
+                  onClick={handleUpdateAssignment}
+                  disabled={assigningSubject || !editSubjectId || !editClassId}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                >
+                  {assigningSubject ? (
+                    <>
+                      <LoadingSpinner size="sm" />
+                      Updating...
+                    </>
+                  ) : (
+                    <>
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                      </svg>
+                      Update Assignment
+                    </>
+                  )}
                 </button>
               </div>
             </div>
@@ -1101,7 +1299,7 @@ export default function TeachersPage() {
                   <option value="">Choose a teacher...</option>
                   {teachers.map((teacher) => (
                     <option key={teacher.id} value={teacher.id}>
-                      {(teacher as any).user.firstName} {(teacher as any).user.lastName} ({(teacher as any).user.email})
+                      {teacher.user.firstName} {teacher.user.lastName} ({teacher.user.email})
                     </option>
                   ))}
                 </select>

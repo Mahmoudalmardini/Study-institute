@@ -17,6 +17,21 @@ export class TeachersService {
             phone: true,
           },
         },
+        subjects: {
+          include: {
+            subject: {
+              include: {
+                class: {
+                  select: {
+                    id: true,
+                    name: true,
+                    grade: true,
+                  },
+                },
+              },
+            },
+          },
+        },
         _count: {
           select: {
             subjects: true,

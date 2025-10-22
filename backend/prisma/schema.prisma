@@ -350,10 +350,10 @@ model TeacherSubject {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  @@unique([teacherId, subjectId])
   @@index([teacherId])
   @@index([subjectId])
   @@index([assignedBy])
+  @@index([teacherId, subjectId])
   @@map("teacher_subjects")
 }
 
