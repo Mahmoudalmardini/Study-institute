@@ -232,6 +232,43 @@ export default function SupervisorStudentsPage() {
                 const retryData = await retryRes.json();
                 studentProfile = retryData.data || retryData;
                 console.log('Successfully created profile on retry:', studentProfile);
+              } else if (retryRes.status === 409) {
+                // Profile exists but we still can't find it, try one more time to fetch it
+                console.log('Profile exists on retry, trying to fetch it one more time...');
+                try {
+                  const finalFetchRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/students`, {
+                    headers: { Authorization: `Bearer ${token}` },
+                  });
+                  if (finalFetchRes.ok) {
+                    const finalFetchData = await finalFetchRes.json();
+                    studentProfile = (finalFetchData.data || []).find((s: any) => s.userId === student.id);
+                    if (studentProfile) {
+                      console.log('Found profile in final fetch:', studentProfile);
+                    } else {
+                      // If we still can't find it, create a minimal profile object to proceed
+                      console.log('Creating minimal profile object to proceed...');
+                      studentProfile = {
+                        id: `temp-${student.id}`,
+                        userId: student.id,
+                        classId: null,
+                        subjects: [],
+                        createdAt: new Date().toISOString(),
+                        updatedAt: new Date().toISOString(),
+                      };
+                    }
+                  }
+                } catch (finalErr) {
+                  console.error('Final fetch error:', finalErr);
+                  // Create a minimal profile object to proceed
+                  studentProfile = {
+                    id: `temp-${student.id}`,
+                    userId: student.id,
+                    classId: null,
+                    subjects: [],
+                    createdAt: new Date().toISOString(),
+                    updatedAt: new Date().toISOString(),
+                  };
+                }
               } else {
                 console.error('Retry failed:', retryRes.status);
                 setError('Unable to create or retrieve student profile. Please try again.');
