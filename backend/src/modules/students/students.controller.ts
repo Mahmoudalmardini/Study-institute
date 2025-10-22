@@ -13,6 +13,7 @@ import { StudentsService } from './students.service';
 import { CreateStudentDto } from './dto/create-student.dto';
 import { UpdateStudentDto } from './dto/update-student.dto';
 import { EnrollSubjectsDto } from './dto/enroll-subjects.dto';
+import { AssignClassesDto } from './dto/assign-classes.dto';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { Role } from '@prisma/client';
@@ -78,5 +79,34 @@ export class StudentsController {
   @Roles(Role.ADMIN, Role.SUPERVISOR, Role.TEACHER, Role.STUDENT)
   getStudentSubjects(@Param('id') id: string) {
     return this.studentsService.getStudentSubjects(id);
+  }
+
+  @Post(':id/assign-classes')
+  @Roles(Role.ADMIN, Role.SUPERVISOR)
+  assignClasses(
+    @Param('id') id: string,
+    @Body() assignClassesDto: AssignClassesDto,
+    @CurrentUser() user: CurrentUserData,
+  ) {
+    return this.studentsService.assignClasses(
+      id,
+      assignClassesDto.classIds,
+      user.id,
+    );
+  }
+
+  @Get(':id/classes')
+  @Roles(Role.ADMIN, Role.SUPERVISOR, Role.TEACHER, Role.STUDENT)
+  getStudentClasses(@Param('id') id: string) {
+    return this.studentsService.getStudentClasses(id);
+  }
+
+  @Delete(':id/classes/:classId')
+  @Roles(Role.ADMIN, Role.SUPERVISOR)
+  removeStudentClass(
+    @Param('id') id: string,
+    @Param('classId') classId: string,
+  ) {
+    return this.studentsService.removeStudentClass(id, classId);
   }
 }

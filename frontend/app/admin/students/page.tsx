@@ -5,22 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useI18n } from '@/lib/i18n-context';
 import SettingsMenu from '@/components/SettingsMenu';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
-
-interface Teacher {
-  id: string;
-  user: {
-    id: string;
-    firstName: string;
-    lastName: string;
-    email: string;
-  };
-}
-
-interface StudentTeacher {
-  id: string;
-  teacherId: string;
-  teacher: Teacher;
-}
+import type { Class, Subject, StudentClass, StudentSubject } from '@/types';
 
 interface Student {
   id: string;
@@ -32,23 +17,27 @@ interface Student {
   createdAt: string;
   studentProfile?: {
     id: string;
+    classes?: StudentClass[];
+    subjects?: StudentSubject[];
   };
-  teachers?: StudentTeacher[];
 }
 
 export default function StudentsPage() {
   const router = useRouter();
   const { t } = useI18n();
   const [students, setStudents] = useState<Student[]>([]);
-  const [allTeachers, setAllTeachers] = useState<Teacher[]>([]);
+  const [allClasses, setAllClasses] = useState<Class[]>([]);
+  const [allSubjects, setAllSubjects] = useState<Subject[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [error, setError] = useState('');
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
   const [showModal, setShowModal] = useState(false);
-  const [selectedTeacherId, setSelectedTeacherId] = useState('');
   const [modalLoading, setModalLoading] = useState(false);
   const [success, setSuccess] = useState('');
+  const [selectedClassId, setSelectedClassId] = useState<string>('');
+  const [selectedSubjectIds, setSelectedSubjectIds] = useState<string[]>([]);
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     const token = localStorage.getItem('accessToken');
@@ -83,7 +72,7 @@ export default function StudentsPage() {
 
       const studentsData = await studentsRes.json();
       
-      // For each student user, try to get their student profile
+      // For each student user, try to get their student profile with classes and subjects
       const studentsWithProfiles = await Promise.all(
         (studentsData.data || []).map(async (user: any) => {
           try {
@@ -92,33 +81,50 @@ export default function StudentsPage() {
             });
             const profileData = await profileRes.json();
             const studentProfile = (profileData.data || []).find((s: any) => s.userId === user.id);
+            
+            let subjects = [];
+            if (studentProfile) {
+              try {
+                const subjectsRes = await fetch(
+                  `${process.env.NEXT_PUBLIC_API_URL}/students/${studentProfile.id}/subjects`,
+                  { headers: { Authorization: `Bearer ${token}` } }
+                );
+                if (subjectsRes.ok) {
+                  const subjectsData = await subjectsRes.json();
+                  subjects = subjectsData.data || [];
+                }
+              } catch (err) {
+                console.error('Error fetching subjects for student:', err);
+              }
+            }
+            
             return {
               ...user,
               studentProfile: studentProfile || null,
+              subjects: subjects,
+              class: studentProfile?.class || null,
             };
           } catch {
-            return { ...user, studentProfile: null };
+            return { ...user, studentProfile: null, subjects: [], class: null };
           }
         })
       );
       
       setStudents(studentsWithProfiles);
 
-      // Fetch all teachers
-      const teachersRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/users?role=TEACHER`, {
+      // Fetch all classes
+      const classesRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/classes`, {
         headers: { Authorization: `Bearer ${token}` },
       });
-      const teachersData = await teachersRes.json();
-      const teachersList = (teachersData.data || []).map((user: any) => ({
-        id: user.id,
-        user: {
-          id: user.id,
-          firstName: user.firstName,
-          lastName: user.lastName,
-          email: user.email,
-        },
-      }));
-      setAllTeachers(teachersList);
+      const classesData = await classesRes.json();
+      setAllClasses(classesData.data || []);
+
+      // Fetch all subjects
+      const subjectsRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/subjects`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const subjectsData = await subjectsRes.json();
+      setAllSubjects(subjectsData.data || []);
 
     } catch (err) {
       console.error('Error fetching data:', err);
@@ -133,12 +139,39 @@ export default function StudentsPage() {
     setModalLoading(true);
     setError('');
     setSuccess('');
+    setSelectedClassId('');
+    setSelectedSubjectIds([]);
     
-    // First, check if student has a profile, if not create one
-    if (!student.studentProfile) {
+    const token = localStorage.getItem('accessToken');
+    
+    // First, try to fetch the student profile directly
+    let studentProfile = student.studentProfile;
+    
+    if (!studentProfile) {
+      try {
+        // Try to get all students and find this one
+        const studentsRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/students`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        
+        if (studentsRes.ok) {
+          const studentsData = await studentsRes.json();
+          const existingProfile = (studentsData.data || []).find((s: any) => s.userId === student.id);
+          
+          if (existingProfile) {
+            studentProfile = existingProfile;
+            console.log('Found existing student profile:', studentProfile);
+          }
+        }
+      } catch (err) {
+        console.error('Error checking for existing profile:', err);
+      }
+    }
+    
+    // If still no profile, try to create one
+    if (!studentProfile) {
       console.log('Creating student profile for user:', student.id);
       try {
-        const token = localStorage.getItem('accessToken');
         const createRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/students`, {
           method: 'POST',
           headers: {
@@ -150,132 +183,148 @@ export default function StudentsPage() {
           }),
         });
         
-        const createData = await createRes.json();
-        console.log('Create profile response:', createRes.status, createData);
-        
         if (createRes.ok) {
-          student.studentProfile = createData.data;
-          console.log('Student profile created:', student.studentProfile);
+          const createData = await createRes.json();
+          studentProfile = createData.data || createData;
+          console.log('Student profile created:', studentProfile);
         } else {
-          console.error('Failed to create profile:', createData);
-          setError('Failed to create student profile: ' + (createData.message || 'Unknown error'));
+          const errorData = await createRes.json().catch(() => ({}));
+          console.error('Failed to create profile:', createRes.status, errorData);
+          setError(`Failed to create student profile. ${errorData.message || 'Please ensure the student user exists and try again.'}`);
+          setModalLoading(false);
+          return;
         }
       } catch (err) {
         console.error('Error creating student profile:', err);
-        setError('Error creating student profile');
+        setError('Error creating student profile. Please try again.');
+        setModalLoading(false);
+        return;
       }
     }
 
-    setSelectedStudent(student);
+    setSelectedStudent({
+      ...student,
+      studentProfile,
+    });
 
-    // Fetch student's teachers if they have a profile
-    if (student.studentProfile) {
+    // Fetch student's class and subjects if they have a profile
+    if (studentProfile) {
       try {
-        const token = localStorage.getItem('accessToken');
-        console.log('Fetching teachers for student profile:', student.studentProfile.id);
-        const response = await fetch(
-          `${process.env.NEXT_PUBLIC_API_URL}/student-teachers/student/${student.studentProfile.id}`,
+        // Fetch full student details
+        const studentResponse = await fetch(
+          `${process.env.NEXT_PUBLIC_API_URL}/students/${studentProfile.id}`,
           { headers: { Authorization: `Bearer ${token}` } }
         );
-        const data = await response.json();
-        console.log('Fetched teachers:', data);
-        setSelectedStudent({
-          ...student,
-          teachers: data.data || [],
-        });
+        
+        if (studentResponse.ok) {
+          const studentData = await studentResponse.json();
+          const fullStudent = studentData.data || studentData;
+          setSelectedClassId(fullStudent.classId || '');
+        }
+        
+        // Fetch subjects
+        const subjectsResponse = await fetch(
+          `${process.env.NEXT_PUBLIC_API_URL}/students/${studentProfile.id}/subjects`,
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+        
+        if (subjectsResponse.ok) {
+          const subjectsData = await subjectsResponse.json();
+          const studentSubjects = subjectsData.data || [];
+          setSelectedSubjectIds(studentSubjects.map((ss: StudentSubject) => ss.subjectId));
+          
+          setSelectedStudent({
+            ...student,
+            studentProfile: {
+              ...studentProfile,
+              subjects: studentSubjects,
+            }
+          });
+        }
       } catch (err) {
-        console.error('Error fetching student teachers:', err);
+        console.error('Error fetching student class/subjects:', err);
       }
     }
     
     setModalLoading(false);
   };
 
-  const assignTeacher = async () => {
-    if (!selectedStudent || !selectedTeacherId) return;
-
-    if (!selectedStudent.studentProfile?.id) {
+  const handleSaveChanges = async () => {
+    if (!selectedStudent || !selectedStudent.studentProfile?.id) {
       setError('Student profile not created yet. Please try again.');
       return;
     }
 
-    try {
-      setError('');
-      setSuccess('');
-      const token = localStorage.getItem('accessToken');
-      
-      console.log('Assigning teacher:', {
-        studentId: selectedStudent.studentProfile.id,
-        teacherId: selectedTeacherId,
-      });
-      
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/student-teachers`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          studentId: selectedStudent.studentProfile.id,
-          teacherId: selectedTeacherId,
-        }),
-      });
-
-      const data = await response.json();
-      console.log('Assignment response:', response.status, data);
-
-      if (response.ok) {
-        setSuccess('Teacher assigned successfully!');
-        setSelectedTeacherId('');
-        // Refresh student's teachers
-        openStudentModal(selectedStudent);
-        fetchData(); // Refresh main list
-      } else {
-        setError(data.message || 'Error assigning teacher');
-      }
-    } catch (err: any) {
-      console.error('Assignment error:', err);
-      setError(err.message || 'Error assigning teacher');
+    // Validate minimum 1 subject
+    if (selectedSubjectIds.length === 0) {
+      setError('At least one subject must be assigned to the student');
+      return;
     }
-  };
-
-  const removeTeacher = async (teacherId: string) => {
-    if (!selectedStudent) return;
-    if (!window.confirm('Are you sure you want to remove this teacher?')) return;
 
     try {
+      setSaving(true);
       setError('');
       setSuccess('');
       const token = localStorage.getItem('accessToken');
       
-      console.log('Removing teacher:', {
-        studentId: selectedStudent.studentProfile?.id,
-        teacherId: teacherId,
-      });
-      
-      const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/student-teachers/${selectedStudent.studentProfile?.id}/${teacherId}`,
+      // Update class (single class assignment)
+      const classResponse = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL}/students/${selectedStudent.studentProfile.id}`,
         {
-          method: 'DELETE',
-          headers: { Authorization: `Bearer ${token}` },
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ classId: selectedClassId || null }),
         }
       );
 
-      const data = await response.json();
-      console.log('Remove response:', response.status, data);
-
-      if (response.ok) {
-        setSuccess('Teacher removed successfully!');
-        // Refresh student's teachers
-        openStudentModal(selectedStudent);
-        fetchData(); // Refresh main list
-      } else {
-        setError(data.message || 'Error removing teacher');
+      if (!classResponse.ok) {
+        const data = await classResponse.json();
+        throw new Error(data.message || 'Error updating class');
       }
+
+      // Enroll subjects
+      const subjectsResponse = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL}/students/${selectedStudent.studentProfile.id}/enroll-subjects`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ subjectIds: selectedSubjectIds }),
+        }
+      );
+
+      if (!subjectsResponse.ok) {
+        const data = await subjectsResponse.json();
+        throw new Error(data.message || 'Error enrolling subjects');
+      }
+
+      setSuccess('Class and subjects updated successfully!');
+      setTimeout(() => {
+        setShowModal(false);
+        fetchData();
+      }, 1500);
+      
     } catch (err: any) {
-      console.error('Remove error:', err);
-      setError(err.message || 'Error removing teacher');
+      console.error('Save error:', err);
+      setError(err.message || 'Error saving changes');
+    } finally {
+      setSaving(false);
     }
+  };
+
+  const toggleSubject = (subjectId: string) => {
+    setSelectedSubjectIds(prev => {
+      if (prev.includes(subjectId)) {
+        return prev.filter(id => id !== subjectId);
+      } else {
+        return [...prev, subjectId];
+      }
+    });
   };
 
   const handleLogout = () => {
@@ -294,9 +343,11 @@ export default function StudentsPage() {
     return fullName.includes(search) || email.includes(search);
   });
 
-  const availableTeachers = allTeachers.filter(
-    (teacher) => !selectedStudent?.teachers?.some((st) => st.teacherId === teacher.id)
-  );
+  // Get subjects that belong to selected class
+  const availableSubjects = allSubjects.filter(subject => {
+    if (!selectedClassId) return true;
+    return subject.classId === selectedClassId;
+  });
 
   return (
     <div className="min-h-screen gradient-bg">
@@ -364,7 +415,7 @@ export default function StudentsPage() {
               <span className="text-sm text-gray-600">
                 {t.users?.totalUsers || 'Total students'}: {filteredStudents.length}
               </span>
-              <span className="text-xs text-gray-500">Click on a student to assign teachers</span>
+              <span className="text-xs text-gray-500">Click on a student to manage classes & subjects</span>
             </div>
 
             {/* Desktop Table View */}
@@ -379,10 +430,13 @@ export default function StudentsPage() {
                       {t.users?.email || 'Email'}
                     </th>
                     <th className="px-6 py-4 text-left text-xs font-medium text-white uppercase tracking-wider">
-                      {t.users?.status || 'Status'}
+                      Class
                     </th>
                     <th className="px-6 py-4 text-left text-xs font-medium text-white uppercase tracking-wider">
-                      Joined
+                      Subjects
+                    </th>
+                    <th className="px-6 py-4 text-left text-xs font-medium text-white uppercase tracking-wider">
+                      {t.users?.status || 'Status'}
                     </th>
                     <th className="px-6 py-4 text-left text-xs font-medium text-white uppercase tracking-wider">
                       Actions
@@ -410,6 +464,33 @@ export default function StudentsPage() {
                         <div className="text-sm text-gray-900">{student.email}</div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm text-gray-900">
+                          {student.class ? (
+                            <span className="px-2 py-1 bg-blue-100 text-blue-800 rounded-full text-xs font-medium">
+                              {student.class.name}
+                            </span>
+                          ) : (
+                            <span className="text-gray-400 text-xs">No class assigned</span>
+                          )}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="flex flex-wrap gap-1 max-w-xs">
+                          {student.subjects && student.subjects.length > 0 ? (
+                            student.subjects.map((subject: any) => (
+                              <span
+                                key={subject.id}
+                                className="px-2 py-1 bg-purple-100 text-purple-800 rounded-full text-xs font-medium"
+                              >
+                                {subject.subject?.name || subject.name}
+                              </span>
+                            ))
+                          ) : (
+                            <span className="text-gray-400 text-xs">No subjects</span>
+                          )}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
                         <span
                           className={`px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${
                             student.isActive
@@ -420,13 +501,6 @@ export default function StudentsPage() {
                           {student.isActive ? t.users?.active || 'Active' : t.users?.inactive || 'Inactive'}
                         </span>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {new Date(student.createdAt).toLocaleDateString('en-US', { 
-                          year: 'numeric', 
-                          month: 'short', 
-                          day: 'numeric' 
-                        })}
-                      </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm">
                         <button
                           onClick={(e) => {
@@ -435,7 +509,7 @@ export default function StudentsPage() {
                           }}
                           className="text-indigo-600 hover:text-indigo-900 font-medium"
                         >
-                          Manage Teachers
+                          Manage Classes & Subjects
                         </button>
                       </td>
                     </tr>
@@ -476,21 +550,55 @@ export default function StudentsPage() {
                       {student.isActive ? t.users?.active || 'Active' : t.users?.inactive || 'Inactive'}
                     </span>
                   </div>
-                  <div className="text-sm text-gray-500">
-                    Joined: {new Date(student.createdAt).toLocaleDateString('en-US', { 
-                      year: 'numeric', 
-                      month: 'short', 
-                      day: 'numeric' 
-                    })}
+                  <div className="mb-3">
+                    <div className="text-sm text-gray-500 mb-2">
+                      Joined: {new Date(student.createdAt).toLocaleDateString('en-US', { 
+                        year: 'numeric', 
+                        month: 'short', 
+                        day: 'numeric' 
+                      })}
+                    </div>
+                    
+                    {/* Class Display */}
+                    <div className="mb-2">
+                      <span className="text-xs font-medium text-gray-600">Class: </span>
+                      {student.class ? (
+                        <span className="px-2 py-1 bg-blue-100 text-blue-800 rounded-full text-xs font-medium">
+                          {student.class.name}
+                        </span>
+                      ) : (
+                        <span className="text-gray-400 text-xs">No class assigned</span>
+                      )}
+                    </div>
+                    
+                    {/* Subjects Display */}
+                    <div className="mb-2">
+                      <span className="text-xs font-medium text-gray-600">Subjects: </span>
+                      <div className="flex flex-wrap gap-1 mt-1">
+                        {student.subjects && student.subjects.length > 0 ? (
+                          student.subjects.map((subject: any) => (
+                            <span
+                              key={subject.id}
+                              className="px-2 py-1 bg-purple-100 text-purple-800 rounded-full text-xs font-medium"
+                            >
+                              {subject.subject?.name || subject.name}
+                            </span>
+                          ))
+                        ) : (
+                          <span className="text-gray-400 text-xs">No subjects</span>
+                        )}
+                      </div>
+                    </div>
                   </div>
+                  
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
                       openStudentModal(student);
                     }}
-                    className="mt-3 w-full py-2 text-center text-indigo-600 hover:text-indigo-900 font-medium text-sm border border-indigo-200 rounded-lg hover:bg-indigo-50"
+                    className="w-full py-2 text-center text-indigo-600 hover:text-indigo-900 font-medium text-sm border border-indigo-200 rounded-lg hover:bg-indigo-50"
                   >
-                    Manage Teachers
+                    Manage Classes & Subjects
                   </button>
                 </div>
               ))}
@@ -511,13 +619,13 @@ export default function StudentsPage() {
         )}
       </main>
 
-      {/* Teacher Assignment Modal */}
+      {/* Class & Subject Management Modal */}
       {showModal && selectedStudent && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
             <div className="sticky top-0 bg-gradient-to-r from-emerald-500 to-green-600 px-6 py-4 rounded-t-2xl">
               <div className="flex items-center justify-between">
-                <h2 className="text-2xl font-bold text-white">Manage Teachers</h2>
+                <h2 className="text-2xl font-bold text-white">Manage Classes & Subjects</h2>
                 <button
                   onClick={() => setShowModal(false)}
                   className="text-white hover:bg-white/20 rounded-lg p-2 transition-colors"
@@ -561,81 +669,113 @@ export default function StudentsPage() {
                 </div>
               )}
 
-              {/* Current Teachers */}
-              <div>
-                <h3 className="text-sm font-medium text-gray-700 mb-3">Assigned Teachers</h3>
-                {modalLoading ? (
-                  <div className="flex justify-center py-4">
-                    <LoadingSpinner size="sm" />
-                  </div>
-                ) : (
-                  <div className="space-y-2">
-                    {selectedStudent.teachers && selectedStudent.teachers.length > 0 ? (
-                      selectedStudent.teachers.map((assignment) => (
-                        <div
-                          key={assignment.id}
-                          className="flex items-center justify-between p-3 bg-purple-50 border border-purple-200 rounded-lg"
-                        >
-                          <div className="flex items-center gap-3">
-                            <div className="h-10 w-10 bg-gradient-to-br from-purple-500 to-indigo-600 rounded-full flex items-center justify-center">
-                              <span className="text-white font-semibold">
-                                {assignment.teacher.user.firstName[0]}{assignment.teacher.user.lastName[0]}
-                              </span>
-                            </div>
-                            <div>
-                              <p className="font-medium text-gray-900">
-                                {assignment.teacher.user.firstName} {assignment.teacher.user.lastName}
-                              </p>
-                              <p className="text-xs text-gray-600">{assignment.teacher.user.email}</p>
-                            </div>
-                          </div>
-                          <button
-                            onClick={() => removeTeacher(assignment.teacherId)}
-                            className="px-3 py-1 text-sm text-red-600 hover:bg-red-100 rounded-lg transition-colors"
-                            aria-label={`Remove ${assignment.teacher.user.firstName} ${assignment.teacher.user.lastName}`}
-                          >
-                            Remove
-                          </button>
-                        </div>
-                      ))
-                    ) : (
-                      <p className="text-sm text-gray-500 italic py-4 text-center">No teachers assigned yet</p>
+              {modalLoading ? (
+                <div className="flex justify-center py-8">
+                  <LoadingSpinner size="md" />
+                </div>
+              ) : (
+                <>
+                  {/* Class Section (Single Select) */}
+                  <div>
+                    <label htmlFor="class-select" className="block text-lg font-semibold text-gray-900 mb-3 flex items-center gap-2">
+                      <svg className="w-5 h-5 text-emerald-600" fill="currentColor" viewBox="0 0 20 20">
+                        <path d="M10.394 2.08a1 1 0 00-.788 0l-7 3a1 1 0 000 1.84L5.25 8.051a.999.999 0 01.356-.257l4-1.714a1 1 0 11.788 1.838L7.667 9.088l1.94.831a1 1 0 00.787 0l7-3a1 1 0 000-1.838l-7-3z" />
+                      </svg>
+                      Class (Select One)
+                    </label>
+                    <select
+                      id="class-select"
+                      value={selectedClassId}
+                      onChange={(e) => setSelectedClassId(e.target.value)}
+                      className="w-full px-4 py-3 text-base border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 bg-white"
+                    >
+                      <option value="">-- No Class (Optional) --</option>
+                      {allClasses.map((classItem) => (
+                        <option key={classItem.id} value={classItem.id}>
+                          {classItem.name} {classItem.grade ? `- Grade ${classItem.grade}` : ''}
+                        </option>
+                      ))}
+                    </select>
+                    {allClasses.length === 0 && (
+                      <p className="text-sm text-gray-500 italic mt-2">No classes available</p>
                     )}
                   </div>
-                )}
-              </div>
 
-              {/* Add Teacher */}
-              <div className="border-t pt-4">
-                <label htmlFor="teacher-select-modal" className="block text-sm font-medium text-gray-700 mb-3">
-                  Assign New Teacher
-                </label>
-                <div className="flex gap-2">
-                  <select
-                    id="teacher-select-modal"
-                    value={selectedTeacherId}
-                    onChange={(e) => setSelectedTeacherId(e.target.value)}
-                    className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-                  >
-                    <option value="">Choose a teacher...</option>
-                    {availableTeachers.map((teacher) => (
-                      <option key={teacher.id} value={teacher.id}>
-                        {teacher.user.firstName} {teacher.user.lastName}
-                      </option>
-                    ))}
-                  </select>
-                  <button
-                    onClick={assignTeacher}
-                    disabled={!selectedTeacherId}
-                    className="px-6 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors font-medium"
-                  >
-                    Assign
-                  </button>
-                </div>
-                {availableTeachers.length === 0 && (
-                  <p className="text-xs text-gray-500 mt-2">All teachers are already assigned to this student</p>
-                )}
-              </div>
+                  {/* Subjects Section */}
+                  <div className="border-t pt-6">
+                    <h3 className="text-lg font-semibold text-gray-900 mb-3 flex items-center gap-2">
+                      <svg className="w-5 h-5 text-indigo-600" fill="currentColor" viewBox="0 0 20 20">
+                        <path d="M9 4.804A7.968 7.968 0 005.5 4c-1.255 0-2.443.29-3.5.804v10A7.969 7.969 0 015.5 14c1.669 0 3.218.51 4.5 1.385A7.962 7.962 0 0114.5 14c1.255 0 2.443.29 3.5.804v-10A7.968 7.968 0 0014.5 4c-1.255 0-2.443.29-3.5.804V12a1 1 0 11-2 0V4.804z" />
+                      </svg>
+                      Subjects ({selectedSubjectIds.length} selected)
+                      <span className="text-xs text-red-600 font-normal">(Minimum 1 required)</span>
+                    </h3>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 max-h-60 overflow-y-auto p-2">
+                      {availableSubjects.map((subject) => (
+                        <button
+                          key={subject.id}
+                          onClick={() => toggleSubject(subject.id)}
+                          className={`p-4 rounded-lg border-2 transition-all text-left min-h-[60px] ${
+                            selectedSubjectIds.includes(subject.id)
+                              ? 'border-indigo-500 bg-indigo-50 shadow-md'
+                              : 'border-gray-200 hover:border-indigo-300 bg-white'
+                          }`}
+                        >
+                          <div className="flex items-center justify-between">
+                            <div className="flex-1">
+                              <p className="font-semibold text-gray-900">{subject.name}</p>
+                              {subject.class && (
+                                <p className="text-xs text-gray-600 mt-1">Class: {subject.class.name}</p>
+                              )}
+                            </div>
+                            {selectedSubjectIds.includes(subject.id) && (
+                              <svg className="w-6 h-6 text-indigo-600 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                              </svg>
+                            )}
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                    {availableSubjects.length === 0 && (
+                      <p className="text-sm text-gray-500 italic text-center py-4">
+                        {!selectedClassId 
+                          ? 'Please select a class to see available subjects, or leave class empty to see all subjects'
+                          : 'No subjects available for the selected class'}
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Save Button */}
+                  <div className="flex justify-end gap-3 pt-4 border-t">
+                    <button
+                      onClick={() => setShowModal(false)}
+                      className="px-6 py-3 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 font-medium transition-colors"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={handleSaveChanges}
+                      disabled={saving || selectedSubjectIds.length === 0}
+                      className="px-6 py-3 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors font-medium flex items-center gap-2"
+                    >
+                      {saving ? (
+                        <>
+                          <LoadingSpinner size="sm" />
+                          Saving...
+                        </>
+                      ) : (
+                        <>
+                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                          </svg>
+                          Save Changes
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </>
+              )}
             </div>
           </div>
         </div>

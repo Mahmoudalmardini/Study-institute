@@ -37,6 +37,28 @@ export interface AuthResponse {
   refreshToken: string;
 }
 
+export interface StudentClass {
+  id: string;
+  studentId: string;
+  classId: string;
+  class: Class;
+  assignedBy: string;
+  assignedAt: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface StudentSubject {
+  id: string;
+  studentId: string;
+  subjectId: string;
+  subject: Subject;
+  enrolledBy: string;
+  enrolledAt: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface Student {
   id: string;
   userId: string;
@@ -46,6 +68,8 @@ export interface Student {
   enrollmentDate: string;
   classId?: string;
   class?: Class;
+  classes?: StudentClass[];
+  subjects?: StudentSubject[];
 }
 
 export interface Teacher {

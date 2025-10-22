@@ -121,6 +121,15 @@ export class StudentsService {
           },
         },
         class: true,
+        classes: {
+          include: {
+            class: {
+              include: {
+                subjects: true,
+              },
+            },
+          },
+        },
         subjects: {
           include: {
             subject: {
@@ -279,15 +288,43 @@ export class StudentsService {
     subjectIds: string[],
     enrolledBy: string,
   ) {
-    await this.findOne(studentId); // Validate student exists
+    const student = await this.findOne(studentId); // Validate student exists
+
+    // Validate minimum 1 subject
+    if (!subjectIds || subjectIds.length === 0) {
+      throw new ConflictException('At least one subject must be assigned');
+    }
 
     // Validate all subjects exist
     const subjects = await this.prisma.subject.findMany({
       where: { id: { in: subjectIds } },
+      include: { class: true },
     });
 
     if (subjects.length !== subjectIds.length) {
       throw new NotFoundException('One or more subjects not found');
+    }
+
+    // Get student's assigned classes
+    const studentClasses = await this.prisma.studentClass.findMany({
+      where: { studentId },
+      select: { classId: true },
+    });
+
+    const studentClassIds = studentClasses.map((sc) => sc.classId);
+
+    // Validate subjects belong to student's assigned classes (if student has classes)
+    if (studentClassIds.length > 0) {
+      const invalidSubjects = subjects.filter(
+        (subject) =>
+          subject.classId && !studentClassIds.includes(subject.classId),
+      );
+
+      if (invalidSubjects.length > 0) {
+        throw new ConflictException(
+          `Some subjects do not belong to student's assigned classes: ${invalidSubjects.map((s) => s.name).join(', ')}`,
+        );
+      }
     }
 
     // Remove existing enrollments not in the new list
@@ -328,6 +365,105 @@ export class StudentsService {
     );
 
     return enrollments;
+  }
+
+  async assignClasses(
+    studentId: string,
+    classIds: string[],
+    assignedBy: string,
+  ) {
+    await this.findOne(studentId); // Validate student exists
+
+    // Validate all classes exist
+    const classes = await this.prisma.class.findMany({
+      where: { id: { in: classIds } },
+    });
+
+    if (classes.length !== classIds.length) {
+      throw new NotFoundException('One or more classes not found');
+    }
+
+    // Remove existing class assignments not in the new list
+    await this.prisma.studentClass.deleteMany({
+      where: {
+        studentId,
+        classId: { notIn: classIds },
+      },
+    });
+
+    // Create new class assignments (skip if already exists)
+    const assignments = await Promise.all(
+      classIds.map(async (classId) => {
+        const existing = await this.prisma.studentClass.findUnique({
+          where: {
+            studentId_classId: {
+              studentId,
+              classId,
+            },
+          },
+        });
+
+        if (existing) {
+          return existing;
+        }
+
+        return this.prisma.studentClass.create({
+          data: {
+            studentId,
+            classId,
+            assignedBy,
+          },
+          include: {
+            class: true,
+          },
+        });
+      }),
+    );
+
+    return assignments;
+  }
+
+  async getStudentClasses(studentId: string) {
+    await this.findOne(studentId); // Validate student exists
+
+    return this.prisma.studentClass.findMany({
+      where: { studentId },
+      include: {
+        class: {
+          include: {
+            subjects: true,
+          },
+        },
+      },
+    });
+  }
+
+  async removeStudentClass(studentId: string, classId: string) {
+    await this.findOne(studentId); // Validate student exists
+
+    const assignment = await this.prisma.studentClass.findUnique({
+      where: {
+        studentId_classId: {
+          studentId,
+          classId,
+        },
+      },
+    });
+
+    if (!assignment) {
+      throw new NotFoundException('Class assignment not found');
+    }
+
+    await this.prisma.studentClass.delete({
+      where: {
+        studentId_classId: {
+          studentId,
+          classId,
+        },
+      },
+    });
+
+    return { message: 'Class assignment removed successfully' };
   }
 
   async getStudentSubjects(studentId: string) {

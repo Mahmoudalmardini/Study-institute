@@ -103,6 +103,7 @@ model Student {
   evaluations   Evaluation[]
   teachers      StudentTeacher[]
   subjects      StudentSubject[]
+  classes       StudentClass[]
 
   @@index([userId])
   @@index([classId])
@@ -138,9 +139,10 @@ model Class {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
-  students Student[]
-  homework Homework[]
-  subjects Subject[]
+  students       Student[]
+  homework       Homework[]
+  subjects       Subject[]
+  studentClasses StudentClass[]
 
   @@index([teacherId])
   @@index([academicYear])
@@ -373,4 +375,22 @@ model StudentSubject {
   @@index([subjectId])
   @@index([enrolledBy])
   @@map("student_subjects")
+}
+
+model StudentClass {
+  id          String   @id @default(uuid())
+  studentId   String
+  student     Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  classId     String
+  class       Class    @relation(fields: [classId], references: [id], onDelete: Cascade)
+  assignedBy  String   // User ID of admin/supervisor who made the assignment
+  assignedAt  DateTime @default(now())
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([studentId, classId])
+  @@index([studentId])
+  @@index([classId])
+  @@index([assignedBy])
+  @@map("student_classes")
 }
