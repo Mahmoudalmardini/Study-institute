@@ -187,6 +187,64 @@ export default function SupervisorStudentsPage() {
           const createData = await createRes.json();
           studentProfile = createData.data || createData;
           console.log('Student profile created:', studentProfile);
+        } else if (createRes.status === 409) {
+          // Profile already exists, try to fetch it directly
+          console.log('Profile already exists, fetching it...');
+          try {
+            // First try to get the profile from the response if it contains the created profile
+            const errorData = await createRes.json().catch(() => ({}));
+            if (errorData.data) {
+              studentProfile = errorData.data;
+              console.log('Found profile in error response:', studentProfile);
+            } else {
+              // If not in error response, try to fetch all students and find the one we need
+              const fetchRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/students`, {
+                headers: { Authorization: `Bearer ${token}` },
+              });
+              if (fetchRes.ok) {
+                const fetchData = await fetchRes.json();
+                studentProfile = (fetchData.data || []).find((s: any) => s.userId === student.id);
+                if (studentProfile) {
+                  console.log('Found existing profile from students list:', studentProfile);
+                }
+              }
+            }
+          } catch (fetchErr) {
+            console.error('Error fetching existing profile:', fetchErr);
+          }
+          
+          if (!studentProfile) {
+            // If we still can't find the profile, try to create it again with a different approach
+            console.log('Profile not found, attempting to create again...');
+            try {
+              const retryRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/students`, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  Authorization: `Bearer ${token}`,
+                },
+                body: JSON.stringify({
+                  userId: student.id,
+                }),
+              });
+              
+              if (retryRes.ok) {
+                const retryData = await retryRes.json();
+                studentProfile = retryData.data || retryData;
+                console.log('Successfully created profile on retry:', studentProfile);
+              } else {
+                console.error('Retry failed:', retryRes.status);
+                setError('Unable to create or retrieve student profile. Please try again.');
+                setModalLoading(false);
+                return;
+              }
+            } catch (retryErr) {
+              console.error('Retry error:', retryErr);
+              setError('Unable to create or retrieve student profile. Please try again.');
+              setModalLoading(false);
+              return;
+            }
+          }
         } else {
           const errorData = await createRes.json().catch(() => ({}));
           console.error('Failed to create profile:', createRes.status, errorData);
@@ -345,8 +403,8 @@ export default function SupervisorStudentsPage() {
 
   // Get subjects that belong to selected class
   const availableSubjects = allSubjects.filter(subject => {
-    if (!selectedClassId) return true;
-    return subject.classId === selectedClassId;
+    if (!selectedClassId) return false; // Don't show any subjects if no class is selected
+    return subject.class?.id === selectedClassId;
   });
 
   return (
@@ -621,8 +679,8 @@ export default function SupervisorStudentsPage() {
 
       {/* Class & Subject Management Modal */}
       {showModal && selectedStudent && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50 overflow-hidden">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] flex flex-col">
             <div className="sticky top-0 bg-gradient-to-r from-blue-500 to-cyan-600 px-6 py-4 rounded-t-2xl">
               <div className="flex items-center justify-between">
                 <h2 className="text-2xl font-bold text-white">Manage Classes & Subjects</h2>
@@ -638,7 +696,7 @@ export default function SupervisorStudentsPage() {
               </div>
             </div>
 
-            <div className="p-6 space-y-6">
+            <div className="p-6 space-y-6 overflow-y-auto flex-1">
               {/* Student Info */}
               <div className="bg-gray-50 rounded-lg p-4">
                 <h3 className="text-sm font-medium text-gray-700 mb-2">Student</h3>
@@ -686,10 +744,17 @@ export default function SupervisorStudentsPage() {
                     <select
                       id="class-select"
                       value={selectedClassId}
-                      onChange={(e) => setSelectedClassId(e.target.value)}
+                      onChange={(e) => {
+                        const newClassId = e.target.value;
+                        setSelectedClassId(newClassId);
+                        // Clear selected subjects when class changes to force reselection
+                        setSelectedSubjectIds([]);
+                        setSuccess('Class changed. Please reselect subjects for the new class.');
+                      }}
                       className="w-full px-4 py-3 text-base border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
+                      required
                     >
-                      <option value="">-- No Class (Optional) --</option>
+                      <option value="">-- Select a Class --</option>
                       {allClasses.map((classItem) => (
                         <option key={classItem.id} value={classItem.id}>
                           {classItem.name} {classItem.grade ? `- Grade ${classItem.grade}` : ''}
@@ -703,13 +768,33 @@ export default function SupervisorStudentsPage() {
 
                   {/* Subjects Section */}
                   <div className="border-t pt-6">
-                    <h3 className="text-lg font-semibold text-gray-900 mb-3 flex items-center gap-2">
-                      <svg className="w-5 h-5 text-indigo-600" fill="currentColor" viewBox="0 0 20 20">
-                        <path d="M9 4.804A7.968 7.968 0 005.5 4c-1.255 0-2.443.29-3.5.804v10A7.969 7.969 0 015.5 14c1.669 0 3.218.51 4.5 1.385A7.962 7.962 0 0114.5 14c1.255 0 2.443.29 3.5.804v-10A7.968 7.968 0 0014.5 4c-1.255 0-2.443.29-3.5.804V12a1 1 0 11-2 0V4.804z" />
-                      </svg>
-                      Subjects ({selectedSubjectIds.length} selected)
-                      <span className="text-xs text-red-600 font-normal">(Minimum 1 required)</span>
-                    </h3>
+                    <div className="mb-3">
+                      <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+                        <svg className="w-5 h-5 text-indigo-600" fill="currentColor" viewBox="0 0 20 20">
+                          <path d="M9 4.804A7.968 7.968 0 005.5 4c-1.255 0-2.443.29-3.5.804v10A7.969 7.969 0 015.5 14c1.669 0 3.218.51 4.5 1.385A7.962 7.962 0 0114.5 14c1.255 0 2.443.29 3.5.804v-10A7.968 7.968 0 0014.5 4c-1.255 0-2.443.29-3.5.804V12a1 1 0 11-2 0V4.804z" />
+                        </svg>
+                        Subjects ({selectedSubjectIds.length} selected)
+                        <span className="text-xs text-red-600 font-normal">(Minimum 1 required)</span>
+                      </h3>
+                      {selectedClassId && selectedSubjectIds.length === 0 && (
+                        <p className="text-sm text-amber-600 bg-amber-50 p-2 rounded-lg mt-2">
+                          <svg className="w-4 h-4 inline mr-1" fill="currentColor" viewBox="0 0 20 20">
+                            <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                          </svg>
+                          Please select subjects for the chosen class
+                        </p>
+                      )}
+                    </div>
+                    {selectedClassId && availableSubjects.length > 0 && (
+                      <div className="mb-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                        <p className="text-sm text-blue-800 font-medium">
+                          <svg className="w-4 h-4 inline mr-1" fill="currentColor" viewBox="0 0 20 20">
+                            <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                          </svg>
+                          Showing subjects for: {allClasses.find(c => c.id === selectedClassId)?.name || 'Selected Class'}
+                        </p>
+                      </div>
+                    )}
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 max-h-60 overflow-y-auto p-2">
                       {availableSubjects.map((subject) => (
                         <button
@@ -756,7 +841,7 @@ export default function SupervisorStudentsPage() {
                     </button>
                     <button
                       onClick={handleSaveChanges}
-                      disabled={saving || selectedSubjectIds.length === 0}
+                      disabled={saving || !selectedClassId || selectedSubjectIds.length === 0}
                       className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors font-medium flex items-center gap-2"
                     >
                       {saving ? (

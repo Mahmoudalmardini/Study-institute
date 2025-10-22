@@ -163,6 +163,7 @@ export default function SubjectsPage() {
       setError('');
       await apiClient.post(`/subjects/${selectedSubject?.id}/assign-teacher`, {
         teacherId: teacherFormData.teacherId,
+        classId: selectedSubject?.classId, // Use the subject's class ID
       });
       setSuccess('Teacher assigned successfully!');
       setTeacherFormData({ teacherId: '' });
