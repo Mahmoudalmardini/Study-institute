@@ -29,6 +29,27 @@ interface Teacher {
   };
 }
 
+interface Subject {
+  id: string;
+  subject: {
+    id: string;
+    name: string;
+    class: {
+      id: string;
+      name: string;
+    };
+    teachers: Array<{
+      teacher: {
+        id: string;
+        user: {
+          firstName: string;
+          lastName: string;
+        };
+      };
+    }>;
+  };
+}
+
 export default function StudentHomeworkPage() {
   const router = useRouter();
   const { t, locale } = useI18n();
@@ -43,10 +64,14 @@ export default function StudentHomeworkPage() {
   const [submitting, setSubmitting] = useState(false);
   const [myTeachers, setMyTeachers] = useState<Teacher[]>([]);
   const [studentProfileId, setStudentProfileId] = useState<string | null>(null);
+  const [mySubjects, setMySubjects] = useState<Subject[]>([]);
+  const [availableTeachers, setAvailableTeachers] = useState<Teacher[]>([]);
+  const [loadingTeachers, setLoadingTeachers] = useState(false);
 
   const [formData, setFormData] = useState({
     title: '',
     description: '',
+    subjectId: '',
     teacherId: '',
   });
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
@@ -63,6 +88,7 @@ export default function StudentHomeworkPage() {
     setUser({ name: 'Student', role: 'STUDENT' });
     setMounted(true);
     fetchStudentData();
+    fetchSubjects();
     fetchHomework();
   }, [router]);
 
@@ -73,7 +99,7 @@ export default function StudentHomeworkPage() {
       console.log('Fetching student profile...');
       
       // Get student profile (backend auto-creates if doesn't exist)
-      const profileRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/students/me`, {
+      const profileRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api'}/students/me`, {
         headers: { Authorization: `Bearer ${token}` },
       });
 
@@ -93,7 +119,7 @@ export default function StudentHomeworkPage() {
       // Fetch assigned teachers
       console.log('Fetching assigned teachers for profile:', profile.id);
       const teachersRes = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/student-teachers/student/${profile.id}`,
+        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api'}/student-teachers/student/${profile.id}`,
         { headers: { Authorization: `Bearer ${token}` } }
       );
 
@@ -119,6 +145,71 @@ export default function StudentHomeworkPage() {
       }
     } catch (err) {
       console.error('Error fetching student data:', err);
+    }
+  };
+
+  const fetchSubjects = async () => {
+    try {
+      const token = localStorage.getItem('accessToken');
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api'}/homework/my-subjects`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        console.log('Student subjects:', data);
+        // Handle both direct array response and wrapped response
+        const subjects = Array.isArray(data) ? data : (data.data || []);
+        setMySubjects(subjects);
+      } else {
+        console.error('Failed to fetch subjects:', response.status);
+        setMySubjects([]);
+      }
+    } catch (err) {
+      console.error('Error fetching subjects:', err);
+      setMySubjects([]);
+    }
+  };
+
+  const fetchTeachersForSubject = async (subjectId: string) => {
+    if (!subjectId) {
+      setAvailableTeachers([]);
+      return;
+    }
+
+    setLoadingTeachers(true);
+    try {
+      const token = localStorage.getItem('accessToken');
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api'}/homework/subjects/${subjectId}/teachers`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+
+      if (response.ok) {
+        const data = await response.json();
+        console.log('Available teachers for subject:', data);
+        // Handle both direct array response and wrapped response
+        const teachers = Array.isArray(data) ? data : (data.data || []);
+        console.log('Processed teachers:', teachers);
+        setAvailableTeachers(teachers);
+        
+        // Auto-select teacher if only one available
+        if (teachers.length === 1) {
+          setFormData(prev => ({ ...prev, teacherId: teachers[0].id }));
+        } else {
+          setFormData(prev => ({ ...prev, teacherId: '' }));
+        }
+      } else {
+        console.error('Failed to fetch teachers:', response.status);
+        const errorData = await response.json().catch(() => ({}));
+        console.error('Error details:', errorData);
+        setAvailableTeachers([]);
+      }
+    } catch (err) {
+      console.error('Error fetching teachers:', err);
+      setAvailableTeachers([]);
+    } finally {
+      setLoadingTeachers(false);
     }
   };
 
@@ -206,18 +297,19 @@ export default function StudentHomeworkPage() {
   };
 
   const openAddForm = () => {
-    console.log('Opening add form, myTeachers:', myTeachers);
-    console.log('Number of teachers:', myTeachers.length);
+    console.log('Opening add form, mySubjects:', mySubjects);
+    console.log('Number of subjects:', (mySubjects || []).length);
     
-    if (myTeachers.length === 0) {
-      console.error('No teachers available!');
-      setError('You need to be assigned to at least one teacher before submitting homework. Please contact your administrator.');
+    if ((mySubjects || []).length === 0) {
+      console.error('No subjects available!');
+      setError('You are not enrolled in any subjects. Please contact your administrator.');
       return;
     }
     
     setEditingHomework(null);
-    setFormData({ title: '', description: '', teacherId: '' });
+    setFormData({ title: '', description: '', subjectId: '', teacherId: '' });
     setSelectedFiles([]);
+    setAvailableTeachers([]);
     setShowForm(true);
     setError('');
     setSuccess('');
@@ -239,8 +331,9 @@ export default function StudentHomeworkPage() {
   const closeForm = () => {
     setShowForm(false);
     setEditingHomework(null);
-    setFormData({ title: '', description: '', teacherId: '' });
+    setFormData({ title: '', description: '', subjectId: '', teacherId: '' });
     setSelectedFiles([]);
+    setAvailableTeachers([]);
     setError('');
   };
 
@@ -254,8 +347,14 @@ export default function StudentHomeworkPage() {
       return;
     }
 
-    if (!formData.teacherId) {
-      setError('Please select a teacher to submit this homework to.');
+    if (!formData.subjectId) {
+      setError('Please select a subject.');
+      return;
+    }
+
+    // Teacher selection is required only if multiple teachers available
+    if (availableTeachers.length > 1 && !formData.teacherId) {
+      setError('Please select a teacher.');
       return;
     }
 
@@ -264,15 +363,18 @@ export default function StudentHomeworkPage() {
     try {
       const token = localStorage.getItem('accessToken');
       
-      console.log('Submitting homework to teacher (multipart):', formData.teacherId);
+      console.log('Submitting homework to subject:', formData.subjectId);
       
       const fd = new FormData();
+      fd.append('subjectId', formData.subjectId);
       fd.append('title', formData.title);
       fd.append('description', formData.description);
-      fd.append('teacherId', formData.teacherId);
+      if (formData.teacherId) {
+        fd.append('teacherId', formData.teacherId);
+      }
       selectedFiles.forEach((file) => fd.append('files', file));
 
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/homework/submit-to-teacher`, {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api'}/homework/submit-to-subject-teacher`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -490,32 +592,81 @@ export default function StudentHomeworkPage() {
                 />
               </div>
 
-              {/* Teacher Selection */}
+              {/* Subject Selection */}
               <div>
-                <label htmlFor="teacher" className="block text-sm font-medium text-gray-700">
-                  {t.homework.selectTeacher || 'Select Teacher'} *
+                <label htmlFor="subject" className="block text-sm font-medium text-gray-700">
+                  Select Subject *
                 </label>
                 <select
-                  id="teacher"
-                  value={formData.teacherId}
-                  onChange={(e) => setFormData({ ...formData, teacherId: e.target.value })}
+                  id="subject"
+                  value={formData.subjectId}
+                  onChange={(e) => {
+                    setFormData({ ...formData, subjectId: e.target.value, teacherId: '' });
+                    fetchTeachersForSubject(e.target.value);
+                  }}
                   required
-                  disabled={submitting}
+                  disabled={submitting || loadingTeachers}
                   className="mt-2 w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-300 bg-white"
                 >
-                  <option value="">{t.homework.chooseTeacher || 'Choose a teacher...'}</option>
-                  {myTeachers.map((teacher) => (
-                    <option key={teacher.id} value={teacher.id}>
-                      {teacher.user.firstName} {teacher.user.lastName}
+                  <option value="">Choose a subject...</option>
+                  {(mySubjects || []).map((enrollment) => (
+                    <option key={enrollment.subject.id} value={enrollment.subject.id}>
+                      {enrollment.subject.name} - {enrollment.subject.class?.name || 'N/A'}
                     </option>
                   ))}
                 </select>
-                {myTeachers.length === 0 && (
+                {(mySubjects || []).length === 0 && (
                   <p className="mt-2 text-sm text-amber-600">
-                    ⚠️ You are not assigned to any teachers yet. Please contact your administrator.
+                    ⚠️ You are not enrolled in any subjects. Please contact your administrator.
                   </p>
                 )}
               </div>
+
+              {/* Teacher Selection - Show if teachers are available */}
+              {(() => {
+                console.log('Teacher selection check:', {
+                  subjectId: formData.subjectId,
+                  availableTeachersLength: availableTeachers.length,
+                  availableTeachers: availableTeachers,
+                  shouldShow: formData.subjectId && availableTeachers.length > 0
+                });
+                return formData.subjectId && availableTeachers.length > 0;
+              })() && (
+                <div>
+                  <label htmlFor="teacher" className="block text-sm font-medium text-gray-700">
+                    Select Teacher *
+                  </label>
+                  <select
+                    id="teacher"
+                    value={formData.teacherId}
+                    onChange={(e) => setFormData({ ...formData, teacherId: e.target.value })}
+                    required
+                    disabled={submitting}
+                    className="mt-2 w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-300 bg-white"
+                  >
+                    <option value="">Choose a teacher...</option>
+                    {availableTeachers.map((teacher) => (
+                      <option key={teacher.id} value={teacher.id}>
+                        {teacher.user.firstName} {teacher.user.lastName}
+                      </option>
+                    ))}
+                  </select>
+                  <p className="mt-2 text-sm text-gray-500">
+                    {availableTeachers.length > 1 
+                      ? 'Multiple teachers teach this subject. Please select one.'
+                      : 'Select the teacher for this subject.'
+                    }
+                  </p>
+                </div>
+              )}
+
+              {/* Loading state */}
+              {loadingTeachers && formData.subjectId && (
+                <div className="flex items-center gap-2 text-sm text-gray-600">
+                  <LoadingSpinner size="sm" />
+                  <span>Loading available teachers...</span>
+                </div>
+              )}
 
               {/* File Upload */}
               <div>

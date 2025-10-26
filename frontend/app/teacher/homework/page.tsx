@@ -67,7 +67,7 @@ export default function TeacherHomeworkPage() {
     try {
       const token = localStorage.getItem('accessToken');
       // Use the conflict-safe endpoint path
-      const url = `${process.env.NEXT_PUBLIC_API_URL}/homework/submissions/received`;
+      const url = `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api'}/homework/submissions/received`;
       
       console.log('=== FETCHING TEACHER SUBMISSIONS ===');
       console.log('URL:', url);
@@ -125,7 +125,10 @@ export default function TeacherHomeworkPage() {
       // Transform data to match the interface
       type SubmissionApi = {
         id: string;
+        title?: string;
+        description?: string;
         homework?: { title?: string; description?: string } | null;
+        subject?: { id?: string; name?: string } | null;
         submittedAt?: string;
         status?: string;
         grade?: number | null;
@@ -154,8 +157,8 @@ export default function TeacherHomeworkPage() {
 
       const transformedSubmissions: StudentHomeworkSubmission[] = (rawList as SubmissionApi[]).map((sub: SubmissionApi) => ({
         id: sub.id,
-        title: sub.homework?.title ?? '',
-        description: sub.homework?.description ?? '',
+        title: sub.title || sub.homework?.title || '',
+        description: sub.description || sub.homework?.description || '',
         files: (sub.fileUrls ?? []).map((url) => ({
           name: fileNameFrom(url),
           url: buildFileUrl(url),
@@ -226,7 +229,7 @@ export default function TeacherHomeworkPage() {
     try {
       const token = localStorage.getItem('accessToken');
       const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/homework/submissions/${selectedSubmission?.id}/evaluate`,
+        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api'}/homework/submissions/${selectedSubmission?.id}/evaluate`,
         {
           method: 'POST',
           headers: {

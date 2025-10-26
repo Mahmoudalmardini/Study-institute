@@ -8,6 +8,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { CreateHomeworkDto } from './dto/create-homework.dto';
 import { UpdateHomeworkDto } from './dto/update-homework.dto';
 import { CreateSubmissionDto } from './dto/create-submission.dto';
+import { SubmitToSubjectTeacherDto } from './dto/submit-to-subject-teacher.dto';
 import { GradeSubmissionDto } from './dto/grade-submission.dto';
 import { TeacherEvaluateSubmissionDto } from './dto/teacher-evaluate-submission.dto';
 import { AdminReviewSubmissionDto } from './dto/admin-review-submission.dto';
@@ -487,21 +488,57 @@ export class HomeworkService {
     console.log('[getTeacherSubmissions] Fetching submissions for teacher user:', teacherUserId);
     
     // Find teacher profile
-    const teacher = await this.prisma.teacher.findFirst({
+    let teacher = await this.prisma.teacher.findFirst({
       where: { userId: teacherUserId },
     });
 
     console.log('[getTeacherSubmissions] Teacher profile found:', teacher);
+    console.log('[getTeacherSubmissions] Teacher ID:', teacher?.id);
 
     if (!teacher) {
-      console.log('[getTeacherSubmissions] No teacher profile found, returning empty array');
-      return []; // Return empty array if no teacher profile
+      console.log('[getTeacherSubmissions] No teacher profile found, creating one...');
+      // Auto-create teacher profile if it doesn't exist
+      teacher = await this.prisma.teacher.create({
+        data: { userId: teacherUserId },
+      });
+      console.log('[getTeacherSubmissions] Created teacher profile:', teacher);
     }
 
     console.log('[getTeacherSubmissions] Searching for submissions with teacherId:', teacher.id);
 
-    // Get all submissions for homework created by this teacher
-    const submissions = await this.prisma.submission.findMany({
+    // Get submissions directly assigned to this teacher (new approach)
+    const directSubmissions = await this.prisma.submission.findMany({
+      where: {
+        teacherId: teacher.id,
+      },
+      include: {
+        student: {
+          include: {
+            user: {
+              select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+                email: true,
+              },
+            },
+          },
+        },
+        subject: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
+      },
+      orderBy: { submittedAt: 'desc' },
+    });
+
+    console.log('[getTeacherSubmissions] Found direct submissions:', directSubmissions.length);
+    console.log('[getTeacherSubmissions] Direct submissions:', JSON.stringify(directSubmissions, null, 2));
+
+    // Get all submissions for homework created by this teacher (legacy approach)
+    const homeworkSubmissions = await this.prisma.submission.findMany({
       where: {
         homework: {
           teacherId: teacher.id,
@@ -532,10 +569,15 @@ export class HomeworkService {
       orderBy: { submittedAt: 'desc' },
     });
 
-    console.log('[getTeacherSubmissions] Found submissions:', submissions.length);
-    console.log('[getTeacherSubmissions] Submissions:', JSON.stringify(submissions, null, 2));
+    console.log('[getTeacherSubmissions] Found homework submissions:', homeworkSubmissions.length);
 
-    return submissions;
+    // Combine both types of submissions
+    const allSubmissions = [...directSubmissions, ...homeworkSubmissions];
+
+    console.log('[getTeacherSubmissions] Found total submissions:', allSubmissions.length);
+    console.log('[getTeacherSubmissions] Submissions:', JSON.stringify(allSubmissions, null, 2));
+
+    return allSubmissions;
   }
 
   // Admin Review Workflow Methods
@@ -900,5 +942,200 @@ export class HomeworkService {
         },
       },
     });
+  }
+
+  // Get teachers for a subject based on student's class
+  async getTeachersForStudentSubject(studentUserId: string, subjectId: string) {
+    // Find student profile
+    const student = await this.prisma.student.findUnique({
+      where: { userId: studentUserId },
+      include: {
+        classes: {
+          include: {
+            class: true,
+          },
+        },
+      },
+    });
+
+    if (!student) {
+      throw new NotFoundException('Student profile not found');
+    }
+
+    // Get subject to validate it exists
+    const subject = await this.prisma.subject.findUnique({
+      where: { id: subjectId },
+      include: {
+        class: true,
+      },
+    });
+
+    if (!subject) {
+      throw new NotFoundException('Subject not found');
+    }
+
+    // Check if student is enrolled in this subject
+    const enrollment = await this.prisma.studentSubject.findFirst({
+      where: {
+        studentId: student.id,
+        subjectId: subjectId,
+      },
+    });
+
+    if (!enrollment) {
+      throw new BadRequestException('Student is not enrolled in this subject');
+    }
+
+    // Get student's class IDs
+    const studentClassIds = student.classes.map(sc => sc.classId);
+
+    // Find teachers who teach this subject
+    const teacherSubjects = await this.prisma.teacherSubject.findMany({
+      where: {
+        subjectId: subjectId,
+      },
+      include: {
+        teacher: {
+          include: {
+            user: {
+              select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+                email: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    return teacherSubjects.map(ts => ({
+      id: ts.teacher.id,
+      user: ts.teacher.user,
+    }));
+  }
+
+  // Submit to subject with optional teacher selection
+  async submitToSubjectWithTeacher(
+    studentUserId: string,
+    dto: SubmitToSubjectTeacherDto,
+    files?: Express.Multer.File[],
+  ) {
+    // Find student profile
+    let student = await this.prisma.student.findUnique({
+      where: { userId: studentUserId },
+    });
+
+    if (!student) {
+      student = await this.prisma.student.create({
+        data: { userId: studentUserId },
+      });
+    }
+
+    // Get subject with class
+    const subject = await this.prisma.subject.findUnique({
+      where: { id: dto.subjectId },
+      include: {
+        class: true,
+      },
+    });
+
+    if (!subject) {
+      throw new NotFoundException('Subject not found');
+    }
+
+    // Validate student is enrolled in subject
+    const enrollment = await this.prisma.studentSubject.findFirst({
+      where: {
+        studentId: student.id,
+        subjectId: dto.subjectId,
+      },
+    });
+
+    if (!enrollment) {
+      throw new BadRequestException('You are not enrolled in this subject');
+    }
+
+    // Get students class IDs
+    const studentClasses = await this.prisma.studentClass.findMany({
+      where: { studentId: student.id },
+    });
+    const studentClassIds = studentClasses.map(sc => sc.classId);
+
+    // Find teachers who teach this subject
+    const availableTeachers = await this.prisma.teacherSubject.findMany({
+      where: {
+        subjectId: dto.subjectId,
+      },
+      include: {
+        teacher: true,
+      },
+    });
+
+    if (availableTeachers.length === 0) {
+      throw new NotFoundException('No teachers found for this subject');
+    }
+
+    let selectedTeacherId: string | undefined;
+
+    // If multiple teachers, require teacherId
+    if (availableTeachers.length > 1) {
+      if (!dto.teacherId) {
+        throw new BadRequestException('Multiple teachers teach this subject. Please select a teacher.');
+      }
+
+      // Validate teacherId is one of the available teachers
+      const teacherExists = availableTeachers.some(
+        at => at.teacher.id === dto.teacherId
+      );
+
+      if (!teacherExists) {
+        throw new BadRequestException('Selected teacher does not teach this subject in your class');
+      }
+
+      selectedTeacherId = dto.teacherId;
+    } else {
+      // Only one teacher, use their ID
+      selectedTeacherId = availableTeachers[0].teacher.id;
+    }
+
+    // Upload files if provided
+    const fileUrls: string[] = [];
+    if (files && files.length > 0) {
+      // TODO: Implement file upload logic here
+      // For now, just store the filenames
+      fileUrls.push(...files.map(f => f.filename || f.originalname));
+    }
+
+    // Create submission
+    const submission = await this.prisma.submission.create({
+      data: {
+        subjectId: dto.subjectId,
+        studentId: student.id,
+        teacherId: selectedTeacherId,
+        title: dto.title,
+        description: dto.description,
+        fileUrls,
+        submittedAt: new Date(),
+        status: SubmissionStatus.SUBMITTED,
+      },
+      include: {
+        student: {
+          include: {
+            user: {
+              select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+                email: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    return submission;
   }
 }

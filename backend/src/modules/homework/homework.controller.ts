@@ -16,6 +16,7 @@ import { HomeworkService } from './homework.service';
 import { CreateHomeworkDto } from './dto/create-homework.dto';
 import { UpdateHomeworkDto } from './dto/update-homework.dto';
 import { CreateSubmissionDto } from './dto/create-submission.dto';
+import { SubmitToSubjectTeacherDto } from './dto/submit-to-subject-teacher.dto';
 import { GradeSubmissionDto } from './dto/grade-submission.dto';
 import { TeacherEvaluateSubmissionDto } from './dto/teacher-evaluate-submission.dto';
 import { AdminReviewSubmissionDto } from './dto/admin-review-submission.dto';
@@ -55,6 +56,12 @@ export class HomeworkController {
   @Roles(Role.STUDENT)
   getMyHomeworkResults(@CurrentUser() user: CurrentUserData) {
     return this.homeworkService.getStudentHomeworkResults(user.id);
+  }
+
+  @Get('my-subjects')
+  @Roles(Role.STUDENT)
+  getMySubjects(@CurrentUser() user: CurrentUserData) {
+    return this.homeworkService.getStudentSubjects(user.id);
   }
 
   @Get(':id')
@@ -111,9 +118,12 @@ export class HomeworkController {
     console.log('========================================');
     console.log('✅ ROUTE HIT: submissions/received');
     console.log('[Controller] getTeacherSubmissions called by user:', user.id);
+    console.log('[Controller] User email:', user.email);
+    console.log('[Controller] User role:', user.role);
     console.log('========================================');
     const result = await this.homeworkService.getTeacherSubmissions(user.id);
     console.log('Returning', result.length, 'submissions');
+    console.log('Submissions data:', JSON.stringify(result, null, 2));
     return { success: true, data: result };
   }
 
@@ -182,23 +192,7 @@ export class HomeworkController {
     );
   }
 
-  // Parameterized routes MUST come after specific routes
-  @Get(':homeworkId/submissions')
-  @Roles(Role.TEACHER, Role.ADMIN, Role.SUPERVISOR)
-  getSubmissions(
-    @CurrentUser() user: CurrentUserData,
-    @Param('homeworkId') homeworkId: string,
-  ) {
-    console.log('========================================');
-    console.log('❌ WRONG ROUTE HIT: :homeworkId/submissions');
-    console.log('[Controller] getSubmissions called with homeworkId:', homeworkId);
-    console.log('[Controller] User:', user.id);
-    console.log('========================================');
-    const teacherId = user.role === Role.TEACHER ? user.id : undefined;
-    return this.homeworkService.getSubmissions(homeworkId, teacherId);
-  }
-
-  // Subject-based submission endpoints
+  // Subject-based submission endpoints - Must come before parameterized routes
   @Post('submit-to-subject')
   @Roles(Role.STUDENT)
   @UseInterceptors(FilesInterceptor('files', 10))
@@ -223,9 +217,42 @@ export class HomeworkController {
     return this.homeworkService.getSubmissionsBySubject(subjectId, teacherId);
   }
 
-  @Get('my-subjects')
+  @Get('subjects/:subjectId/teachers')
   @Roles(Role.STUDENT)
-  getMySubjects(@CurrentUser() user: CurrentUserData) {
-    return this.homeworkService.getStudentSubjects(user.id);
+  getTeachersForSubject(
+    @CurrentUser() user: CurrentUserData,
+    @Param('subjectId') subjectId: string,
+  ) {
+    return this.homeworkService.getTeachersForStudentSubject(user.id, subjectId);
+  }
+
+  @Post('submit-to-subject-teacher')
+  @Roles(Role.STUDENT)
+  @UseInterceptors(FilesInterceptor('files', 10))
+  submitToSubjectTeacher(
+    @CurrentUser() user: CurrentUserData,
+    @Body() dto: SubmitToSubjectTeacherDto,
+    @UploadedFiles() files: Express.Multer.File[],
+  ) {
+    console.log('[Controller] submitToSubjectTeacher called by user:', user.id);
+    console.log('[Controller] submitToSubjectTeacher dto:', dto);
+    console.log('[Controller] submitToSubjectTeacher files:', files?.length || 0);
+    return this.homeworkService.submitToSubjectWithTeacher(user.id, dto, files);
+  }
+
+  // Parameterized routes MUST come after all specific routes
+  @Get(':homeworkId/submissions')
+  @Roles(Role.TEACHER, Role.ADMIN, Role.SUPERVISOR)
+  getSubmissions(
+    @CurrentUser() user: CurrentUserData,
+    @Param('homeworkId') homeworkId: string,
+  ) {
+    console.log('========================================');
+    console.log('❌ WRONG ROUTE HIT: :homeworkId/submissions');
+    console.log('[Controller] getSubmissions called with homeworkId:', homeworkId);
+    console.log('[Controller] User:', user.id);
+    console.log('========================================');
+    const teacherId = user.role === Role.TEACHER ? user.id : undefined;
+    return this.homeworkService.getSubmissions(homeworkId, teacherId);
   }
 }

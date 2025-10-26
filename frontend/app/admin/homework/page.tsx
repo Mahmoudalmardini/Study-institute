@@ -10,11 +10,13 @@ import SettingsMenu from '@/components/SettingsMenu';
 
 interface PendingSubmission {
   id: string;
+  title?: string;
+  description?: string;
   submittedAt: string;
   teacherEvaluation: 'ACCEPTED' | 'REJECTED';
   teacherFeedback: string;
   teacherReviewedAt: string;
-  homework: {
+  homework?: {
     id: string;
     title: string;
     description: string;
@@ -268,8 +270,8 @@ export default function AdminHomeworkReviewPage() {
                     {/* Left Side - Info */}
                     <div className="flex-1 space-y-3">
                       <div>
-                        <h3 className="text-xl font-bold text-gray-900 mb-1">{submission.homework.title}</h3>
-                        <p className="text-sm text-gray-600">{submission.homework.description}</p>
+                        <h3 className="text-xl font-bold text-gray-900 mb-1">{submission.title || submission.homework?.title || 'No Title'}</h3>
+                        <p className="text-sm text-gray-600">{submission.description || submission.homework?.description || 'No Description'}</p>
                       </div>
                       
                       <div className="flex flex-wrap gap-4 text-sm">
@@ -365,8 +367,17 @@ export default function AdminHomeworkReviewPage() {
 
               {/* Homework Content */}
               <div className="mb-6 p-4 bg-gray-50 rounded-lg">
-                <h4 className="font-bold text-gray-900 mb-2">{selectedSubmission.homework.title}</h4>
-                <p className="text-gray-700 mb-3">{selectedSubmission.homework.description}</p>
+                {selectedSubmission.homework ? (
+                  <>
+                    <h4 className="font-bold text-gray-900 mb-2">{selectedSubmission.homework.title}</h4>
+                    <p className="text-gray-700 mb-3">{selectedSubmission.homework.description}</p>
+                  </>
+                ) : (
+                  <>
+                    <h4 className="font-bold text-gray-900 mb-2">{selectedSubmission.title || 'Direct Submission'}</h4>
+                    <p className="text-gray-700 mb-3">{selectedSubmission.description || 'No description provided'}</p>
+                  </>
+                )}
                 <p className="text-xs text-gray-500">Submitted: {formatDate(selectedSubmission.submittedAt)}</p>
               </div>
 

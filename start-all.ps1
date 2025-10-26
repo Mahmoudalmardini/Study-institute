@@ -5,6 +5,23 @@ Write-Host "`n========================================" -ForegroundColor Cyan
 Write-Host " Study Institute - Starting Services" -ForegroundColor Cyan
 Write-Host "========================================`n" -ForegroundColor Cyan
 
+# Check and kill existing processes on ports 3000 and 3001
+Write-Host "[0/3] Checking for existing processes..." -ForegroundColor Yellow
+$port3000 = Get-NetTCPConnection -LocalPort 3000 -ErrorAction SilentlyContinue
+$port3001 = Get-NetTCPConnection -LocalPort 3001 -ErrorAction SilentlyContinue
+
+if ($port3000) {
+    Write-Host "  [WARN] Port 3000 is in use. Killing process..." -ForegroundColor Yellow
+    Stop-Process -Id $port3000.OwningProcess -Force -ErrorAction SilentlyContinue
+    Start-Sleep -Seconds 2
+}
+
+if ($port3001) {
+    Write-Host "  [WARN] Port 3001 is in use. Killing process..." -ForegroundColor Yellow
+    Stop-Process -Id $port3001.OwningProcess -Force -ErrorAction SilentlyContinue
+    Start-Sleep -Seconds 2
+}
+
 # Start Docker services
 Write-Host "[1/3] Starting Docker services (PostgreSQL & Redis)..." -ForegroundColor Yellow
 docker-compose up -d
@@ -23,13 +40,13 @@ if ($postgres -and $redis) {
 }
 
 # Start Backend
-Write-Host "[2/3] Starting Backend server..." -ForegroundColor Yellow
+Write-Host "[2/4] Starting Backend server..." -ForegroundColor Yellow
 Start-Process powershell -ArgumentList "-NoExit", "-Command", "cd '$PSScriptRoot\backend'; Write-Host 'Backend Server' -ForegroundColor Cyan; Write-Host '=============='; npm run start:dev"
 Write-Host "  [OK] Backend starting in new window`n" -ForegroundColor Green
 Start-Sleep -Seconds 3
 
 # Start Frontend
-Write-Host "[3/3] Starting Frontend server..." -ForegroundColor Yellow
+Write-Host "[3/4] Starting Frontend server..." -ForegroundColor Yellow
 Start-Process powershell -ArgumentList "-NoExit", "-Command", "cd '$PSScriptRoot\frontend'; Write-Host 'Frontend Server' -ForegroundColor Cyan; Write-Host '==============='; npm run dev"
 Write-Host "  [OK] Frontend starting in new window`n" -ForegroundColor Green
 

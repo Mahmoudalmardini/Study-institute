@@ -124,6 +124,7 @@ model Teacher {
   evaluations Evaluation[]
   students    StudentTeacher[]
   subjects    TeacherSubject[]
+  submissions Submission[]
 
   @@index([userId])
   @@map("teachers")
@@ -163,6 +164,7 @@ model Subject {
   homework  Homework[]
   teachers  TeacherSubject[]
   students  StudentSubject[]
+  submissions Submission[]
 
   @@index([classId])
   @@index([code])
@@ -201,8 +203,11 @@ model Submission {
   homeworkId  String?
   homework    Homework?        @relation(fields: [homeworkId], references: [id], onDelete: Cascade)
   subjectId   String?
+  subject     Subject?         @relation(fields: [subjectId], references: [id], onDelete: SetNull)
   studentId   String
   student     Student          @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  teacherId   String?
+  teacher     Teacher?         @relation(fields: [teacherId], references: [id], onDelete: SetNull)
   submittedAt DateTime?
   fileUrls    String[]
   status      SubmissionStatus @default(PENDING)
@@ -229,6 +234,7 @@ model Submission {
   @@index([homeworkId])
   @@index([subjectId])
   @@index([studentId])
+  @@index([teacherId])
   @@index([status])
   @@index([reviewStatus])
   @@map("submissions")
