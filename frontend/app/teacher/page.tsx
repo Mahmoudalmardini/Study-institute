@@ -148,16 +148,26 @@ export default function TeacherDashboard() {
               </div>
             </button>
 
-            {/* Grades Card */}
-            <div className={`bg-white overflow-hidden rounded-xl hover-lift p-6 sm:p-7 border-2 border-blue-100 hover:border-blue-300 group ${mounted ? 'animate-slide-up stagger-4' : 'opacity-0'}`}>
-              <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-lg flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
-                <svg className="w-7 h-7 text-white" fill="currentColor" viewBox="0 0 20 20">
-                  <path d="M2 11a1 1 0 011-1h2a1 1 0 011 1v5a1 1 0 01-1 1H3a1 1 0 01-1-1v-5zM8 7a1 1 0 011-1h2a1 1 0 011 1v9a1 1 0 01-1 1H9a1 1 0 01-1-1V7zM14 4a1 1 0 011-1h2a1 1 0 011 1v12a1 1 0 01-1 1h-2a1 1 0 01-1-1V4z" />
+            {/* Points Card - Clickable */}
+            <button
+              onClick={() => router.push('/teacher/points')}
+              className={`bg-white overflow-hidden rounded-xl hover-lift p-6 sm:p-7 border-2 border-blue-100 hover:border-blue-300 group text-start ${mounted ? 'animate-slide-up stagger-4' : 'opacity-0'}`}
+            >
+              <div className="flex items-start justify-between">
+                <div className="flex-1">
+                  <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-lg flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+                    <svg className="w-7 h-7 text-white" fill="currentColor" viewBox="0 0 20 20">
+                      <path d="M2 11a1 1 0 011-1h2a1 1 0 011 1v5a1 1 0 01-1 1H3a1 1 0 01-1-1v-5zM8 7a1 1 0 011-1h2a1 1 0 011 1v9a1 1 0 01-1 1H9a1 1 0 01-1-1V7zM14 4a1 1 0 011-1h2a1 1 0 011 1v12a1 1 0 01-1 1h-2a1 1 0 01-1-1V4z" />
+                    </svg>
+                  </div>
+                  <h3 className="text-xl font-bold text-gray-900 mb-2">{t.teacher.grades}</h3>
+                  <p className="text-sm text-gray-600">{t.teacher.gradesDesc}</p>
+                </div>
+                <svg className="w-6 h-6 text-blue-500 flex-shrink-0 ms-2 rtl:rotate-180 group-hover:translate-x-1 rtl:group-hover:-translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                 </svg>
               </div>
-              <h3 className="text-xl font-bold text-gray-900 mb-2">{t.teacher.grades}</h3>
-              <p className="text-sm text-gray-600">{t.teacher.gradesDesc}</p>
-            </div>
+            </button>
           </div>
         </div>
       </main>

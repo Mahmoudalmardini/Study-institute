@@ -104,6 +104,7 @@ model Student {
   teachers      StudentTeacher[]
   subjects      StudentSubject[]
   classes       StudentClass[]
+  pointTransactions PointTransaction[]
 
   @@index([userId])
   @@index([classId])
@@ -165,6 +166,7 @@ model Subject {
   teachers  TeacherSubject[]
   students  StudentSubject[]
   submissions Submission[]
+  pointTransactions PointTransaction[]
 
   @@index([classId])
   @@index([code])
@@ -399,4 +401,19 @@ model StudentClass {
   @@index([classId])
   @@index([assignedBy])
   @@map("student_classes")
+}
+
+model PointTransaction {
+  id         String   @id @default(uuid())
+  studentId  String
+  student    Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  subjectId  String?
+  subject    Subject? @relation(fields: [subjectId], references: [id], onDelete: SetNull)
+  amount     Int      // positive to add, negative to deduct
+  createdAt  DateTime @default(now())
+
+  @@index([studentId])
+  @@index([studentId, createdAt])
+  @@index([studentId, subjectId])
+  @@map("point_transactions")
 }

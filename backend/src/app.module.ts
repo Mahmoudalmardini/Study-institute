@@ -22,6 +22,7 @@ import { TeachersModule } from './modules/teachers/teachers.module';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import { AllExceptionsFilter } from './common/filters/http-exception.filter';
 import { TransformInterceptor } from './common/interceptors/transform.interceptor';
+import { PointsModule } from './modules/points/points.module';
 
 @Module({
   imports: [
@@ -52,6 +53,7 @@ import { TransformInterceptor } from './common/interceptors/transform.intercepto
     ClassesModule,
     SubjectsModule,
     TeachersModule,
+    PointsModule,
   ],
   controllers: [AppController],
   providers: [
