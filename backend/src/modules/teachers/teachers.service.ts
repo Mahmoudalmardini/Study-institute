@@ -128,5 +128,102 @@ export class TeachersService {
       },
     });
   }
+
+  async getMyStudents(userId: string) {
+    // Resolve teacher by userId
+    const teacher = await this.prisma.teacher.findUnique({
+      where: { userId },
+      select: { id: true },
+    });
+
+    if (!teacher) {
+      throw new NotFoundException('Teacher not found');
+    }
+
+    // Find classes owned by this teacher
+    const ownedClasses = await this.prisma.class.findMany({
+      where: { teacherId: teacher.id },
+      select: { id: true, name: true },
+    });
+
+    // Find classes where the teacher teaches a subject (via TeacherSubject -> Subject.classId)
+    const taughtSubjects = await this.prisma.teacherSubject.findMany({
+      where: { teacherId: teacher.id },
+      select: { subject: { select: { classId: true } } },
+    });
+
+    const classIds = Array.from(
+      new Set([
+        ...ownedClasses.map((c) => c.id),
+        ...taughtSubjects
+          .map((ts) => ts.subject?.classId)
+          .filter((id): id is string => Boolean(id)),
+      ]),
+    );
+
+    if (classIds.length === 0) {
+      return [];
+    }
+
+    // Students either directly assigned to those classes, or via StudentClass junction
+    const students = await this.prisma.student.findMany({
+      where: {
+        OR: [
+          { classId: { in: classIds } },
+          {
+            classes: {
+              some: {
+                classId: { in: classIds },
+              },
+            },
+          },
+        ],
+      },
+      select: {
+        id: true,
+        classId: true,
+        user: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true,
+          },
+        },
+        classes: {
+          select: {
+            class: {
+              select: {
+                id: true,
+                name: true,
+              },
+            },
+          },
+        },
+      },
+      orderBy: {
+        user: {
+          firstName: 'asc',
+        },
+      },
+    });
+
+    // Build a small lookup for class id -> name (from owned classes)
+    const classIdToName = new Map<string, string>();
+    for (const c of ownedClasses) classIdToName.set(c.id, c.name);
+
+    // Normalize to include class names array
+    return students.map((s) => ({
+      id: s.id,
+      userId: s.user.id,
+      firstName: s.user.firstName,
+      lastName: s.user.lastName,
+      email: s.user.email,
+      classNames: [
+        ...(s.classId ? (classIdToName.get(s.classId) ? [classIdToName.get(s.classId)!] : []) : []),
+        ...s.classes.map((sc) => sc.class?.name).filter((n): n is string => Boolean(n)),
+      ],
+    }));
+  }
 }
 

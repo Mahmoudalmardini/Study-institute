@@ -241,3 +241,12 @@ export interface CreateEvaluationDto {
   comments?: string;
 }
 
+export interface TeacherStudentSummary {
+  id: string;
+  userId: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  classNames: string[];
+}
+

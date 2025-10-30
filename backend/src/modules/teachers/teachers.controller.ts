@@ -24,6 +24,12 @@ export class TeachersController {
     return this.teachersService.findByUserId(user.id);
   }
 
+  @Get('me/students')
+  @Roles(Role.TEACHER)
+  getMyStudents(@CurrentUser() user: CurrentUserData) {
+    return this.teachersService.getMyStudents(user.id);
+  }
+
   @Get(':id')
   @Roles(Role.ADMIN, Role.SUPERVISOR, Role.TEACHER)
   findOne(@Param('id') id: string) {

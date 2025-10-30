@@ -71,3 +71,7 @@ apiClient.interceptors.response.use(
 
 export default apiClient;
 
+export async function getTeacherMyStudents() {
+  return apiClient.get('/teachers/me/students');
+}
+
