@@ -9,16 +9,28 @@ import { Card } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import type { TeacherStudentSummary } from '@/types';
-import { getTeacherMyStudents, createPoint, getPointSummary } from '@/lib/api-client';
-import { getStudentSubjects } from '@/lib/api-client';
+import apiClient from '@/lib/api-client';
+import { createPoint, getPointSummary, getStudentSubjects } from '@/lib/api-client';
 import type { Subject } from '@/types';
 
-export default function TeacherPointsPage() {
+interface Student {
+  id: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  user: {
+    id: string;
+    email: string;
+    firstName: string;
+    lastName: string;
+  };
+}
+
+export default function AdminPointsPage() {
   const router = useRouter();
   const { t } = useI18n();
 
-  const [students, setStudents] = useState<TeacherStudentSummary[]>([]);
+  const [students, setStudents] = useState<Student[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null);
@@ -35,15 +47,23 @@ export default function TeacherPointsPage() {
     let mounted = true;
     (async () => {
       try {
-        const list = await getTeacherMyStudents();
+        const list = await apiClient.get('/students');
         const studentsList = Array.isArray(list) ? list : (list?.data ?? []);
-        if (mounted) setStudents(studentsList);
+        // Map student data to match expected format
+        const mappedStudents = studentsList.map((s: any) => ({
+          id: s.id,
+          firstName: s.user?.firstName || '',
+          lastName: s.user?.lastName || '',
+          email: s.user?.email || '',
+          user: s.user
+        }));
+        if (mounted) setStudents(mappedStudents);
         
         // Load summaries for all students
-        if (mounted && studentsList.length > 0) {
+        if (mounted && mappedStudents.length > 0) {
           const summaries: Record<string, { total: number; daily: number; bySubject: { subjectId: string | null; subjectName: string; total: number; daily: number }[] }> = {};
           // Load summaries sequentially with longer delay to avoid rate limits
-          for (const student of studentsList) {
+          for (const student of mappedStudents) {
             try {
               // Increased delay to 200ms between requests to avoid 429 errors
               await new Promise(resolve => setTimeout(resolve, 200));
@@ -101,9 +121,12 @@ export default function TeacherPointsPage() {
       return;
     }
     
+    // Use timestamp to ensure each click is unique
+    const clickTimestamp = Date.now();
+    const requestKey = `add-${studentId}-${subjectId}-${clickTimestamp}`;
     const pointAmount = Math.abs(Number(amount));
 
-    // Always apply optimistic update immediately and synchronously - allow multiple clicks
+    // Always apply optimistic update immediately, even if operation is in progress
     setStudentSummaries(prev => {
       const current = prev[studentId] || { total: 0, daily: 0, bySubject: [] };
       const subjectIndex = current.bySubject.findIndex(s => s.subjectId === subjectId);
@@ -165,60 +188,108 @@ export default function TeacherPointsPage() {
       });
     }
 
-    // Process API call asynchronously - each click fires independently
+    // Increment pending operations counter
+    setPendingOperations(prev => ({
+      ...prev,
+      [requestKey]: (prev[requestKey] || 0) + 1
+    }));
+
+    // Process API call asynchronously (don't block UI)
     (async () => {
       try {
+        setProcessing((prev) => ({ ...prev, [requestKey]: true }));
         setError(null);
-        // Make API call - fire immediately, no blocking
+        
+        // Make API call
         await createPoint({ studentId, subjectId, amount: pointAmount });
         
-        // Debounced refresh - wait a bit then refresh to sync with server
-        setTimeout(async () => {
-          try {
-            const updatedSummary = await getPointSummary(studentId) as any;
-            if (updatedSummary) {
-              setStudentSummaries(prev => ({
-                ...prev,
-                [studentId]: { 
-                  total: updatedSummary.total || 0, 
-                  daily: updatedSummary.daily || 0,
-                  bySubject: updatedSummary.bySubject || []
-                }
-              }));
-              
-              if (selectedStudentId === studentId) {
-                setSummary(updatedSummary);
-              }
+        // Decrement pending operations
+        setPendingOperations(prev => {
+          const next = { ...prev };
+          if (next[requestKey] > 0) {
+            next[requestKey] = next[requestKey] - 1;
+            if (next[requestKey] === 0) {
+              delete next[requestKey];
             }
-          } catch (refreshErr) {
-            // Ignore refresh errors
           }
-        }, 500); // Debounce refresh by 500ms
+          return next;
+        });
+        
+        // Wait a bit before refreshing to avoid rate limits
+        await new Promise(resolve => setTimeout(resolve, 300));
+        
+        // Check if there are no more pending operations before refreshing
+        setPendingOperations(prev => {
+          const hasPending = prev[requestKey] && prev[requestKey] > 0;
+          if (!hasPending) {
+            // Refresh summary to get accurate data from server
+            setTimeout(() => {
+              getPointSummary(studentId).then(updatedSummary => {
+                if (updatedSummary) {
+                  setStudentSummaries(prev => ({
+                    ...prev,
+                    [studentId]: { 
+                      total: updatedSummary.total || 0, 
+                      daily: updatedSummary.daily || 0,
+                      bySubject: updatedSummary.bySubject || []
+                    }
+                  }));
+                  
+                  if (selectedStudentId === studentId) {
+                    setSummary(updatedSummary);
+                  }
+                }
+              }).catch(() => {
+                // Ignore refresh errors
+              });
+            }, 100);
+          }
+          return prev;
+        });
       } catch (err: any) {
+        // Decrement pending operations on error too
+        setPendingOperations(prev => {
+          const next = { ...prev };
+          if (next[requestKey] > 0) {
+            next[requestKey] = next[requestKey] - 1;
+            if (next[requestKey] === 0) {
+              delete next[requestKey];
+            }
+          }
+          return next;
+        });
+        
         if (err?.response?.status !== 429) {
           setError(err?.response?.data?.message || 'Failed to add points');
-        }
-        // On 429, silently retry refresh after delay
-        setTimeout(async () => {
-          try {
-            const updatedSummary = await getPointSummary(studentId) as any;
-            if (updatedSummary) {
-              setStudentSummaries(prev => ({
-                ...prev,
-                [studentId]: { 
-                  total: updatedSummary.total || 0, 
-                  daily: updatedSummary.daily || 0,
-                  bySubject: updatedSummary.bySubject || []
+        } else {
+          // On 429, retry after delay
+          setTimeout(async () => {
+            try {
+              const updatedSummary = await getPointSummary(studentId) as any;
+              if (updatedSummary) {
+                setStudentSummaries(prev => ({
+                  ...prev,
+                  [studentId]: { 
+                    total: updatedSummary.total || 0, 
+                    daily: updatedSummary.daily || 0,
+                    bySubject: updatedSummary.bySubject || []
+                  }
+                }));
+                if (selectedStudentId === studentId) {
+                  setSummary(updatedSummary);
                 }
-              }));
-              if (selectedStudentId === studentId) {
-                setSummary(updatedSummary);
               }
+            } catch (retryErr) {
+              // Ignore retry errors
             }
-          } catch (retryErr) {
-            // Ignore retry errors
-          }
-        }, 2000);
+          }, 2000);
+        }
+      } finally {
+        setProcessing((prev) => {
+          const next = { ...prev };
+          delete next[requestKey];
+          return next;
+        });
       }
     })();
   };
@@ -233,9 +304,12 @@ export default function TeacherPointsPage() {
       return;
     }
     
+    // Use timestamp to ensure each click is unique
+    const clickTimestamp = Date.now();
+    const requestKey = `delete-${studentId}-${subjectId}-${clickTimestamp}`;
     const pointAmount = Math.abs(Number(amount));
 
-    // Always apply optimistic update immediately and synchronously - allow multiple clicks
+    // Always apply optimistic update immediately, even if operation is in progress
     setStudentSummaries(prev => {
       const current = prev[studentId] || { total: 0, daily: 0, bySubject: [] };
       const subjectIndex = current.bySubject.findIndex(s => s.subjectId === subjectId);
@@ -286,60 +360,108 @@ export default function TeacherPointsPage() {
       });
     }
 
-    // Process API call asynchronously - each click fires independently
+    // Increment pending operations counter
+    setPendingOperations(prev => ({
+      ...prev,
+      [requestKey]: (prev[requestKey] || 0) + 1
+    }));
+
+    // Process API call asynchronously (don't block UI)
     (async () => {
       try {
+        setProcessing((prev) => ({ ...prev, [requestKey]: true }));
         setError(null);
-        // Make API call - fire immediately, no blocking
+        
+        // Make API call
         await createPoint({ studentId, subjectId, amount: -pointAmount });
         
-        // Debounced refresh - wait a bit then refresh to sync with server
-        setTimeout(async () => {
-          try {
-            const updatedSummary = await getPointSummary(studentId) as any;
-            if (updatedSummary) {
-              setStudentSummaries(prev => ({
-                ...prev,
-                [studentId]: { 
-                  total: updatedSummary.total || 0, 
-                  daily: updatedSummary.daily || 0,
-                  bySubject: updatedSummary.bySubject || []
-                }
-              }));
-              
-              if (selectedStudentId === studentId) {
-                setSummary(updatedSummary);
-              }
+        // Decrement pending operations
+        setPendingOperations(prev => {
+          const next = { ...prev };
+          if (next[requestKey] > 0) {
+            next[requestKey] = next[requestKey] - 1;
+            if (next[requestKey] === 0) {
+              delete next[requestKey];
             }
-          } catch (refreshErr) {
-            // Ignore refresh errors
           }
-        }, 500); // Debounce refresh by 500ms
+          return next;
+        });
+        
+        // Wait a bit before refreshing to avoid rate limits
+        await new Promise(resolve => setTimeout(resolve, 300));
+        
+        // Check if there are no more pending operations before refreshing
+        setPendingOperations(prev => {
+          const hasPending = prev[requestKey] && prev[requestKey] > 0;
+          if (!hasPending) {
+            // Refresh summary to get accurate data from server
+            setTimeout(() => {
+              getPointSummary(studentId).then(updatedSummary => {
+                if (updatedSummary) {
+                  setStudentSummaries(prev => ({
+                    ...prev,
+                    [studentId]: { 
+                      total: updatedSummary.total || 0, 
+                      daily: updatedSummary.daily || 0,
+                      bySubject: updatedSummary.bySubject || []
+                    }
+                  }));
+                  
+                  if (selectedStudentId === studentId) {
+                    setSummary(updatedSummary);
+                  }
+                }
+              }).catch(() => {
+                // Ignore refresh errors
+              });
+            }, 100);
+          }
+          return prev;
+        });
       } catch (err: any) {
+        // Decrement pending operations on error too
+        setPendingOperations(prev => {
+          const next = { ...prev };
+          if (next[requestKey] > 0) {
+            next[requestKey] = next[requestKey] - 1;
+            if (next[requestKey] === 0) {
+              delete next[requestKey];
+            }
+          }
+          return next;
+        });
+        
         if (err?.response?.status !== 429) {
           setError(err?.response?.data?.message || 'Failed to remove points');
-        }
-        // On 429, silently retry refresh after delay
-        setTimeout(async () => {
-          try {
-            const updatedSummary = await getPointSummary(studentId) as any;
-            if (updatedSummary) {
-              setStudentSummaries(prev => ({
-                ...prev,
-                [studentId]: { 
-                  total: updatedSummary.total || 0, 
-                  daily: updatedSummary.daily || 0,
-                  bySubject: updatedSummary.bySubject || []
+        } else {
+          // On 429, retry after delay
+          setTimeout(async () => {
+            try {
+              const updatedSummary = await getPointSummary(studentId) as any;
+              if (updatedSummary) {
+                setStudentSummaries(prev => ({
+                  ...prev,
+                  [studentId]: { 
+                    total: updatedSummary.total || 0, 
+                    daily: updatedSummary.daily || 0,
+                    bySubject: updatedSummary.bySubject || []
+                  }
+                }));
+                if (selectedStudentId === studentId) {
+                  setSummary(updatedSummary);
                 }
-              }));
-              if (selectedStudentId === studentId) {
-                setSummary(updatedSummary);
               }
+            } catch (retryErr) {
+              // Ignore retry errors
             }
-          } catch (retryErr) {
-            // Ignore retry errors
-          }
-        }, 2000);
+          }, 2000);
+        }
+      } finally {
+        setProcessing((prev) => {
+          const next = { ...prev };
+          delete next[requestKey];
+          return next;
+        });
       }
     })();
   };
@@ -369,16 +491,16 @@ export default function TeacherPointsPage() {
 
   return (
     <div className="min-h-screen gradient-bg">
-      <nav className="gradient-secondary shadow-lg sticky top-0 z-40">
+      <nav className="gradient-primary shadow-lg sticky top-0 z-40">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center min-w-0 flex-1 gap-3">
-              <button onClick={() => router.push('/teacher')} className="text-white hover:text-white/80 transition-colors flex-shrink-0" aria-label={t.teacher.backToDashboard}>
+              <button onClick={() => router.push('/admin')} className="text-white hover:text-white/80 transition-colors flex-shrink-0" aria-label="Back to dashboard">
                 <svg className="w-6 h-6 rtl:rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
                 </svg>
               </button>
-              <h1 className="text-lg sm:text-xl font-bold text-white truncate">{t.teacher.grades || 'Points'}</h1>
+              <h1 className="text-lg sm:text-xl font-bold text-white truncate">Points Management</h1>
             </div>
             <div className="flex items-center gap-2 sm:gap-4 flex-shrink-0">
               <SettingsMenu onLogout={() => { localStorage.clear(); router.push('/login'); }} />
@@ -605,10 +727,7 @@ export default function TeacherPointsPage() {
         {students.length === 0 && (
           <div className="text-center py-12 bg-white rounded-2xl shadow-lg mb-6">
             <h3 className="mt-2 text-lg font-medium text-gray-900">No students found</h3>
-            <p className="mt-1 text-sm text-gray-500">Assign classes/subjects to see students here.</p>
-            <div className="mt-4">
-              <Button onClick={() => router.push('/teacher/students')}>View My Students</Button>
-            </div>
+            <p className="mt-1 text-sm text-gray-500">No students are registered in the system.</p>
           </div>
         )}
 
@@ -666,3 +785,4 @@ export default function TeacherPointsPage() {
     </div>
   );
 }
+
