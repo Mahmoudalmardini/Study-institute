@@ -43,7 +43,9 @@
     "classes": "الصفوف",
     "classesDesc": "إدارة الصفوف",
     "subjects": "المواد",
-    "subjectsDesc": "إدارة المواد الدراسية"
+    "subjectsDesc": "إدارة المواد الدراسية",
+    "points": "إدارة النقاط",
+    "pointsDesc": "إدارة نقاط الطلاب والمكافآت"
   },
   "classes": {
     "addClass": "إضافة صف",
@@ -146,6 +148,8 @@
     "myHomeworkDesc": "عرض وتقديم الواجبات",
     "myGrades": "درجاتي",
     "myGradesDesc": "عرض درجاتك",
+    "myPoints": "نقاطي",
+    "myPointsDesc": "عرض نقاطك حسب المادة",
     "announcements": "الإعلانات",
     "announcementsDesc": "قراءة الإعلانات",
     "evaluations": "التقييمات",
@@ -235,6 +239,35 @@
     "passwordPlaceholder": "أدخل كلمة المرور (6 أحرف على الأقل)",
     "loading": "جاري تحميل المستخدمين...",
     "allRoles": "جميع الأدوار"
+  },
+  "points": {
+    "title": "إدارة النقاط",
+    "titleStudent": "نقاطي",
+    "searchStudents": "البحث عن الطلاب",
+    "searchPlaceholder": "البحث بالاسم أو البريد الإلكتروني...",
+    "amount": "المبلغ",
+    "amountPlaceholder": "أدخل المبلغ",
+    "addPoints": "إضافة نقاط",
+    "deletePoints": "حذف النقاط",
+    "selectSubject": "اختر المادة",
+    "loadSubjects": "قم بتحميل المواد لرؤية الخيارات",
+    "studentNotFound": "لا يوجد طلاب",
+    "noStudentsMatch": "لا يوجد طلاب يطابقون بحثك عن",
+    "clearSearch": "مسح البحث",
+    "noPointsYet": "لا توجد نقاط بعد",
+    "noPointsDesc": "ستظهر نقاطك هنا بمجرد أن تكسبها",
+    "totalPoints": "إجمالي النقاط",
+    "todayPoints": "نقاط اليوم",
+    "pointsBySubject": "النقاط حسب المادة",
+    "today": "اليوم",
+    "total": "الإجمالي",
+    "subjectPoints": "نقاط المادة",
+    "viewPointsBySubject": "عرض النقاط التي حصلت عليها حسب المادة",
+    "manageStudentPoints": "إدارة نقاط الطلاب والمكافآت"
+  },
+  "supervisor": {
+    "points": "إدارة النقاط",
+    "pointsDesc": "إدارة نقاط الطلاب والمكافآت"
   },
   "messages": {
     "logoutConfirm": "هل أنت متأكد من تسجيل الخروج؟"

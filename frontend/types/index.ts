@@ -250,3 +250,53 @@ export interface TeacherStudentSummary {
   classNames: string[];
 }
 
+// Payroll types
+export enum HourRequestStatus {
+  PENDING = 'PENDING',
+  APPROVED = 'APPROVED',
+  REJECTED = 'REJECTED',
+  MODIFIED = 'MODIFIED',
+}
+
+export interface TeacherSalary {
+  id: string;
+  teacherId: string;
+  teacher?: Teacher;
+  monthlySalary?: number | string;
+  hourlyWage?: number | string;
+  effectiveFrom: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface HourRequest {
+  id: string;
+  teacherId: string;
+  teacher?: Teacher;
+  date: string;
+  hours: number | string;
+  minutes: number;
+  status: HourRequestStatus;
+  adminModifiedHours?: number | string;
+  adminModifiedMinutes?: number;
+  adminFeedback?: string;
+  reviewedBy?: string;
+  reviewedAt?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface MonthlyPayrollRecord {
+  id: string;
+  teacherId: string;
+  teacher?: Teacher;
+  month: number;
+  year: number;
+  monthlySalary: number | string;
+  totalHours: number | string;
+  hourlyWage: number | string;
+  totalEntitlement: number | string;
+  createdAt: string;
+  updatedAt: string;
+}
+

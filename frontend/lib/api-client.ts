@@ -111,14 +111,20 @@ apiClient.interceptors.response.use(
     }
 
     // Handle 429 rate limit with exponential backoff and limited retries
+    // Only retry GET requests, not POST/PUT/DELETE (state-changing operations)
     if (error.response?.status === 429) {
-      originalRequest.__retryCount = originalRequest.__retryCount || 0;
-      if (originalRequest.__retryCount < 5) {
-        originalRequest.__retryCount += 1;
-        const delayMs = 500 * Math.pow(2, originalRequest.__retryCount - 1);
-        await new Promise((r) => setTimeout(r, delayMs));
-        return apiClient(originalRequest);
+      const method = (originalRequest.method || 'get').toLowerCase();
+      // Only retry GET requests to avoid duplicate state changes
+      if (method === 'get') {
+        originalRequest.__retryCount = originalRequest.__retryCount || 0;
+        if (originalRequest.__retryCount < 3) {
+          originalRequest.__retryCount += 1;
+          const delayMs = 500 * Math.pow(2, originalRequest.__retryCount - 1);
+          await new Promise((r) => setTimeout(r, delayMs));
+          return apiClient(originalRequest);
+        }
       }
+      // For POST/PUT/DELETE, don't retry - just reject immediately
     }
 
     // Clear inflight on error

@@ -50,6 +50,13 @@ enum ReviewStatus {
   APPROVED_BY_ADMIN
 }
 
+enum HourRequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  MODIFIED
+}
+
 model User {
   id        String   @id @default(uuid())
   email     String   @unique
@@ -126,6 +133,9 @@ model Teacher {
   students    StudentTeacher[]
   subjects    TeacherSubject[]
   submissions Submission[]
+  salaries    TeacherSalary[]
+  hourRequests HourRequest[]
+  payrollRecords MonthlyPayrollRecord[]
 
   @@index([userId])
   @@map("teachers")
@@ -416,4 +426,61 @@ model PointTransaction {
   @@index([studentId, createdAt])
   @@index([studentId, subjectId])
   @@map("point_transactions")
+}
+
+model TeacherSalary {
+  id           String   @id @default(uuid())
+  teacherId    String
+  teacher      Teacher  @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+  monthlySalary Decimal?
+  hourlyWage   Decimal?
+  effectiveFrom DateTime @default(now())
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([teacherId])
+  @@index([effectiveFrom])
+  @@map("teacher_salaries")
+}
+
+model HourRequest {
+  id                 String            @id @default(uuid())
+  teacherId          String
+  teacher            Teacher           @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+  date               DateTime
+  hours              Decimal
+  minutes            Int               @default(0)
+  status             HourRequestStatus @default(PENDING)
+  adminModifiedHours Decimal?
+  adminModifiedMinutes Int?
+  adminFeedback      String?
+  reviewedBy         String?
+  reviewedAt         DateTime?
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime         @updatedAt
+
+  @@index([teacherId])
+  @@index([date])
+  @@index([status])
+  @@index([teacherId, date])
+  @@map("hour_requests")
+}
+
+model MonthlyPayrollRecord {
+  id              String   @id @default(uuid())
+  teacherId       String
+  teacher         Teacher  @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+  month           Int
+  year            Int
+  monthlySalary   Decimal  @default(0)
+  totalHours      Decimal  @default(0)
+  hourlyWage      Decimal  @default(0)
+  totalEntitlement Decimal
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@unique([teacherId, month, year])
+  @@index([teacherId])
+  @@index([year, month])
+  @@map("monthly_payroll_records")
 }

@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useI18n } from '@/lib/i18n-context';
 import SettingsMenu from '@/components/SettingsMenu';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
+import apiClient from '@/lib/api-client';
 import type { Class, Subject, StudentClass, StudentSubject } from '@/types';
 
 interface Student {
@@ -58,76 +59,77 @@ export default function StudentsPage() {
         return;
       }
 
-      // Fetch all users with STUDENT role
-      const studentsRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/users?role=STUDENT`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      // Fetch all users with STUDENT role and all student profiles in parallel
+      const [usersRes, studentsRes, classesRes, subjectsRes] = await Promise.all([
+        apiClient.get('/users?role=STUDENT'),
+        apiClient.get('/students'),
+        apiClient.get('/classes'),
+        apiClient.get('/subjects'),
+      ]);
 
-      if (studentsRes.status === 401) {
+      const users = Array.isArray(usersRes) ? usersRes : (usersRes as any)?.data || [];
+      const studentProfiles = Array.isArray(studentsRes) ? studentsRes : (studentsRes as any)?.data || [];
+      const classes = Array.isArray(classesRes) ? classesRes : (classesRes as any)?.data || [];
+      const subjects = Array.isArray(subjectsRes) ? subjectsRes : (subjectsRes as any)?.data || [];
+
+      // Create a map of userId -> studentProfile for fast lookup
+      const profileMap = new Map(
+        studentProfiles.map((profile: any) => [profile.userId, profile])
+      );
+
+      // Match users with profiles first (no subjects yet to avoid rate limits)
+      const studentsWithProfiles = users.map((user: any) => {
+        const studentProfile = profileMap.get(user.id);
+        return {
+          ...user,
+          studentProfile: studentProfile || null,
+          subjects: [], // Load subjects lazily when needed (modal opens)
+          class: studentProfile?.class || null,
+        };
+      });
+      
+      // Fetch subjects sequentially for students that have profiles to avoid rate limits
+      // We do this in a loop instead of Promise.all to throttle requests
+      const studentsWithSubjects = [];
+      for (let i = 0; i < studentsWithProfiles.length; i++) {
+        const student = studentsWithProfiles[i];
+        
+        if (student.studentProfile) {
+          try {
+            // Small delay between requests to avoid rate limiting (100ms)
+            if (i > 0) {
+              await new Promise(resolve => setTimeout(resolve, 100));
+            }
+            
+            const subjectsData = await apiClient.get(`/students/${student.studentProfile.id}/subjects`);
+            const studentSubjects = Array.isArray(subjectsData) ? subjectsData : (subjectsData as any)?.data || [];
+            student.subjects = studentSubjects;
+          } catch (err: any) {
+            // If rate limited or other error, continue with empty subjects
+            if (err.response?.status === 429) {
+              console.warn(`Rate limited for student ${student.studentProfile.id}, subjects will load on demand`);
+            } else {
+              console.error('Error fetching subjects for student:', err);
+            }
+            student.subjects = [];
+          }
+        }
+        
+        studentsWithSubjects.push(student);
+      }
+      
+      setStudents(studentsWithSubjects);
+      setAllClasses(classes);
+      setAllSubjects(subjects);
+
+    } catch (err: any) {
+      console.error('Error fetching data:', err);
+      if (err.response?.status === 401) {
         localStorage.removeItem('accessToken');
         localStorage.removeItem('refreshToken');
         router.push('/login');
         return;
       }
-
-      const studentsData = await studentsRes.json();
-      
-      // For each student user, try to get their student profile with classes and subjects
-      const studentsWithProfiles = await Promise.all(
-        (studentsData.data || []).map(async (user: any) => {
-          try {
-            const profileRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/students`, {
-              headers: { Authorization: `Bearer ${token}` },
-            });
-            const profileData = await profileRes.json();
-            const studentProfile = (profileData.data || []).find((s: any) => s.userId === user.id);
-            
-            let subjects = [];
-            if (studentProfile) {
-              try {
-                const subjectsRes = await fetch(
-                  `${process.env.NEXT_PUBLIC_API_URL}/students/${studentProfile.id}/subjects`,
-                  { headers: { Authorization: `Bearer ${token}` } }
-                );
-                if (subjectsRes.ok) {
-                  const subjectsData = await subjectsRes.json();
-                  subjects = subjectsData.data || [];
-                }
-              } catch (err) {
-                console.error('Error fetching subjects for student:', err);
-              }
-            }
-            
-            return {
-              ...user,
-              studentProfile: studentProfile || null,
-              subjects: subjects,
-              class: studentProfile?.class || null,
-            };
-          } catch {
-            return { ...user, studentProfile: null, subjects: [], class: null };
-          }
-        })
-      );
-      
-      setStudents(studentsWithProfiles);
-
-      // Fetch all classes
-      const classesRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/classes`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const classesData = await classesRes.json();
-      setAllClasses(classesData.data || []);
-
-      // Fetch all subjects
-      const subjectsRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/subjects`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const subjectsData = await subjectsRes.json();
-      setAllSubjects(subjectsData.data || []);
-
-    } catch (err) {
-      console.error('Error fetching data:', err);
       setError('Error loading students');
     } finally {
       setLoading(false);
@@ -147,151 +149,49 @@ export default function StudentsPage() {
     // First, try to fetch the student profile directly
     let studentProfile = student.studentProfile;
     
+    // If no profile, try to fetch it first, then create if needed (only once)
     if (!studentProfile) {
       try {
-        // Try to get all students and find this one
-        const studentsRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/students`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
+        // First try to fetch all students and find this one
+        const allStudents = await apiClient.get('/students');
+        const studentsList = Array.isArray(allStudents) ? allStudents : (allStudents as any)?.data || [];
+        studentProfile = studentsList.find((s: any) => s.userId === student.id);
         
-        if (studentsRes.ok) {
-          const studentsData = await studentsRes.json();
-          const existingProfile = (studentsData.data || []).find((s: any) => s.userId === student.id);
-          
-          if (existingProfile) {
-            studentProfile = existingProfile;
-            console.log('Found existing student profile:', studentProfile);
-          }
-        }
-      } catch (err) {
-        console.error('Error checking for existing profile:', err);
-      }
-    }
-    
-    // If still no profile, try to create one
-    if (!studentProfile) {
-      console.log('Creating student profile for user:', student.id);
-      try {
-        const createRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/students`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({
-            userId: student.id,
-          }),
-        });
-        
-        if (createRes.ok) {
-          const createData = await createRes.json();
-          studentProfile = createData.data || createData;
-          console.log('Student profile created:', studentProfile);
-        } else if (createRes.status === 409) {
-          // Profile already exists, try to fetch it directly
-          console.log('Profile already exists, fetching it...');
+        if (studentProfile) {
+          console.log('Found existing student profile:', studentProfile);
+        } else {
+          // If not found, try to create it (only once, no retries)
+          console.log('Creating student profile for user:', student.id);
           try {
-            // First try to get the profile from the response if it contains the created profile
-            const errorData = await createRes.json().catch(() => ({}));
-            if (errorData.data) {
-              studentProfile = errorData.data;
-              console.log('Found profile in error response:', studentProfile);
-            } else {
-              // If not in error response, try to fetch all students and find the one we need
-              const fetchRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/students`, {
-                headers: { Authorization: `Bearer ${token}` },
-              });
-              if (fetchRes.ok) {
-                const fetchData = await fetchRes.json();
-                studentProfile = (fetchData.data || []).find((s: any) => s.userId === student.id);
-                if (studentProfile) {
-                  console.log('Found existing profile from students list:', studentProfile);
-                }
-              }
-            }
-          } catch (fetchErr) {
-            console.error('Error fetching existing profile:', fetchErr);
-          }
-          
-          if (!studentProfile) {
-            // If we still can't find the profile, try to create it again with a different approach
-            console.log('Profile not found, attempting to create again...');
-            try {
-              const retryRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/students`, {
-                method: 'POST',
-                headers: {
-                  'Content-Type': 'application/json',
-                  Authorization: `Bearer ${token}`,
-                },
-                body: JSON.stringify({
-                  userId: student.id,
-                }),
-              });
+            studentProfile = await apiClient.post('/students', {
+              userId: student.id,
+            });
+            console.log('Student profile created:', studentProfile);
+          } catch (createErr: any) {
+            // If 409 conflict, profile exists - fetch it one more time
+            if (createErr.response?.status === 409) {
+              console.log('Profile already exists (409), fetching again...');
+              const retryStudents = await apiClient.get('/students');
+              const retryList = Array.isArray(retryStudents) ? retryStudents : (retryStudents as any)?.data || [];
+              studentProfile = retryList.find((s: any) => s.userId === student.id);
               
-              if (retryRes.ok) {
-                const retryData = await retryRes.json();
-                studentProfile = retryData.data || retryData;
-                console.log('Successfully created profile on retry:', studentProfile);
-              } else if (retryRes.status === 409) {
-                // Profile exists but we still can't find it, try one more time to fetch it
-                console.log('Profile exists on retry, trying to fetch it one more time...');
-                try {
-                  const finalFetchRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/students`, {
-                    headers: { Authorization: `Bearer ${token}` },
-                  });
-                  if (finalFetchRes.ok) {
-                    const finalFetchData = await finalFetchRes.json();
-                    studentProfile = (finalFetchData.data || []).find((s: any) => s.userId === student.id);
-                    if (studentProfile) {
-                      console.log('Found profile in final fetch:', studentProfile);
-                    } else {
-                      // If we still can't find it, create a minimal profile object to proceed
-                      console.log('Creating minimal profile object to proceed...');
-                      studentProfile = {
-                        id: `temp-${student.id}`,
-                        userId: student.id,
-                        classId: null,
-                        subjects: [],
-                        createdAt: new Date().toISOString(),
-                        updatedAt: new Date().toISOString(),
-                      };
-                    }
-                  }
-                } catch (finalErr) {
-                  console.error('Final fetch error:', finalErr);
-                  // Create a minimal profile object to proceed
-                  studentProfile = {
-                    id: `temp-${student.id}`,
-                    userId: student.id,
-                    classId: null,
-                    subjects: [],
-                    createdAt: new Date().toISOString(),
-                    updatedAt: new Date().toISOString(),
-                  };
-                }
-              } else {
-                console.error('Retry failed:', retryRes.status);
-                setError('Unable to create or retrieve student profile. Please try again.');
+              if (!studentProfile) {
+                console.warn('Profile should exist but cannot be found');
+                setError('Student profile exists but could not be retrieved. Please refresh the page.');
                 setModalLoading(false);
                 return;
               }
-            } catch (retryErr) {
-              console.error('Retry error:', retryErr);
-              setError('Unable to create or retrieve student profile. Please try again.');
+            } else {
+              console.error('Error creating student profile:', createErr);
+              setError('Unable to create student profile. Please try again.');
               setModalLoading(false);
               return;
             }
           }
-        } else {
-          const errorData = await createRes.json().catch(() => ({}));
-          console.error('Failed to create profile:', createRes.status, errorData);
-          setError(`Failed to create student profile. ${errorData.message || 'Please ensure the student user exists and try again.'}`);
-          setModalLoading(false);
-          return;
         }
-      } catch (err) {
-        console.error('Error creating student profile:', err);
-        setError('Error creating student profile. Please try again.');
+      } catch (err: any) {
+        console.error('Error fetching/creating student profile:', err);
+        setError('Unable to load student profile. Please try again.');
         setModalLoading(false);
         return;
       }

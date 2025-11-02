@@ -43,7 +43,9 @@
     "classes": "Classes",
     "classesDesc": "Manage classes",
     "subjects": "Subjects",
-    "subjectsDesc": "Manage subjects"
+    "subjectsDesc": "Manage subjects",
+    "points": "Points Management",
+    "pointsDesc": "Manage student points and rewards"
   },
   "classes": {
     "addClass": "Add Class",
@@ -146,6 +148,8 @@
     "myHomeworkDesc": "View and submit homework",
     "myGrades": "My Grades",
     "myGradesDesc": "View your grades",
+    "myPoints": "My Points",
+    "myPointsDesc": "View your points by subject",
     "announcements": "Announcements",
     "announcementsDesc": "Read announcements",
     "evaluations": "Evaluations",
@@ -235,6 +239,35 @@
     "passwordPlaceholder": "Enter password (min 6 characters)",
     "loading": "Loading users...",
     "allRoles": "All Roles"
+  },
+  "points": {
+    "title": "Points Management",
+    "titleStudent": "My Points",
+    "searchStudents": "Search Students",
+    "searchPlaceholder": "Search by name or email...",
+    "amount": "Amount",
+    "amountPlaceholder": "Enter amount",
+    "addPoints": "Add Points",
+    "deletePoints": "Delete Points",
+    "selectSubject": "Select Subject",
+    "loadSubjects": "Load subjects to see options",
+    "studentNotFound": "No students found",
+    "noStudentsMatch": "No students match your search for",
+    "clearSearch": "Clear search",
+    "noPointsYet": "No points yet",
+    "noPointsDesc": "Your points will appear here once you earn them",
+    "totalPoints": "Total Points",
+    "todayPoints": "Today's Points",
+    "pointsBySubject": "Points by Subject",
+    "today": "Today",
+    "total": "Total",
+    "subjectPoints": "Subject Points",
+    "viewPointsBySubject": "View your points earned by subject",
+    "manageStudentPoints": "Manage student points and rewards"
+  },
+  "supervisor": {
+    "points": "Points Management",
+    "pointsDesc": "Manage student points and rewards"
   },
   "messages": {
     "logoutConfirm": "Are you sure you want to logout?"

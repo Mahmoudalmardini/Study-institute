@@ -180,10 +180,11 @@ export default function SubjectsPage() {
     }
     try {
       setError('');
-      await apiClient.delete(`/subjects/${subjectId}/unassign-teacher/${teacherId}`);
-      setSuccess('Teacher unassigned successfully!');
+      const response = await apiClient.delete(`/subjects/${subjectId}/unassign-teacher/${teacherId}`);
+      const message = (response as any)?.message || 'Teacher unassigned successfully!';
+      setSuccess(message);
       fetchSubjects();
-      setTimeout(() => setSuccess(''), 3000);
+      setTimeout(() => setSuccess(''), 5000);
     } catch (error: any) {
       console.error('Error unassigning teacher:', error);
       setError(error.response?.data?.message || 'Error unassigning teacher');

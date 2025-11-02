@@ -318,8 +318,10 @@ export default function TeachersPage() {
     
     try {
       setError('');
-      await apiClient.delete(`/subjects/${subjectId}/unassign-teacher/${selectedTeacher.id}`);
-      setSuccess(`Subject "${subjectName}" has been unassigned successfully!`);
+      const response = await apiClient.delete(`/subjects/${subjectId}/unassign-teacher/${selectedTeacher.id}`);
+      // Show the message from backend (which includes info about removed students if applicable)
+      const message = (response as any)?.message || `Subject "${subjectName}" has been unassigned successfully!`;
+      setSuccess(message);
       
       // Refresh teachers data
       const refreshedTeachers = await fetchTeachers();
@@ -330,7 +332,7 @@ export default function TeachersPage() {
         setSelectedTeacher(updatedTeacher);
       }
       
-      setTimeout(() => setSuccess(''), 3000);
+      setTimeout(() => setSuccess(''), 5000);
     } catch (err: any) {
       console.error('Error unassigning subject:', err);
       setError(err.response?.data?.message || 'Error unassigning subject');
@@ -359,11 +361,18 @@ export default function TeachersPage() {
       }
 
       // Remove all assignments one by one
+      let totalRemovedStudents = 0;
       for (const ts of teacher.subjects) {
-        await apiClient.delete(`/subjects/${ts.subject.id}/unassign-teacher/${teacherId}`);
+        const response = await apiClient.delete(`/subjects/${ts.subject.id}/unassign-teacher/${teacherId}`);
+        const removedCount = (response as any)?.removedStudents || 0;
+        totalRemovedStudents += removedCount;
       }
 
-      setSuccess(`All assignments removed for ${teacherName}!`);
+      let successMsg = `All assignments removed for ${teacherName}!`;
+      if (totalRemovedStudents > 0) {
+        successMsg += ` ${totalRemovedStudents} student(s) were automatically removed from subjects with no remaining teachers.`;
+      }
+      setSuccess(successMsg);
       const refreshedTeachers = await fetchTeachers();
       const updatedTeacher = refreshedTeachers.find((t: Teacher) => t.id === teacherId);
       if (updatedTeacher && selectedTeacher?.id === teacherId) {
@@ -395,8 +404,9 @@ export default function TeachersPage() {
         return;
       }
 
-      await apiClient.delete(`/subjects/${teacherSubject.subject.id}/unassign-teacher/${teacherId}`);
-      setSuccess(`Assignment "${subjectName}" removed from ${teacherName}!`);
+      const response = await apiClient.delete(`/subjects/${teacherSubject.subject.id}/unassign-teacher/${teacherId}`);
+      const message = (response as any)?.message || `Assignment "${subjectName}" removed from ${teacherName}!`;
+      setSuccess(message);
       
       const refreshedTeachers = await fetchTeachers();
       const updatedTeacher = refreshedTeachers.find((t: Teacher) => t.id === teacherId);
@@ -447,7 +457,8 @@ export default function TeachersPage() {
       }
       
       // First unassign the old subject
-      await apiClient.delete(`/subjects/${oldSubjectId}/unassign-teacher/${selectedTeacher.id}`);
+      const unassignResponse = await apiClient.delete(`/subjects/${oldSubjectId}/unassign-teacher/${selectedTeacher.id}`);
+      const unassignMessage = (unassignResponse as any)?.message;
       
       // Small delay to ensure backend processes the deletion
       await new Promise(resolve => setTimeout(resolve, 200));
@@ -458,7 +469,12 @@ export default function TeachersPage() {
         classId: editClassId,
       });
       
-      setSuccess(`Assignment updated successfully to "${newSubjectName}"!`);
+      // Include message about removed students if applicable
+      let successMessage = `Assignment updated successfully to "${newSubjectName}"!`;
+      if (unassignMessage && unassignMessage.includes('automatically removed')) {
+        successMessage += ` Note: ${unassignMessage.split('automatically removed')[1]}`;
+      }
+      setSuccess(successMessage);
 
       // Refresh teachers data
       const refreshedTeachers = await fetchTeachers();

@@ -113,7 +113,7 @@ export default function AdminPointsPage() {
 
   const handleAddPoints = async (studentId: string, subjectId: string) => {
     if (!subjectId) {
-      setError('Please select a subject');
+      setError(t.points.selectSubject);
       return;
     }
     if (amount <= 0) {
@@ -121,12 +121,9 @@ export default function AdminPointsPage() {
       return;
     }
     
-    // Use timestamp to ensure each click is unique
-    const clickTimestamp = Date.now();
-    const requestKey = `add-${studentId}-${subjectId}-${clickTimestamp}`;
     const pointAmount = Math.abs(Number(amount));
 
-    // Always apply optimistic update immediately, even if operation is in progress
+    // Always apply optimistic update immediately and synchronously - allow multiple clicks
     setStudentSummaries(prev => {
       const current = prev[studentId] || { total: 0, daily: 0, bySubject: [] };
       const subjectIndex = current.bySubject.findIndex(s => s.subjectId === subjectId);
@@ -188,115 +185,67 @@ export default function AdminPointsPage() {
       });
     }
 
-    // Increment pending operations counter
-    setPendingOperations(prev => ({
-      ...prev,
-      [requestKey]: (prev[requestKey] || 0) + 1
-    }));
-
-    // Process API call asynchronously (don't block UI)
+    // Process API call asynchronously - each click fires independently
     (async () => {
       try {
-        setProcessing((prev) => ({ ...prev, [requestKey]: true }));
         setError(null);
-        
-        // Make API call
+        // Make API call - fire immediately, no blocking
         await createPoint({ studentId, subjectId, amount: pointAmount });
         
-        // Decrement pending operations
-        setPendingOperations(prev => {
-          const next = { ...prev };
-          if (next[requestKey] > 0) {
-            next[requestKey] = next[requestKey] - 1;
-            if (next[requestKey] === 0) {
-              delete next[requestKey];
-            }
-          }
-          return next;
-        });
-        
-        // Wait a bit before refreshing to avoid rate limits
-        await new Promise(resolve => setTimeout(resolve, 300));
-        
-        // Check if there are no more pending operations before refreshing
-        setPendingOperations(prev => {
-          const hasPending = prev[requestKey] && prev[requestKey] > 0;
-          if (!hasPending) {
-            // Refresh summary to get accurate data from server
-            setTimeout(() => {
-              getPointSummary(studentId).then(updatedSummary => {
-                if (updatedSummary) {
-                  setStudentSummaries(prev => ({
-                    ...prev,
-                    [studentId]: { 
-                      total: updatedSummary.total || 0, 
-                      daily: updatedSummary.daily || 0,
-                      bySubject: updatedSummary.bySubject || []
-                    }
-                  }));
-                  
-                  if (selectedStudentId === studentId) {
-                    setSummary(updatedSummary);
-                  }
+        // Debounced refresh - wait a bit then refresh to sync with server
+        setTimeout(async () => {
+          try {
+            const updatedSummary = await getPointSummary(studentId) as any;
+            if (updatedSummary) {
+              setStudentSummaries(prev => ({
+                ...prev,
+                [studentId]: { 
+                  total: updatedSummary.total || 0, 
+                  daily: updatedSummary.daily || 0,
+                  bySubject: updatedSummary.bySubject || []
                 }
-              }).catch(() => {
-                // Ignore refresh errors
-              });
-            }, 100);
-          }
-          return prev;
-        });
-      } catch (err: any) {
-        // Decrement pending operations on error too
-        setPendingOperations(prev => {
-          const next = { ...prev };
-          if (next[requestKey] > 0) {
-            next[requestKey] = next[requestKey] - 1;
-            if (next[requestKey] === 0) {
-              delete next[requestKey];
+              }));
+              
+              if (selectedStudentId === studentId) {
+                setSummary(updatedSummary);
+              }
             }
+          } catch (refreshErr) {
+            // Ignore refresh errors
           }
-          return next;
-        });
-        
+        }, 500); // Debounce refresh by 500ms
+      } catch (err: any) {
         if (err?.response?.status !== 429) {
           setError(err?.response?.data?.message || 'Failed to add points');
-        } else {
-          // On 429, retry after delay
-          setTimeout(async () => {
-            try {
-              const updatedSummary = await getPointSummary(studentId) as any;
-              if (updatedSummary) {
-                setStudentSummaries(prev => ({
-                  ...prev,
-                  [studentId]: { 
-                    total: updatedSummary.total || 0, 
-                    daily: updatedSummary.daily || 0,
-                    bySubject: updatedSummary.bySubject || []
-                  }
-                }));
-                if (selectedStudentId === studentId) {
-                  setSummary(updatedSummary);
-                }
-              }
-            } catch (retryErr) {
-              // Ignore retry errors
-            }
-          }, 2000);
         }
-      } finally {
-        setProcessing((prev) => {
-          const next = { ...prev };
-          delete next[requestKey];
-          return next;
-        });
+        // On 429, silently retry refresh after delay
+        setTimeout(async () => {
+          try {
+            const updatedSummary = await getPointSummary(studentId) as any;
+            if (updatedSummary) {
+              setStudentSummaries(prev => ({
+                ...prev,
+                [studentId]: { 
+                  total: updatedSummary.total || 0, 
+                  daily: updatedSummary.daily || 0,
+                  bySubject: updatedSummary.bySubject || []
+                }
+              }));
+              if (selectedStudentId === studentId) {
+                setSummary(updatedSummary);
+              }
+            }
+          } catch (retryErr) {
+            // Ignore retry errors
+          }
+        }, 2000);
       }
     })();
   };
 
   const handleDeletePoints = async (studentId: string, subjectId: string) => {
     if (!subjectId) {
-      setError('Please select a subject');
+      setError(t.points.selectSubject);
       return;
     }
     if (amount <= 0) {
@@ -304,12 +253,9 @@ export default function AdminPointsPage() {
       return;
     }
     
-    // Use timestamp to ensure each click is unique
-    const clickTimestamp = Date.now();
-    const requestKey = `delete-${studentId}-${subjectId}-${clickTimestamp}`;
     const pointAmount = Math.abs(Number(amount));
 
-    // Always apply optimistic update immediately, even if operation is in progress
+    // Always apply optimistic update immediately and synchronously - allow multiple clicks
     setStudentSummaries(prev => {
       const current = prev[studentId] || { total: 0, daily: 0, bySubject: [] };
       const subjectIndex = current.bySubject.findIndex(s => s.subjectId === subjectId);
@@ -360,108 +306,60 @@ export default function AdminPointsPage() {
       });
     }
 
-    // Increment pending operations counter
-    setPendingOperations(prev => ({
-      ...prev,
-      [requestKey]: (prev[requestKey] || 0) + 1
-    }));
-
-    // Process API call asynchronously (don't block UI)
+    // Process API call asynchronously - each click fires independently
     (async () => {
       try {
-        setProcessing((prev) => ({ ...prev, [requestKey]: true }));
         setError(null);
-        
-        // Make API call
+        // Make API call - fire immediately, no blocking
         await createPoint({ studentId, subjectId, amount: -pointAmount });
         
-        // Decrement pending operations
-        setPendingOperations(prev => {
-          const next = { ...prev };
-          if (next[requestKey] > 0) {
-            next[requestKey] = next[requestKey] - 1;
-            if (next[requestKey] === 0) {
-              delete next[requestKey];
-            }
-          }
-          return next;
-        });
-        
-        // Wait a bit before refreshing to avoid rate limits
-        await new Promise(resolve => setTimeout(resolve, 300));
-        
-        // Check if there are no more pending operations before refreshing
-        setPendingOperations(prev => {
-          const hasPending = prev[requestKey] && prev[requestKey] > 0;
-          if (!hasPending) {
-            // Refresh summary to get accurate data from server
-            setTimeout(() => {
-              getPointSummary(studentId).then(updatedSummary => {
-                if (updatedSummary) {
-                  setStudentSummaries(prev => ({
-                    ...prev,
-                    [studentId]: { 
-                      total: updatedSummary.total || 0, 
-                      daily: updatedSummary.daily || 0,
-                      bySubject: updatedSummary.bySubject || []
-                    }
-                  }));
-                  
-                  if (selectedStudentId === studentId) {
-                    setSummary(updatedSummary);
-                  }
+        // Debounced refresh - wait a bit then refresh to sync with server
+        setTimeout(async () => {
+          try {
+            const updatedSummary = await getPointSummary(studentId) as any;
+            if (updatedSummary) {
+              setStudentSummaries(prev => ({
+                ...prev,
+                [studentId]: { 
+                  total: updatedSummary.total || 0, 
+                  daily: updatedSummary.daily || 0,
+                  bySubject: updatedSummary.bySubject || []
                 }
-              }).catch(() => {
-                // Ignore refresh errors
-              });
-            }, 100);
-          }
-          return prev;
-        });
-      } catch (err: any) {
-        // Decrement pending operations on error too
-        setPendingOperations(prev => {
-          const next = { ...prev };
-          if (next[requestKey] > 0) {
-            next[requestKey] = next[requestKey] - 1;
-            if (next[requestKey] === 0) {
-              delete next[requestKey];
+              }));
+              
+              if (selectedStudentId === studentId) {
+                setSummary(updatedSummary);
+              }
             }
+          } catch (refreshErr) {
+            // Ignore refresh errors
           }
-          return next;
-        });
-        
+        }, 500); // Debounce refresh by 500ms
+      } catch (err: any) {
         if (err?.response?.status !== 429) {
           setError(err?.response?.data?.message || 'Failed to remove points');
-        } else {
-          // On 429, retry after delay
-          setTimeout(async () => {
-            try {
-              const updatedSummary = await getPointSummary(studentId) as any;
-              if (updatedSummary) {
-                setStudentSummaries(prev => ({
-                  ...prev,
-                  [studentId]: { 
-                    total: updatedSummary.total || 0, 
-                    daily: updatedSummary.daily || 0,
-                    bySubject: updatedSummary.bySubject || []
-                  }
-                }));
-                if (selectedStudentId === studentId) {
-                  setSummary(updatedSummary);
-                }
-              }
-            } catch (retryErr) {
-              // Ignore retry errors
-            }
-          }, 2000);
         }
-      } finally {
-        setProcessing((prev) => {
-          const next = { ...prev };
-          delete next[requestKey];
-          return next;
-        });
+        // On 429, silently retry refresh after delay
+        setTimeout(async () => {
+          try {
+            const updatedSummary = await getPointSummary(studentId) as any;
+            if (updatedSummary) {
+              setStudentSummaries(prev => ({
+                ...prev,
+                [studentId]: { 
+                  total: updatedSummary.total || 0, 
+                  daily: updatedSummary.daily || 0,
+                  bySubject: updatedSummary.bySubject || []
+                }
+              }));
+              if (selectedStudentId === studentId) {
+                setSummary(updatedSummary);
+              }
+            }
+          } catch (retryErr) {
+            // Ignore retry errors
+          }
+        }, 2000);
       }
     })();
   };
@@ -500,7 +398,7 @@ export default function AdminPointsPage() {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
                 </svg>
               </button>
-              <h1 className="text-lg sm:text-xl font-bold text-white truncate">Points Management</h1>
+              <h1 className="text-lg sm:text-xl font-bold text-white truncate">{t.points.title}</h1>
             </div>
             <div className="flex items-center gap-2 sm:gap-4 flex-shrink-0">
               <SettingsMenu onLogout={() => { localStorage.clear(); router.push('/login'); }} />
@@ -525,7 +423,7 @@ export default function AdminPointsPage() {
         <div className="bg-white rounded-2xl shadow-lg p-4 sm:p-6 mb-6 border border-gray-200">
           <div className="grid grid-cols-1 gap-4">
             <div className="relative">
-              <Label className="text-gray-700 font-semibold mb-2 block">Search Students</Label>
+              <Label className="text-gray-700 font-semibold mb-2 block">{t.points.searchStudents}</Label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                   <svg className="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -533,7 +431,7 @@ export default function AdminPointsPage() {
                   </svg>
                 </div>
                 <Input 
-                  placeholder="Search by name or email..." 
+                  placeholder={t.points.searchPlaceholder} 
                   value={query} 
                   onChange={(e) => setQuery(e.target.value)}
                   className="pl-10 pr-10"
@@ -578,13 +476,13 @@ export default function AdminPointsPage() {
                 <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                 </svg>
-                <h3 className="mt-4 text-lg font-medium text-gray-900">No students found</h3>
+                <h3 className="mt-4 text-lg font-medium text-gray-900">{t.points.studentNotFound}</h3>
                 <p className="mt-2 text-sm text-gray-500">
-                  No students match your search for "{query}"
+                  {t.points.noStudentsMatch} "{query}"
                 </p>
                 <div className="mt-4">
                   <Button onClick={() => setQuery('')} variant="outline">
-                    Clear search
+                    {t.points.clearSearch}
                   </Button>
                 </div>
               </div>
@@ -648,33 +546,33 @@ export default function AdminPointsPage() {
                         <div>
                           <Label className="text-sm text-gray-700">Subject *</Label>
                           <select
+                            className="mt-1 w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent"
                             onFocus={() => ensureStudentSubjects(s.id)}
                             value={subjectForStudent[s.id] || ''}
                             onChange={(e) => setSubjectForStudent((m) => ({ ...m, [s.id]: e.target.value || undefined }))}
-                            className="mt-1 w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent"
                             required
                           >
-                            <option value="">Select a subject</option>
+                            <option value="">{t.points.selectSubject}</option>
                             {(subjectsByStudent[s.id] || []).map((sub) => (
                               <option key={sub.id} value={sub.id}>{sub.name}</option>
                             ))}
                           </select>
                           {!subjectForStudent[s.id] && (subjectsByStudent[s.id] || []).length === 0 && (
-                            <p className="text-xs text-gray-500 mt-1">Load subjects to see options</p>
+                            <p className="text-xs text-gray-500 mt-1">{t.points.loadSubjects}</p>
                           )}
                         </div>
                         <div>
-                          <Label className="text-sm text-gray-700">Amount *</Label>
+                          <Label className="text-sm text-gray-700">{t.points.amount} *</Label>
                           <Input 
                             type="number" 
                             min="1"
                             step="1"
                             inputMode="numeric"
-                            value={amount > 0 ? amount : ''} 
+                            value={amount > 0 ? amount.toString() : ''} 
                             onChange={(e) => {
                               const inputValue = e.target.value;
                               if (inputValue === '') {
-                                setAmount(1);
+                                setAmount(0);
                                 return;
                               }
                               const val = parseInt(inputValue, 10);
@@ -683,12 +581,17 @@ export default function AdminPointsPage() {
                               }
                             }}
                             onKeyDown={(e) => {
-                              // Allow typing numbers, backspace, delete, arrow keys, tab
-                              if (!/[0-9]/.test(e.key) && !['Backspace', 'Delete', 'ArrowLeft', 'ArrowRight', 'Tab', 'Enter'].includes(e.key)) {
+                              // Allow typing numbers (including numpad), backspace, delete, arrow keys, tab
+                              const isNumber = /^[0-9]$/.test(e.key);
+                              const isNumpad = /^Numpad[0-9]$/.test(e.key);
+                              const isAllowedKey = ['Backspace', 'Delete', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Tab', 'Enter', 'Home', 'End'].includes(e.key);
+                              const isCopyPaste = (e.ctrlKey || e.metaKey) && ['a', 'c', 'v', 'x'].includes(e.key.toLowerCase());
+                              
+                              if (!isNumber && !isNumpad && !isAllowedKey && !isCopyPaste) {
                                 e.preventDefault();
                               }
                             }}
-                            placeholder="Enter amount"
+                            placeholder={t.points.amountPlaceholder}
                             className="[&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
                           />
                         </div>
@@ -699,7 +602,7 @@ export default function AdminPointsPage() {
                             onClick={() => handleAddPoints(s.id, subjectForStudent[s.id] || '')}
                             disabled={!subjectForStudent[s.id] || amount <= 0}
                           >
-                            Add Points
+                            {t.points.addPoints}
                           </Button>
                           <Button
                             size="sm"
@@ -707,7 +610,7 @@ export default function AdminPointsPage() {
                             onClick={() => handleDeletePoints(s.id, subjectForStudent[s.id] || '')}
                             disabled={!subjectForStudent[s.id] || amount <= 0}
                           >
-                            Remove Points
+                            {t.points.deletePoints}
                           </Button>
                         </div>
                       </div>

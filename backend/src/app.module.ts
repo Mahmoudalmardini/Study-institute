@@ -7,6 +7,7 @@ import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import configuration from './config/configuration';
+import { ConfigService } from '@nestjs/config';
 import { PrismaModule } from './modules/prisma/prisma.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { UsersModule } from './modules/users/users.module';
@@ -23,6 +24,7 @@ import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import { AllExceptionsFilter } from './common/filters/http-exception.filter';
 import { TransformInterceptor } from './common/interceptors/transform.interceptor';
 import { PointsModule } from './modules/points/points.module';
+import { PayrollModule } from './modules/payroll/payroll.module';
 
 @Module({
   imports: [
@@ -35,12 +37,15 @@ import { PointsModule } from './modules/points/points.module';
       isGlobal: true,
       load: [configuration],
     }),
-    ThrottlerModule.forRoot([
-      {
-        ttl: 60000,
-        limit: 10,
-      },
-    ]),
+    ThrottlerModule.forRootAsync({
+      inject: [ConfigService],
+      useFactory: (config: ConfigService) => [
+        {
+          ttl: config.get('throttle.ttl') * 1000, // Convert seconds to milliseconds
+          limit: config.get('throttle.limit') || 10,
+        },
+      ],
+    }),
     PrismaModule,
     AuthModule,
     UsersModule,
@@ -54,6 +59,7 @@ import { PointsModule } from './modules/points/points.module';
     SubjectsModule,
     TeachersModule,
     PointsModule,
+    PayrollModule,
   ],
   controllers: [AppController],
   providers: [

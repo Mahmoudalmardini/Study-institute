@@ -323,11 +323,47 @@ export class SubjectsService {
       throw new NotFoundException('Teacher assignment not found');
     }
 
-    return this.prisma.teacherSubject.delete({
+    // Delete the teacher assignment
+    await this.prisma.teacherSubject.delete({
       where: {
         id: assignment.id,
       },
     });
+
+    // Check if there are any other teachers assigned to this subject
+    const remainingTeachers = await this.prisma.teacherSubject.findMany({
+      where: {
+        subjectId,
+      },
+    });
+
+    // If no teachers remain for this subject, remove all students from it
+    if (remainingTeachers.length === 0) {
+      // Get the subject details for logging/debugging
+      const subject = await this.prisma.subject.findUnique({
+        where: { id: subjectId },
+        select: { name: true },
+      });
+
+      // Delete all student enrollments for this subject
+      const deletedEnrollments = await this.prisma.studentSubject.deleteMany({
+        where: {
+          subjectId,
+        },
+      });
+
+      // Return information about what was done
+      return {
+        message: `Teacher unassigned successfully. ${deletedEnrollments.count} student(s) automatically removed from "${subject?.name || 'this subject'}" because no teachers remain.`,
+        removedStudents: deletedEnrollments.count,
+        subjectName: subject?.name,
+      };
+    }
+
+    return {
+      message: 'Teacher unassigned successfully.',
+      removedStudents: 0,
+    };
   }
 
   async getTeachersBySubject(subjectId: string) {

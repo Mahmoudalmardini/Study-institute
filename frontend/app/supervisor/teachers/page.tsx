@@ -281,8 +281,9 @@ export default function TeachersPage() {
     
     try {
       setError('');
-      await apiClient.delete(`/subjects/${subjectId}/unassign-teacher/${selectedTeacher.teacher.id}`);
-      setSuccess('Subject unassigned successfully!');
+      const response = await apiClient.delete(`/subjects/${subjectId}/unassign-teacher/${selectedTeacher.teacher.id}`);
+      const message = (response as any)?.message || 'Subject unassigned successfully!';
+      setSuccess(message);
       
       // Refresh teachers data
       await fetchTeachers();
@@ -296,7 +297,7 @@ export default function TeachersPage() {
         setSelectedTeacher(updatedTeacher);
       }
       
-      setTimeout(() => setSuccess(''), 3000);
+      setTimeout(() => setSuccess(''), 5000);
     } catch (err: any) {
       console.error('Error unassigning subject:', err);
       setError(err.response?.data?.message || 'Error unassigning subject');
@@ -326,7 +327,8 @@ export default function TeachersPage() {
       setError('');
       
       // First unassign the subject
-      await apiClient.delete(`/subjects/${editingAssignment.subject.id}/unassign-teacher/${selectedTeacher.teacher.id}`);
+      const unassignResponse = await apiClient.delete(`/subjects/${editingAssignment.subject.id}/unassign-teacher/${selectedTeacher.teacher.id}`);
+      const unassignMessage = (unassignResponse as any)?.message;
       
       // Then reassign with new class
       await apiClient.post(`/subjects/${editingAssignment.subject.id}/assign-teacher`, {
@@ -334,7 +336,12 @@ export default function TeachersPage() {
         classId: newClassId,
       });
       
-      setSuccess('Assignment updated successfully!');
+      // Include message about removed students if applicable
+      let successMessage = 'Assignment updated successfully!';
+      if (unassignMessage && unassignMessage.includes('automatically removed')) {
+        successMessage += ` Note: ${unassignMessage.split('automatically removed')[1]}`;
+      }
+      setSuccess(successMessage);
 
       // Refresh teachers data
       await fetchTeachers();
