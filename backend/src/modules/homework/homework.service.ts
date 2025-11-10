@@ -907,14 +907,48 @@ export class HomeworkService {
   async getStudentSubjects(studentUserId: string) {
     let student = await this.prisma.student.findUnique({
       where: { userId: studentUserId },
+      include: {
+        class: true,
+        classes: {
+          include: {
+            class: {
+              select: {
+                id: true,
+                name: true,
+                grade: true,
+              },
+            },
+          },
+        },
+      },
     });
 
     if (!student) {
       // Auto-create student profile if it doesn't exist
       student = await this.prisma.student.create({
         data: { userId: studentUserId },
+        include: {
+          class: true,
+          classes: {
+            include: {
+              class: {
+                select: {
+                  id: true,
+                  name: true,
+                  grade: true,
+                },
+              },
+            },
+          },
+        },
       });
     }
+
+    // Get all class IDs the student is enrolled in
+    const studentClassIds = [
+      ...(student.classId ? [student.classId] : []),
+      ...(student.classes?.map(sc => sc.classId) || []),
+    ];
 
     const studentSubjects = await this.prisma.studentSubject.findMany({
       where: { studentId: student.id },
@@ -966,15 +1000,38 @@ export class HomeworkService {
       },
     });
 
-    // Enrich subject with class information (from direct classId or classSubjects)
+    // Enrich subject with class information (from direct classId or classSubjects matching student's classes)
     return studentSubjects.map((ss) => {
       const subject = ss.subject;
       let classInfo = subject.class;
       
-      // If no direct class, try to get from classSubjects (take first one if multiple)
+      console.log(`[getStudentSubjects] Processing subject: ${subject.name}`, {
+        hasDirectClass: !!subject.class,
+        classSubjectsCount: subject.classSubjects?.length || 0,
+        studentClassIds,
+      });
+      
+      // If no direct class, try to get from classSubjects that match student's classes
       if (!classInfo && subject.classSubjects && subject.classSubjects.length > 0) {
-        classInfo = subject.classSubjects[0].class;
+        // First, try to find a class that matches the student's enrolled classes
+        if (studentClassIds.length > 0) {
+          const matchingClassSubject = subject.classSubjects.find(
+            cs => studentClassIds.includes(cs.classId)
+          );
+          if (matchingClassSubject) {
+            classInfo = matchingClassSubject.class;
+            console.log(`[getStudentSubjects] Found matching class for ${subject.name}:`, classInfo);
+          }
+        }
+        
+        // If still no match, just take the first one
+        if (!classInfo) {
+          classInfo = subject.classSubjects[0].class;
+          console.log(`[getStudentSubjects] Using first classSubject for ${subject.name}:`, classInfo);
+        }
       }
+      
+      console.log(`[getStudentSubjects] Final class for ${subject.name}:`, classInfo);
       
       return {
         ...ss,

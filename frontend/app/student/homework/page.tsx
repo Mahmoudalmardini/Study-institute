@@ -190,9 +190,18 @@ export default function StudentHomeworkPage() {
 
       if (response.ok) {
         const data = await response.json();
-        console.log('Student subjects:', data);
+        console.log('Student subjects raw response:', data);
         // Handle both direct array response and wrapped response
         const subjects = Array.isArray(data) ? data : (data.data || []);
+        console.log('Processed subjects:', subjects);
+        // Log class information for each subject
+        subjects.forEach((subj: any) => {
+          console.log(`Subject: ${subj.subject?.name || 'Unknown'}`, {
+            directClass: subj.subject?.class,
+            classSubjects: subj.subject?.classSubjects,
+            finalClass: subj.subject?.class,
+          });
+        });
         setMySubjects(subjects);
       } else {
         console.error('Failed to fetch subjects:', response.status);
