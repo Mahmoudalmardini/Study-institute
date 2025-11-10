@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useI18n } from '@/lib/i18n-context';
 import SettingsMenu from '@/components/SettingsMenu';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
+import apiClient from '@/lib/api-client';
 import type { Class, Subject, StudentClass, StudentSubject } from '@/types';
 
 interface Student {
@@ -28,6 +29,7 @@ export default function SupervisorStudentsPage() {
   const [students, setStudents] = useState<Student[]>([]);
   const [allClasses, setAllClasses] = useState<Class[]>([]);
   const [allSubjects, setAllSubjects] = useState<Subject[]>([]);
+  const [availableSubjects, setAvailableSubjects] = useState<Subject[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [error, setError] = useState('');
@@ -37,6 +39,9 @@ export default function SupervisorStudentsPage() {
   const [success, setSuccess] = useState('');
   const [selectedClassId, setSelectedClassId] = useState<string>('');
   const [selectedSubjectIds, setSelectedSubjectIds] = useState<string[]>([]);
+  const [subjectTeachers, setSubjectTeachers] = useState<Record<string, string>>({}); // subjectId -> teacherId
+  const [teachersBySubject, setTeachersBySubject] = useState<Record<string, any[]>>({}); // subjectId -> teachers[]
+  const [loadingTeachers, setLoadingTeachers] = useState<Record<string, boolean>>({});
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -141,6 +146,8 @@ export default function SupervisorStudentsPage() {
     setSuccess('');
     setSelectedClassId('');
     setSelectedSubjectIds([]);
+    setSubjectTeachers({});
+    setTeachersBySubject({});
     
     const token = localStorage.getItem('accessToken');
     
@@ -328,6 +335,20 @@ export default function SupervisorStudentsPage() {
           const studentSubjects = subjectsData.data || [];
           setSelectedSubjectIds(studentSubjects.map((ss: StudentSubject) => ss.subjectId));
           
+          // Set teacher assignments if they exist
+          const teacherAssignments: Record<string, string> = {};
+          studentSubjects.forEach((ss: any) => {
+            if (ss.teacherId) {
+              teacherAssignments[ss.subjectId] = ss.teacherId;
+            }
+          });
+          setSubjectTeachers(teacherAssignments);
+          
+          // Fetch teachers for all enrolled subjects
+          for (const ss of studentSubjects) {
+            await fetchTeachersForSubject(ss.subjectId);
+          }
+          
           setSelectedStudent({
             ...student,
             studentProfile: {
@@ -380,7 +401,12 @@ export default function SupervisorStudentsPage() {
         throw new Error(data.message || 'Error updating class');
       }
 
-      // Enroll subjects
+      // Enroll subjects with optional teacher assignments
+      const subjectsToEnroll = selectedSubjectIds.map(subjectId => ({
+        subjectId,
+        teacherId: subjectTeachers[subjectId] || undefined,
+      }));
+
       const subjectsResponse = await fetch(
         `${process.env.NEXT_PUBLIC_API_URL}/students/${selectedStudent.studentProfile.id}/enroll-subjects`,
         {
@@ -389,7 +415,7 @@ export default function SupervisorStudentsPage() {
             'Content-Type': 'application/json',
             Authorization: `Bearer ${token}`,
           },
-          body: JSON.stringify({ subjectIds: selectedSubjectIds }),
+          body: JSON.stringify({ subjects: subjectsToEnroll }),
         }
       );
 
@@ -412,14 +438,40 @@ export default function SupervisorStudentsPage() {
     }
   };
 
-  const toggleSubject = (subjectId: string) => {
-    setSelectedSubjectIds(prev => {
-      if (prev.includes(subjectId)) {
-        return prev.filter(id => id !== subjectId);
-      } else {
-        return [...prev, subjectId];
-      }
-    });
+  const fetchTeachersForSubject = async (subjectId: string) => {
+    if (teachersBySubject[subjectId]) {
+      return; // Already fetched
+    }
+    
+    setLoadingTeachers(prev => ({ ...prev, [subjectId]: true }));
+    try {
+      const data = await apiClient.get(`/subjects/${subjectId}/teachers`);
+      const teachers = Array.isArray(data) ? data : (data as any)?.data || [];
+      setTeachersBySubject(prev => ({ ...prev, [subjectId]: teachers }));
+    } catch (error) {
+      console.error('Error fetching teachers for subject:', error);
+      setTeachersBySubject(prev => ({ ...prev, [subjectId]: [] }));
+    } finally {
+      setLoadingTeachers(prev => ({ ...prev, [subjectId]: false }));
+    }
+  };
+
+  const toggleSubject = async (subjectId: string) => {
+    const isCurrentlySelected = selectedSubjectIds.includes(subjectId);
+    
+    if (isCurrentlySelected) {
+      // Deselecting - remove from selection and clear teacher
+      setSelectedSubjectIds(prev => prev.filter(id => id !== subjectId));
+      setSubjectTeachers(prev => {
+        const updated = { ...prev };
+        delete updated[subjectId];
+        return updated;
+      });
+    } else {
+      // Selecting - add to selection and fetch teachers
+      setSelectedSubjectIds(prev => [...prev, subjectId]);
+      await fetchTeachersForSubject(subjectId);
+    }
   };
 
   const handleLogout = () => {
@@ -438,11 +490,25 @@ export default function SupervisorStudentsPage() {
     return fullName.includes(search) || email.includes(search);
   });
 
-  // Get subjects that belong to selected class
-  const availableSubjects = allSubjects.filter(subject => {
-    if (!selectedClassId) return false; // Don't show any subjects if no class is selected
-    return subject.class?.id === selectedClassId;
-  });
+  // Fetch subjects for selected class
+  useEffect(() => {
+    const fetchClassSubjects = async () => {
+      if (!selectedClassId) {
+        setAvailableSubjects([]);
+        return;
+      }
+      
+      try {
+        const data = await apiClient.get(`/classes/${selectedClassId}/subjects`);
+        setAvailableSubjects(data || []);
+      } catch (error) {
+        console.error('Error fetching class subjects:', error);
+        setAvailableSubjects([]);
+      }
+    };
+    
+    fetchClassSubjects();
+  }, [selectedClassId]);
 
   return (
     <div className="min-h-screen gradient-bg">
@@ -781,12 +847,25 @@ export default function SupervisorStudentsPage() {
                     <select
                       id="class-select"
                       value={selectedClassId}
-                      onChange={(e) => {
+                      onChange={async (e) => {
                         const newClassId = e.target.value;
                         setSelectedClassId(newClassId);
                         // Clear selected subjects when class changes to force reselection
                         setSelectedSubjectIds([]);
                         setSuccess('Class changed. Please reselect subjects for the new class.');
+                        
+                        // Fetch subjects for the selected class
+                        if (newClassId) {
+                          try {
+                            const data = await apiClient.get(`/classes/${newClassId}/subjects`);
+                            setAvailableSubjects(data || []);
+                          } catch (error) {
+                            console.error('Error fetching class subjects:', error);
+                            setAvailableSubjects([]);
+                          }
+                        } else {
+                          setAvailableSubjects([]);
+                        }
                       }}
                       className="w-full px-4 py-3 text-base border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
                       required
@@ -832,32 +911,96 @@ export default function SupervisorStudentsPage() {
                         </p>
                       </div>
                     )}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 max-h-60 overflow-y-auto p-2">
-                      {availableSubjects.map((subject) => (
-                        <button
-                          key={subject.id}
-                          onClick={() => toggleSubject(subject.id)}
-                          className={`p-4 rounded-lg border-2 transition-all text-left min-h-[60px] ${
-                            selectedSubjectIds.includes(subject.id)
-                              ? 'border-indigo-500 bg-indigo-50 shadow-md'
-                              : 'border-gray-200 hover:border-indigo-300 bg-white'
-                          }`}
-                        >
-                          <div className="flex items-center justify-between">
-                            <div className="flex-1">
-                              <p className="font-semibold text-gray-900">{subject.name}</p>
-                              {subject.class && (
-                                <p className="text-xs text-gray-600 mt-1">Class: {subject.class.name}</p>
+                    <div className="space-y-4">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 max-h-60 overflow-y-auto p-2">
+                        {availableSubjects.map((subject) => (
+                          <button
+                            key={subject.id}
+                            onClick={() => toggleSubject(subject.id)}
+                            className={`p-4 rounded-lg border-2 transition-all text-left min-h-[60px] ${
+                              selectedSubjectIds.includes(subject.id)
+                                ? 'border-indigo-500 bg-indigo-50 shadow-md'
+                                : 'border-gray-200 hover:border-indigo-300 bg-white'
+                            }`}
+                          >
+                            <div className="flex items-center justify-between">
+                              <div className="flex-1">
+                                <p className="font-semibold text-gray-900">{subject.name}</p>
+                                {subject.class && (
+                                  <p className="text-xs text-gray-600 mt-1">Class: {subject.class.name}</p>
+                                )}
+                              </div>
+                              {selectedSubjectIds.includes(subject.id) && (
+                                <svg className="w-6 h-6 text-indigo-600 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                                </svg>
                               )}
                             </div>
-                            {selectedSubjectIds.includes(subject.id) && (
-                              <svg className="w-6 h-6 text-indigo-600 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                              </svg>
-                            )}
+                          </button>
+                        ))}
+                      </div>
+
+                      {/* Teacher Selection for Selected Subjects */}
+                      {selectedSubjectIds.length > 0 && (
+                        <div className="border-t pt-4 mt-4">
+                          <h4 className="text-md font-semibold text-gray-900 mb-3 flex items-center gap-2">
+                            <svg className="w-5 h-5 text-purple-600" fill="currentColor" viewBox="0 0 20 20">
+                              <path d="M9 6a3 3 0 11-6 0 3 3 0 016 0zM17 6a3 3 0 11-6 0 3 3 0 016 0zM12.93 17c.046-.327.07-.66.07-1a6.97 6.97 0 00-1.5-4.33A5 5 0 0119 16v1h-6.07zM6 11a5 5 0 015 5v1H1v-1a5 5 0 015-5z" />
+                            </svg>
+                            Assign Teachers (Optional)
+                          </h4>
+                          <p className="text-sm text-gray-600 mb-4">
+                            If multiple teachers teach the same subject, select which teacher will teach this student. If not selected, the student will need to choose when submitting homework.
+                          </p>
+                          <div className="space-y-3">
+                            {selectedSubjectIds.map((subjectId) => {
+                              const subject = availableSubjects.find(s => s.id === subjectId);
+                              const teachers = teachersBySubject[subjectId] || [];
+                              const isLoading = loadingTeachers[subjectId];
+                              const selectedTeacherId = subjectTeachers[subjectId] || '';
+
+                              return (
+                                <div key={subjectId} className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                                  <div className="flex items-start justify-between mb-2">
+                                    <div className="flex-1">
+                                      <p className="font-semibold text-gray-900">{subject?.name || 'Unknown Subject'}</p>
+                                    </div>
+                                  </div>
+                                  {isLoading ? (
+                                    <div className="flex items-center gap-2 text-sm text-gray-600">
+                                      <LoadingSpinner size="sm" />
+                                      Loading teachers...
+                                    </div>
+                                  ) : teachers.length > 0 ? (
+                                    <select
+                                      value={selectedTeacherId}
+                                      onChange={(e) => {
+                                        setSubjectTeachers(prev => ({
+                                          ...prev,
+                                          [subjectId]: e.target.value || '',
+                                        }));
+                                      }}
+                                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white"
+                                    >
+                                      <option value="">-- No teacher assigned (student will choose) --</option>
+                                      {teachers.map((teacherAssignment: any) => {
+                                        const teacher = teacherAssignment.teacher || teacherAssignment;
+                                        return (
+                                          <option key={teacher.id} value={teacher.id}>
+                                            {teacher.user?.firstName || teacher.firstName} {teacher.user?.lastName || teacher.lastName}
+                                          </option>
+                                        );
+                                      })}
+                                    </select>
+                                  ) : (
+                                    <p className="text-sm text-gray-500 italic">No teachers available for this subject</p>
+                                  )}
+                                </div>
+                              );
+                            })}
                           </div>
-                        </button>
-                      ))}
+                        </div>
+                      )}
                     </div>
                     {availableSubjects.length === 0 && (
                       <p className="text-sm text-gray-500 italic text-center py-4">

@@ -70,7 +70,7 @@ export class StudentsController {
   ) {
     return this.studentsService.enrollSubjects(
       id,
-      enrollSubjectsDto.subjectIds,
+      enrollSubjectsDto.subjects,
       user.id,
     );
   }

@@ -132,6 +132,7 @@ model Teacher {
   evaluations Evaluation[]
   students    StudentTeacher[]
   subjects    TeacherSubject[]
+  studentSubjects StudentSubject[]
   submissions Submission[]
   salaries    TeacherSalary[]
   hourRequests HourRequest[]
@@ -155,6 +156,7 @@ model Class {
   homework       Homework[]
   subjects       Subject[]
   studentClasses StudentClass[]
+  classSubjects  ClassSubject[]
 
   @@index([teacherId])
   @@index([academicYear])
@@ -177,6 +179,7 @@ model Subject {
   students  StudentSubject[]
   submissions Submission[]
   pointTransactions PointTransaction[]
+  classSubjects ClassSubject[]
 
   @@index([classId])
   @@index([code])
@@ -383,6 +386,8 @@ model StudentSubject {
   student     Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
   subjectId   String
   subject     Subject  @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  teacherId   String?  // Optional: Teacher assigned to teach this subject to this student
+  teacher     Teacher? @relation(fields: [teacherId], references: [id], onDelete: SetNull)
   enrolledBy  String   // User ID of admin/supervisor who made the enrollment
   enrolledAt  DateTime @default(now())
   createdAt   DateTime @default(now())
@@ -391,6 +396,7 @@ model StudentSubject {
   @@unique([studentId, subjectId])
   @@index([studentId])
   @@index([subjectId])
+  @@index([teacherId])
   @@index([enrolledBy])
   @@map("student_subjects")
 }
@@ -411,6 +417,24 @@ model StudentClass {
   @@index([classId])
   @@index([assignedBy])
   @@map("student_classes")
+}
+
+model ClassSubject {
+  id          String   @id @default(uuid())
+  classId     String
+  class       Class    @relation(fields: [classId], references: [id], onDelete: Cascade)
+  subjectId   String
+  subject     Subject  @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  assignedBy  String   // User ID of admin/supervisor who made the assignment
+  assignedAt  DateTime @default(now())
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([classId, subjectId])
+  @@index([classId])
+  @@index([subjectId])
+  @@index([assignedBy])
+  @@map("class_subjects")
 }
 
 model PointTransaction {

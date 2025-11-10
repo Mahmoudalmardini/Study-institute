@@ -179,6 +179,18 @@ export default function StudentHomeworkPage() {
 
     setLoadingTeachers(true);
     try {
+      // First, check if the student has a pre-assigned teacher for this subject
+      const subject = mySubjects.find((s: any) => s.subject?.id === subjectId || s.id === subjectId);
+      const studentSubject = Array.isArray(subject) ? null : subject;
+      
+      // Check if there's a pre-assigned teacher in the student's subject enrollment
+      let preAssignedTeacherId: string | null = null;
+      if (studentSubject && (studentSubject as any).teacherId) {
+        preAssignedTeacherId = (studentSubject as any).teacherId;
+      } else if (studentSubject && (studentSubject as any).teacher) {
+        preAssignedTeacherId = (studentSubject as any).teacher.id;
+      }
+
       const token = localStorage.getItem('accessToken');
       const response = await fetch(
         `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api'}/homework/subjects/${subjectId}/teachers`,
@@ -193,8 +205,21 @@ export default function StudentHomeworkPage() {
         console.log('Processed teachers:', teachers);
         setAvailableTeachers(teachers);
         
-        // Auto-select teacher if only one available
-        if (teachers.length === 1) {
+        // Auto-select teacher: first check for pre-assigned, then single teacher, otherwise empty
+        if (preAssignedTeacherId) {
+          // Check if pre-assigned teacher is still available
+          const preAssignedTeacher = teachers.find((t: any) => t.id === preAssignedTeacherId);
+          if (preAssignedTeacher) {
+            setFormData(prev => ({ ...prev, teacherId: preAssignedTeacherId! }));
+          } else {
+            // Pre-assigned teacher no longer available, use single teacher or empty
+            if (teachers.length === 1) {
+              setFormData(prev => ({ ...prev, teacherId: teachers[0].id }));
+            } else {
+              setFormData(prev => ({ ...prev, teacherId: '' }));
+            }
+          }
+        } else if (teachers.length === 1) {
           setFormData(prev => ({ ...prev, teacherId: teachers[0].id }));
         } else {
           setFormData(prev => ({ ...prev, teacherId: '' }));
@@ -622,15 +647,24 @@ export default function StudentHomeworkPage() {
                 )}
               </div>
 
-              {/* Teacher Selection - Show if teachers are available */}
+              {/* Teacher Selection - Show if teachers are available and no pre-assigned teacher */}
               {(() => {
-                console.log('Teacher selection check:', {
-                  subjectId: formData.subjectId,
-                  availableTeachersLength: availableTeachers.length,
-                  availableTeachers: availableTeachers,
-                  shouldShow: formData.subjectId && availableTeachers.length > 0
-                });
-                return formData.subjectId && availableTeachers.length > 0;
+                // Check if student has a pre-assigned teacher for this subject
+                const subject = mySubjects.find((s: any) => (s.subject?.id === formData.subjectId || s.id === formData.subjectId));
+                const hasPreAssignedTeacher = subject && (
+                  (subject as any).teacherId || 
+                  ((subject as any).teacher && (subject as any).teacher.id)
+                );
+                
+                // Only show teacher selection if:
+                // 1. Subject is selected
+                // 2. Teachers are available
+                // 3. No pre-assigned teacher OR pre-assigned teacher is not in available list
+                const shouldShow = formData.subjectId && 
+                  availableTeachers.length > 0 && 
+                  (!hasPreAssignedTeacher || availableTeachers.length > 1);
+                
+                return shouldShow;
               })() && (
                 <div>
                   <label htmlFor="teacher" className="block text-sm font-medium text-gray-700">
@@ -659,6 +693,22 @@ export default function StudentHomeworkPage() {
                   </p>
                 </div>
               )}
+
+              {/* Show message if teacher is pre-assigned */}
+              {(() => {
+                const subject = mySubjects.find((s: any) => (s.subject?.id === formData.subjectId || s.id === formData.subjectId));
+                const preAssignedTeacher = subject && ((subject as any).teacher);
+                return formData.subjectId && preAssignedTeacher && formData.teacherId && (
+                  <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                    <p className="text-sm text-blue-800">
+                      <svg className="w-4 h-4 inline mr-1" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                      </svg>
+                      Teacher: {preAssignedTeacher.user.firstName} {preAssignedTeacher.user.lastName} (pre-assigned)
+                    </p>
+                  </div>
+                );
+              })()}
 
               {/* Loading state */}
               {loadingTeachers && formData.subjectId && (

@@ -34,6 +34,14 @@ interface Teacher {
   };
 }
 
+interface Subject {
+  id: string;
+  name: string;
+  code?: string;
+  description?: string;
+  classId?: string;
+}
+
 export default function ClassesPage() {
   const { t, locale } = useI18n();
   const router = useRouter();
@@ -50,6 +58,12 @@ export default function ClassesPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [showSubjectModal, setShowSubjectModal] = useState(false);
+  const [selectedClassForSubjects, setSelectedClassForSubjects] = useState<Class | null>(null);
+  const [allSubjects, setAllSubjects] = useState<Subject[]>([]);
+  const [assignedSubjects, setAssignedSubjects] = useState<Subject[]>([]);
+  const [selectedSubjectIds, setSelectedSubjectIds] = useState<string[]>([]);
+  const [subjectModalLoading, setSubjectModalLoading] = useState(false);
 
   useEffect(() => {
     const token = localStorage.getItem('accessToken');
@@ -84,6 +98,148 @@ export default function ClassesPage() {
     } catch (error) {
       console.error('Error fetching teachers:', error);
       setTeachers([]);
+    }
+  };
+
+  const fetchAllSubjects = async () => {
+    try {
+      const data = await apiClient.get('/subjects');
+      setAllSubjects(data || []);
+    } catch (error) {
+      console.error('Error fetching subjects:', error);
+      setAllSubjects([]);
+    }
+  };
+
+  const fetchClassSubjects = async (classId: string) => {
+    try {
+      const data = await apiClient.get(`/classes/${classId}/subjects`);
+      setAssignedSubjects(data || []);
+      // Don't reset selectedSubjectIds here - only update assignedSubjects
+      // selectedSubjectIds should only be set when user manually selects/deselects
+    } catch (error) {
+      console.error('Error fetching class subjects:', error);
+      setAssignedSubjects([]);
+    }
+  };
+
+  const handleOpenSubjectModal = async (cls: Class) => {
+    setSelectedClassForSubjects(cls);
+    setShowSubjectModal(true);
+    setSubjectModalLoading(true);
+    setError('');
+    setSuccess('');
+    // Clear selected subjects when opening modal
+    setSelectedSubjectIds([]);
+    
+    try {
+      await Promise.all([
+        fetchAllSubjects(),
+        fetchClassSubjects(cls.id),
+      ]);
+    } catch (error) {
+      console.error('Error loading subjects:', error);
+      setError('Failed to load subjects');
+    } finally {
+      setSubjectModalLoading(false);
+    }
+  };
+
+  const handleCloseSubjectModal = () => {
+    setShowSubjectModal(false);
+    setSelectedClassForSubjects(null);
+    setAllSubjects([]);
+    setAssignedSubjects([]);
+    setSelectedSubjectIds([]);
+    setError('');
+    setSuccess('');
+  };
+
+  const toggleSubject = (subjectId: string) => {
+    setSelectedSubjectIds(prev => {
+      if (prev.includes(subjectId)) {
+        return prev.filter(id => id !== subjectId);
+      } else {
+        return [...prev, subjectId];
+      }
+    });
+  };
+
+  const handleAssignSubjects = async () => {
+    if (!selectedClassForSubjects) return;
+    
+    try {
+      setError('');
+      setSubjectModalLoading(true);
+      
+      // Only assign subjects that are not already assigned
+      const subjectsToAssign = selectedSubjectIds.filter(
+        id => !assignedSubjects.find(as => as.id === id)
+      );
+      
+      if (subjectsToAssign.length === 0) {
+        setError('Selected subjects are already assigned to this class');
+        setSubjectModalLoading(false);
+        return;
+      }
+      
+      await apiClient.post(`/classes/${selectedClassForSubjects.id}/subjects`, {
+        subjectIds: subjectsToAssign,
+      });
+      
+      // Get the newly assigned subjects from allSubjects
+      const newlyAssignedSubjects = allSubjects.filter(subject => 
+        subjectsToAssign.includes(subject.id)
+      );
+      
+      // Update assignedSubjects immediately
+      setAssignedSubjects(prev => [...prev, ...newlyAssignedSubjects]);
+      
+      // Update classes state to reflect new subject count
+      setClasses(prev => prev.map(cls => 
+        cls.id === selectedClassForSubjects.id
+          ? { ...cls, _count: { ...cls._count, subjects: (cls._count?.subjects || 0) + subjectsToAssign.length } }
+          : cls
+      ));
+      
+      setSuccess('Subjects assigned successfully!');
+      // Clear selected subjects after successful assignment
+      setSelectedSubjectIds([]);
+      setTimeout(() => setSuccess(''), 3000);
+    } catch (error: any) {
+      console.error('Error assigning subjects:', error);
+      setError(error.response?.data?.message || 'Error assigning subjects');
+    } finally {
+      setSubjectModalLoading(false);
+    }
+  };
+
+  const handleUnassignSubject = async (subjectId: string) => {
+    if (!selectedClassForSubjects) return;
+    
+    if (!confirm('Are you sure you want to unassign this subject from the class?')) {
+      return;
+    }
+    
+    try {
+      setError('');
+      await apiClient.delete(`/classes/${selectedClassForSubjects.id}/subjects/${subjectId}`);
+      
+      // Update assignedSubjects immediately by removing the unassigned subject
+      setAssignedSubjects(prev => prev.filter(subject => subject.id !== subjectId));
+      
+      // Update classes state to reflect new subject count
+      setClasses(prev => prev.map(cls => 
+        cls.id === selectedClassForSubjects.id
+          ? { ...cls, _count: { ...cls._count, subjects: Math.max(0, (cls._count?.subjects || 0) - 1) } }
+          : cls
+      ));
+      
+      setSuccess('Subject unassigned successfully!');
+      setTimeout(() => setSuccess(''), 3000);
+    } catch (error: any) {
+      console.error('Error unassigning subject:', error);
+      setError(error.response?.data?.message || 'Error unassigning subject');
     }
   };
 
@@ -340,6 +496,15 @@ export default function ClassesPage() {
                 </div>
                 <div className="flex gap-2">
                   <button
+                    onClick={() => handleOpenSubjectModal(cls)}
+                    className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                    title="Assign Subjects"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                    </svg>
+                  </button>
+                  <button
                     onClick={() => handleEdit(cls)}
                     className="p-2 text-cyan-600 hover:bg-cyan-50 rounded-lg transition-colors"
                     title="Edit"
@@ -433,6 +598,146 @@ export default function ClassesPage() {
           </div>
         )}
       </main>
+
+      {/* Subject Assignment Modal */}
+      {showSubjectModal && selectedClassForSubjects && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-2xl shadow-xl max-w-4xl w-full max-h-[90vh] flex flex-col">
+            <div className="sticky top-0 bg-gradient-to-r from-cyan-500 to-blue-600 px-6 py-4 rounded-t-2xl">
+              <div className="flex items-center justify-between">
+                <h2 className="text-2xl font-bold text-white">
+                  Assign Subjects - {selectedClassForSubjects.name}
+                </h2>
+                <button
+                  onClick={handleCloseSubjectModal}
+                  className="text-white hover:bg-white/20 rounded-lg p-2 transition-colors"
+                  aria-label="Close modal"
+                >
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+
+            <div className="p-6 space-y-6 overflow-y-auto flex-1">
+              {error && (
+                <div className="p-3 bg-red-50 border border-red-200 text-red-700 rounded-lg text-sm">
+                  {error}
+                </div>
+              )}
+
+              {success && (
+                <div className="p-3 bg-green-50 border border-green-200 text-green-700 rounded-lg text-sm">
+                  {success}
+                </div>
+              )}
+
+              {subjectModalLoading ? (
+                <div className="flex justify-center py-8">
+                  <LoadingSpinner size="md" />
+                </div>
+              ) : (
+                <>
+                  {/* Currently Assigned Subjects */}
+                  {assignedSubjects.length > 0 && (
+                    <div>
+                      <h3 className="text-lg font-semibold text-gray-900 mb-3 flex items-center gap-2">
+                        <svg className="w-5 h-5 text-green-600" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                        </svg>
+                        Currently Assigned Subjects ({assignedSubjects.length})
+                      </h3>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mb-6">
+                        {assignedSubjects.map((subject) => (
+                          <div
+                            key={subject.id}
+                            className="p-4 bg-green-50 border-2 border-green-200 rounded-lg flex items-center justify-between"
+                          >
+                            <div className="flex-1">
+                              <p className="font-semibold text-gray-900">{subject.name}</p>
+                              {subject.code && (
+                                <p className="text-sm text-gray-600">{subject.code}</p>
+                              )}
+                            </div>
+                            <button
+                              onClick={() => handleUnassignSubject(subject.id)}
+                              className="ml-2 text-red-600 hover:text-red-800 p-1"
+                              title="Unassign"
+                            >
+                              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                              </svg>
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Available Subjects */}
+                  <div>
+                    <h3 className="text-lg font-semibold text-gray-900 mb-3 flex items-center gap-2">
+                      <svg className="w-5 h-5 text-blue-600" fill="currentColor" viewBox="0 0 20 20">
+                        <path d="M9 4.804A7.968 7.968 0 005.5 4c-1.255 0-2.443.29-3.5.804v10A7.969 7.969 0 015.5 14c1.669 0 3.218.51 4.5 1.385A7.962 7.962 0 0114.5 14c1.255 0 2.443.29 3.5.804v-10A7.968 7.968 0 0014.5 4c-1.255 0-2.443.29-3.5.804V12a1 1 0 11-2 0V4.804z" />
+                      </svg>
+                      Available Subjects ({selectedSubjectIds.length} selected)
+                    </h3>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 max-h-96 overflow-y-auto p-2">
+                      {allSubjects
+                        .filter(subject => !assignedSubjects.find(as => as.id === subject.id))
+                        .map((subject) => (
+                          <button
+                            key={subject.id}
+                            onClick={() => toggleSubject(subject.id)}
+                            className={`p-4 rounded-lg border-2 transition-all text-left min-h-[60px] ${
+                              selectedSubjectIds.includes(subject.id)
+                                ? 'border-blue-500 bg-blue-50 shadow-md'
+                                : 'border-gray-200 hover:border-blue-300 bg-white'
+                            }`}
+                          >
+                            <div className="flex items-center justify-between">
+                              <div className="flex-1">
+                                <p className="font-semibold text-gray-900">{subject.name}</p>
+                                {subject.code && (
+                                  <p className="text-sm text-gray-600">{subject.code}</p>
+                                )}
+                              </div>
+                              {selectedSubjectIds.includes(subject.id) && (
+                                <svg className="w-5 h-5 text-blue-600" fill="currentColor" viewBox="0 0 20 20">
+                                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                                </svg>
+                              )}
+                            </div>
+                          </button>
+                        ))}
+                    </div>
+                    {allSubjects.filter(subject => !assignedSubjects.find(as => as.id === subject.id)).length === 0 && (
+                      <p className="text-center text-gray-500 py-8">All subjects are already assigned to this class</p>
+                    )}
+                  </div>
+                </>
+              )}
+            </div>
+
+            <div className="sticky bottom-0 bg-gray-50 px-6 py-4 rounded-b-2xl border-t border-gray-200 flex justify-end gap-3">
+              <button
+                onClick={handleCloseSubjectModal}
+                className="bg-gray-100 text-gray-700 px-6 py-2 rounded-xl hover:bg-gray-200 transition-all font-medium"
+              >
+                Close
+              </button>
+              <button
+                onClick={handleAssignSubjects}
+                disabled={subjectModalLoading || selectedSubjectIds.length === 0}
+                className="gradient-primary text-white px-6 py-2 rounded-xl hover:shadow-lg transition-all font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {subjectModalLoading ? 'Assigning...' : `Assign ${selectedSubjectIds.length} Subject${selectedSubjectIds.length !== 1 ? 's' : ''}`}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

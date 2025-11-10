@@ -64,6 +64,11 @@ export default function TeachersPage() {
   const [selectedClassId, setSelectedClassId] = useState<string>('');
   const [editSubjectId, setEditSubjectId] = useState<string>('');
   const [editClassId, setEditClassId] = useState<string>('');
+  // New state for class-first subject assignment
+  const [selectedClassForSubjects, setSelectedClassForSubjects] = useState<string>('');
+  const [availableSubjectsForClass, setAvailableSubjectsForClass] = useState<Subject[]>([]);
+  const [selectedSubjectIds, setSelectedSubjectIds] = useState<string[]>([]);
+  const [loadingClassSubjects, setLoadingClassSubjects] = useState(false);
 
 
   useEffect(() => {
@@ -122,6 +127,9 @@ export default function TeachersPage() {
     setSelectedTeacher(teacher);
     setShowSubjectModal(true);
     setSelectedClassFilter('');
+    setSelectedClassForSubjects('');
+    setAvailableSubjectsForClass([]);
+    setSelectedSubjectIds([]);
     setError('');
     setSuccess('');
   };
@@ -147,6 +155,147 @@ export default function TeachersPage() {
     }
   };
 
+  const handleClassSelectionForSubjects = async (classId: string) => {
+    if (!classId) {
+      setSelectedClassForSubjects('');
+      setAvailableSubjectsForClass([]);
+      setSelectedSubjectIds([]);
+      return;
+    }
+
+    setLoadingClassSubjects(true);
+    setSelectedClassForSubjects(classId);
+    setSelectedSubjectIds([]);
+    setError('');
+
+    try {
+      const response = await apiClient.get(`/classes/${classId}/subjects`);
+      // Handle both direct array and wrapped response
+      let subjects = Array.isArray(response) ? response : (response?.data || response || []);
+      
+      // Strictly filter: Only include subjects that are confirmed to be assigned to this class
+      // The backend should return subjects with class info, but we double-check
+      subjects = subjects.filter((subject: any) => {
+        // Must have class info that matches the selected class
+        const hasMatchingClass = subject?.class?.id === classId;
+        
+        // Log for debugging
+        if (subject && !hasMatchingClass) {
+          console.warn('Subject filtered out - class mismatch:', {
+            subjectId: subject.id,
+            subjectName: subject.name,
+            subjectClassId: subject?.class?.id,
+            expectedClassId: classId
+          });
+        }
+        
+        return hasMatchingClass;
+      });
+      
+      console.log(`Fetched ${subjects.length} subject(s) for class ${classId}:`, subjects.map((s: any) => s.name));
+      setAvailableSubjectsForClass(subjects);
+      
+      // Clear any previous errors
+      setError('');
+      
+      // Verify we got subjects for this class
+      if (subjects.length === 0) {
+        const className = classes.find(c => c.id === classId)?.name || 'this class';
+        setError(`No subjects are assigned to ${className}. Please assign subjects to the class first on the Classes page.`);
+      }
+    } catch (error) {
+      console.error('Error fetching class subjects:', error);
+      setError('Failed to load subjects for this class. Please try again.');
+      setAvailableSubjectsForClass([]);
+    } finally {
+      setLoadingClassSubjects(false);
+    }
+  };
+
+  const toggleSubjectSelection = (subjectId: string) => {
+    setSelectedSubjectIds(prev => {
+      if (prev.includes(subjectId)) {
+        return prev.filter(id => id !== subjectId);
+      } else {
+        return [...prev, subjectId];
+      }
+    });
+  };
+
+  const handleBulkAssignSubjects = async () => {
+    if (!selectedTeacher?.id || !selectedClassForSubjects || selectedSubjectIds.length === 0) {
+      setError('Please select a class and at least one subject');
+      return;
+    }
+
+    try {
+      setAssigningSubject(true);
+      setError('');
+      
+      const results = {
+        success: [] as string[],
+        failed: [] as string[],
+      };
+
+      // Assign each selected subject
+      for (const subjectId of selectedSubjectIds) {
+        try {
+          // Check if subject is already assigned to this teacher
+          const isAlreadyAssigned = selectedTeacher.subjects?.some(
+            (ts) => ts.subject.id === subjectId
+          );
+
+          if (isAlreadyAssigned) {
+            const subjectName = availableSubjectsForClass.find(s => s.id === subjectId)?.name || 'Subject';
+            results.failed.push(`${subjectName} (already assigned)`);
+            continue;
+          }
+
+          await apiClient.post(`/subjects/${subjectId}/assign-teacher`, {
+            teacherId: selectedTeacher.id,
+          });
+
+          const subjectName = availableSubjectsForClass.find(s => s.id === subjectId)?.name || 'Subject';
+          results.success.push(subjectName);
+        } catch (err: any) {
+          const subjectName = availableSubjectsForClass.find(s => s.id === subjectId)?.name || 'Subject';
+          const errorMsg = err.response?.data?.message || 'Error assigning subject';
+          results.failed.push(`${subjectName} (${errorMsg})`);
+        }
+      }
+
+      // Show results
+      if (results.success.length > 0) {
+        setSuccess(`${results.success.length} subject(s) assigned successfully: ${results.success.join(', ')}`);
+      }
+      if (results.failed.length > 0) {
+        setError(`Failed to assign ${results.failed.length} subject(s): ${results.failed.join(', ')}`);
+      }
+
+      // Refresh teachers data
+      const refreshedTeachers = await fetchTeachers();
+      const updatedTeacher = refreshedTeachers.find((t: Teacher) => t.id === selectedTeacher.id);
+      if (updatedTeacher) {
+        setSelectedTeacher(updatedTeacher);
+      }
+
+      // Clear selections
+      setSelectedSubjectIds([]);
+      // Refresh subjects for the class
+      await handleClassSelectionForSubjects(selectedClassForSubjects);
+
+      setTimeout(() => {
+        setSuccess('');
+        setError('');
+      }, 5000);
+    } catch (err: any) {
+      console.error('Error in bulk assignment:', err);
+      setError(err.response?.data?.message || 'Error assigning subjects');
+    } finally {
+      setAssigningSubject(false);
+    }
+  };
+
   const handleAssignSubject = async (subjectId: string) => {
     if (!selectedTeacher?.id) return;
     
@@ -162,8 +311,38 @@ export default function TeachersPage() {
     setShowAssignmentModal(true);
     setSelectedSubjectId('');
     setSelectedClassId('');
+    setAvailableSubjectsForClass([]);
     setError('');
     setSuccess('');
+  };
+
+  const handleClassChangeInModal = async (classId: string) => {
+    setSelectedClassId(classId);
+    setSelectedSubjectId(''); // Clear subject selection when class changes
+    
+    if (!classId) {
+      setAvailableSubjectsForClass([]);
+      return;
+    }
+
+    try {
+      setLoadingClassSubjects(true);
+      const response = await apiClient.get(`/classes/${classId}/subjects`);
+      let subjects = Array.isArray(response) ? response : (response?.data || response || []);
+      
+      // Strictly filter: Only include subjects that are confirmed to be assigned to this class
+      subjects = subjects.filter((subject: any) => {
+        return subject?.class?.id === classId;
+      });
+      
+      setAvailableSubjectsForClass(subjects);
+    } catch (error) {
+      console.error('Error fetching class subjects:', error);
+      setError('Failed to load subjects for this class');
+      setAvailableSubjectsForClass([]);
+    } finally {
+      setLoadingClassSubjects(false);
+    }
   };
 
   const handleConfirmAssignment = async () => {
@@ -178,7 +357,7 @@ export default function TeachersPage() {
     );
 
     if (isAlreadyAssigned) {
-      const subjectName = subjects.find(s => s.id === selectedSubjectId)?.name || 'This subject';
+      const subjectName = availableSubjectsForClass.find(s => s.id === selectedSubjectId)?.name || subjects.find(s => s.id === selectedSubjectId)?.name || 'This subject';
       setError(`${subjectName} is already assigned to this teacher. Please use the Edit button to change the class instead.`);
       return;
     }
@@ -187,11 +366,11 @@ export default function TeachersPage() {
       setAssigningSubject(true);
       setError('');
       
-      const subjectName = subjects.find(s => s.id === selectedSubjectId)?.name || 'Subject';
+      const subjectName = availableSubjectsForClass.find(s => s.id === selectedSubjectId)?.name || subjects.find(s => s.id === selectedSubjectId)?.name || 'Subject';
       
+      // Remove classId - backend no longer requires it
       await apiClient.post(`/subjects/${selectedSubjectId}/assign-teacher`, {
         teacherId: selectedTeacher.id,
-        classId: selectedClassId,
       });
       setSuccess(`${subjectName} assigned successfully!`);
 
@@ -208,6 +387,8 @@ export default function TeachersPage() {
       setShowAssignmentModal(false);
       setSelectedSubjectId('');
       setSelectedClassId('');
+      // Clear class subjects when closing
+      setAvailableSubjectsForClass([]);
 
       setTimeout(() => setSuccess(''), 3000);
     } catch (err: any) {
@@ -1009,79 +1190,151 @@ export default function TeachersPage() {
                 )}
               </div>
 
-              {/* Available Subjects */}
-              <div>
-                <div className="flex items-center justify-between mb-3">
-                  <h4 className="font-semibold text-gray-900">Available Subjects</h4>
-                  <select
-                    value={selectedClassFilter}
-                    onChange={(e) => setSelectedClassFilter(e.target.value)}
-                    className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                  >
-                    <option value="">All Classes</option>
-                    {classes.map((cls) => (
-                      <option key={cls.id} value={cls.id}>
-                        {cls.name}{cls.grade ? ` - ${cls.grade}` : ''}
-                      </option>
-                    ))}
-                  </select>
+              {/* Class Selection (Required) */}
+              <div className="mb-6">
+                <label htmlFor="class-select" className="block text-sm font-semibold text-gray-900 mb-2">
+                  Select Class (Required) *
+                </label>
+                <select
+                  id="class-select"
+                  value={selectedClassForSubjects}
+                  onChange={(e) => handleClassSelectionForSubjects(e.target.value)}
+                  className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 bg-white"
+                  required
+                >
+                  <option value="">-- Select a Class --</option>
+                  {classes.map((cls) => (
+                    <option key={cls.id} value={cls.id}>
+                      {cls.name}{cls.grade ? ` - Grade ${cls.grade}` : ''}
+                    </option>
+                  ))}
+                </select>
+                {classes.length === 0 && (
+                  <p className="text-sm text-gray-500 italic mt-2">No classes available</p>
+                )}
+              </div>
+
+              {/* Available Subjects - Only show after class is selected */}
+              {!selectedClassForSubjects ? (
+                <div className="text-center py-8 bg-gray-50 rounded-lg border border-gray-200">
+                  <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                  <p className="text-gray-500 text-sm font-medium mt-2">Please select a class first</p>
+                  <p className="text-gray-400 text-xs mt-1">Subjects assigned to the selected class will appear here</p>
                 </div>
-                <div className="space-y-2 max-h-60 overflow-y-auto">
-                  {subjects
-                    .filter(
-                      (subject) =>
-                        !selectedTeacher.subjects?.some((ts) => ts.subject.id === subject.id) &&
-                        (!selectedClassFilter || subject.class?.id === selectedClassFilter)
-                    )
-                    .map((subject) => (
-                      <div key={subject.id} className="flex items-center justify-between bg-gray-50 p-3 rounded-lg border border-gray-200 hover:border-purple-300 transition-colors">
-                        <div className="flex-1">
-                          <div className="font-medium text-gray-900">{subject.name}</div>
-                          {subject.code && (
-                            <div className="text-xs text-gray-600">Code: {subject.code}</div>
-                          )}
-                          {subject.class ? (
-                            <div className="flex items-center gap-1 text-xs text-gray-600 mt-1">
-                              <svg className="w-3 h-3 text-cyan-500" fill="currentColor" viewBox="0 0 20 20">
-                                <path d="M10.394 2.08a1 1 0 00-.788 0l-7 3a1 1 0 000 1.84L5.25 8.051a.999.999 0 01.356-.257l4-1.714a1 1 0 11.788 1.838L7.667 9.088l1.94.831a1 1 0 00.787 0l7-3a1 1 0 000-1.838l-7-3z" />
-                              </svg>
-                              <span className="font-medium">Class: {subject.class.name}</span>
-                              {subject.class.grade && ` - ${subject.class.grade}`}
-                            </div>
-                          ) : (
-                            <div className="flex items-center gap-1 text-xs text-amber-600 mt-1">
-                              <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
-                                <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-                              </svg>
-                              <span className="italic">No class assigned</span>
-                            </div>
-                          )}
-                        </div>
-                        <button
-                          onClick={() => handleAssignSubject(subject.id)}
-                          disabled={assigningSubject}
-                          className="ml-3 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                        >
-                          {assigningSubject ? 'Assigning...' : 'Assign'}
-                        </button>
-                      </div>
-                    ))}
-                  {subjects.filter(
-                    (subject) =>
-                      !selectedTeacher.subjects?.some((ts) => ts.subject.id === subject.id) &&
-                      (!selectedClassFilter || subject.class?.id === selectedClassFilter)
-                  ).length === 0 && (
-                    <div className="text-center py-8">
-                      <svg className="mx-auto h-10 w-10 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                      </svg>
-                      <p className="text-gray-500 text-sm italic mt-2">
-                        {selectedClassFilter ? 'No subjects available for this class' : 'All subjects have been assigned'}
+              ) : loadingClassSubjects ? (
+                <div className="text-center py-8">
+                  <LoadingSpinner size="md" />
+                  <p className="text-gray-500 text-sm mt-2">Loading subjects...</p>
+                </div>
+              ) : (
+                <div>
+                  {/* Show selected class info */}
+                  {selectedClassForSubjects && (
+                    <div className="mb-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                      <p className="text-sm text-blue-800 font-medium">
+                        <svg className="w-4 h-4 inline mr-1" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                        </svg>
+                        Showing subjects for: {classes.find(c => c.id === selectedClassForSubjects)?.name || 'Selected Class'}
+                        {availableSubjectsForClass.length > 0 && (
+                          <span className="ml-2 text-blue-600">({availableSubjectsForClass.length} subject{availableSubjectsForClass.length !== 1 ? 's' : ''} available)</span>
+                        )}
                       </p>
                     </div>
                   )}
+                  
+                  <div className="flex items-center justify-between mb-3">
+                    <h4 className="font-semibold text-gray-900">
+                      Available Subjects
+                      {selectedSubjectIds.length > 0 && (
+                        <span className="ml-2 text-sm font-normal text-purple-600">
+                          ({selectedSubjectIds.length} selected)
+                        </span>
+                      )}
+                    </h4>
+                  </div>
+                  <div className="space-y-2 max-h-60 overflow-y-auto">
+                    {availableSubjectsForClass.length === 0 ? (
+                      <div className="text-center py-8">
+                        <svg className="mx-auto h-10 w-10 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                        </svg>
+                        <p className="text-gray-500 text-sm italic mt-2">
+                          No subjects are assigned to this class. Please assign subjects to the class first on the Classes page.
+                        </p>
+                      </div>
+                    ) : (
+                      availableSubjectsForClass
+                        .filter(
+                          (subject) =>
+                            !selectedTeacher.subjects?.some((ts) => ts.subject.id === subject.id)
+                        )
+                        .map((subject) => (
+                        <div key={subject.id} className={`flex items-center gap-3 bg-gray-50 p-3 rounded-lg border-2 transition-colors ${
+                          selectedSubjectIds.includes(subject.id)
+                            ? 'border-purple-500 bg-purple-50'
+                            : 'border-gray-200 hover:border-purple-300'
+                        }`}>
+                          <input
+                            type="checkbox"
+                            checked={selectedSubjectIds.includes(subject.id)}
+                            onChange={() => toggleSubjectSelection(subject.id)}
+                            disabled={assigningSubject}
+                            className="w-5 h-5 text-purple-600 border-gray-300 rounded focus:ring-purple-500"
+                          />
+                          <div className="flex-1">
+                            <div className="font-medium text-gray-900">{subject.name}</div>
+                            {subject.code && (
+                              <div className="text-xs text-gray-600">Code: {subject.code}</div>
+                            )}
+                          </div>
+                        </div>
+                      ))
+                    )}
+                    {availableSubjectsForClass.length > 0 && 
+                     availableSubjectsForClass.filter(
+                       (subject) =>
+                         !selectedTeacher.subjects?.some((ts) => ts.subject.id === subject.id)
+                     ).length === 0 && (
+                      <div className="text-center py-8">
+                        <svg className="mx-auto h-10 w-10 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                        </svg>
+                        <p className="text-gray-500 text-sm italic mt-2">
+                          All subjects for this class have been assigned to this teacher
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                  
+                  {/* Bulk Assign Button */}
+                  {selectedSubjectIds.length > 0 && (
+                    <div className="mt-4 flex justify-end">
+                      <button
+                        onClick={handleBulkAssignSubjects}
+                        disabled={assigningSubject || selectedSubjectIds.length === 0}
+                        className="px-6 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
+                      >
+                        {assigningSubject ? (
+                          <>
+                            <LoadingSpinner size="sm" />
+                            Assigning...
+                          </>
+                        ) : (
+                          <>
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                            </svg>
+                            Assign {selectedSubjectIds.length} Subject{selectedSubjectIds.length !== 1 ? 's' : ''}
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  )}
                 </div>
-              </div>
+              )}
 
               {/* Close Button */}
               <div className="mt-6 flex justify-end">
@@ -1372,42 +1625,69 @@ export default function TeachersPage() {
                 </select>
               </div>
 
-              {/* Subject Selection */}
+              {/* Class Selection (Required First) */}
               <div className="mb-6">
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Select Subject
-                </label>
-                <select
-                  value={selectedSubjectId}
-                  onChange={(e) => setSelectedSubjectId(e.target.value)}
-                  className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
-                >
-                  <option value="">Choose a subject...</option>
-                  {subjects.map((subject) => (
-                    <option key={subject.id} value={subject.id}>
-                      {subject.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Class Selection */}
-              <div className="mb-6">
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Select Class
+                  Select Class (Required) *
                 </label>
                 <select
                   value={selectedClassId}
-                  onChange={(e) => setSelectedClassId(e.target.value)}
+                  onChange={(e) => handleClassChangeInModal(e.target.value)}
                   className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
                 >
                   <option value="">Choose a class...</option>
                   {classes.map((cls) => (
                     <option key={cls.id} value={cls.id}>
-                      {cls.name}
+                      {cls.name}{cls.grade ? ` - Grade ${cls.grade}` : ''}
                     </option>
                   ))}
                 </select>
+                {loadingClassSubjects && (
+                  <p className="text-sm text-gray-500 mt-2">Loading subjects...</p>
+                )}
+              </div>
+
+              {/* Subject Selection - Only show after class is selected */}
+              <div className="mb-6">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Select Subject {selectedClassId && `(for ${classes.find(c => c.id === selectedClassId)?.name || 'selected class'})`}
+                </label>
+                {!selectedClassId ? (
+                  <div className="w-full p-3 border border-gray-300 rounded-lg bg-gray-50 text-gray-500 text-sm">
+                    Please select a class first
+                  </div>
+                ) : availableSubjectsForClass.length === 0 ? (
+                  <div className="w-full p-3 border border-gray-300 rounded-lg bg-yellow-50 text-yellow-700 text-sm">
+                    No subjects are assigned to this class. Please assign subjects to the class first on the Classes page.
+                  </div>
+                ) : (
+                  <select
+                    value={selectedSubjectId}
+                    onChange={(e) => setSelectedSubjectId(e.target.value)}
+                    className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                  >
+                    <option value="">Choose a subject...</option>
+                    {availableSubjectsForClass
+                      .filter(
+                        (subject) =>
+                          !selectedTeacher?.subjects?.some((ts) => ts.subject.id === subject.id)
+                      )
+                      .map((subject) => (
+                        <option key={subject.id} value={subject.id}>
+                          {subject.name} {subject.code ? `(${subject.code})` : ''}
+                        </option>
+                      ))}
+                  </select>
+                )}
+                {selectedClassId && availableSubjectsForClass.length > 0 && 
+                 availableSubjectsForClass.filter(
+                   (subject) =>
+                     !selectedTeacher?.subjects?.some((ts) => ts.subject.id === subject.id)
+                 ).length === 0 && (
+                  <p className="text-sm text-gray-500 mt-2 italic">
+                    All subjects for this class have been assigned to this teacher
+                  </p>
+                )}
               </div>
 
               {/* Error Message */}

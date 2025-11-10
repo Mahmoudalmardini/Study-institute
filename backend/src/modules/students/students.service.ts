@@ -285,24 +285,57 @@ export class StudentsService {
 
   async enrollSubjects(
     studentId: string,
-    subjectIds: string[],
+    subjects: Array<{ subjectId: string; teacherId?: string }>,
     enrolledBy: string,
   ) {
     const student = await this.findOne(studentId); // Validate student exists
 
     // Validate minimum 1 subject
-    if (!subjectIds || subjectIds.length === 0) {
+    if (!subjects || subjects.length === 0) {
       throw new ConflictException('At least one subject must be assigned');
     }
 
+    const subjectIds = subjects.map(s => s.subjectId);
+
     // Validate all subjects exist
-    const subjects = await this.prisma.subject.findMany({
+    const subjectRecords = await this.prisma.subject.findMany({
       where: { id: { in: subjectIds } },
       include: { class: true },
     });
 
-    if (subjects.length !== subjectIds.length) {
+    if (subjectRecords.length !== subjectIds.length) {
       throw new NotFoundException('One or more subjects not found');
+    }
+
+    // Validate teachers if provided
+    const teacherIds = subjects.filter(s => s.teacherId).map(s => s.teacherId!);
+    if (teacherIds.length > 0) {
+      const teachers = await this.prisma.teacher.findMany({
+        where: { id: { in: teacherIds } },
+      });
+
+      if (teachers.length !== teacherIds.length) {
+        throw new NotFoundException('One or more teachers not found');
+      }
+
+      // Validate that teachers are assigned to the corresponding subjects
+      for (const subj of subjects) {
+        if (subj.teacherId) {
+          const teacherSubject = await this.prisma.teacherSubject.findFirst({
+            where: {
+              teacherId: subj.teacherId,
+              subjectId: subj.subjectId,
+            },
+          });
+
+          if (!teacherSubject) {
+            const subject = subjectRecords.find(s => s.id === subj.subjectId);
+            throw new ConflictException(
+              `Teacher is not assigned to teach subject: ${subject?.name || subj.subjectId}`,
+            );
+          }
+        }
+      }
     }
 
     // Get student's assigned classes
@@ -315,9 +348,15 @@ export class StudentsService {
 
     // Validate subjects belong to student's assigned classes (if student has classes)
     if (studentClassIds.length > 0) {
-      const invalidSubjects = subjects.filter(
-        (subject) =>
-          subject.classId && !studentClassIds.includes(subject.classId),
+      // Get subjects assigned to classes via ClassSubject junction table
+      const classSubjects = await this.prisma.classSubject.findMany({
+        where: { classId: { in: studentClassIds } },
+        select: { subjectId: true },
+      });
+      const validSubjectIds = classSubjects.map(cs => cs.subjectId);
+
+      const invalidSubjects = subjectRecords.filter(
+        (subject) => !validSubjectIds.includes(subject.id),
       );
 
       if (invalidSubjects.length > 0) {
@@ -335,9 +374,9 @@ export class StudentsService {
       },
     });
 
-    // Create new enrollments (skip if already exists)
+    // Create or update enrollments
     const enrollments = await Promise.all(
-      subjectIds.map(async (subjectId) => {
+      subjects.map(async ({ subjectId, teacherId }) => {
         const existing = await this.prisma.studentSubject.findUnique({
           where: {
             studentId_subjectId: {
@@ -348,17 +387,56 @@ export class StudentsService {
         });
 
         if (existing) {
-          return existing;
+          // Update existing enrollment with teacher if provided
+          return this.prisma.studentSubject.update({
+            where: {
+              studentId_subjectId: {
+                studentId,
+                subjectId,
+              },
+            },
+            data: {
+              teacherId: teacherId || null,
+            },
+            include: {
+              subject: true,
+              teacher: {
+                include: {
+                  user: {
+                    select: {
+                      id: true,
+                      firstName: true,
+                      lastName: true,
+                      email: true,
+                    },
+                  },
+                },
+              },
+            },
+          });
         }
 
         return this.prisma.studentSubject.create({
           data: {
             studentId,
             subjectId,
+            teacherId: teacherId || null,
             enrolledBy,
           },
           include: {
             subject: true,
+            teacher: {
+              include: {
+                user: {
+                  select: {
+                    id: true,
+                    firstName: true,
+                    lastName: true,
+                    email: true,
+                  },
+                },
+              },
+            },
           },
         });
       }),
@@ -467,33 +545,106 @@ export class StudentsService {
   }
 
   async getStudentSubjects(studentId: string) {
-    await this.findOne(studentId); // Validate student exists
+    // Validate student exists
+    const student = await this.prisma.student.findUnique({
+      where: { id: studentId },
+      select: { id: true },
+    });
 
-    return this.prisma.studentSubject.findMany({
+    if (!student) {
+      throw new NotFoundException('Student not found');
+    }
+
+    // Fetch student subjects with essential data only
+    const studentSubjects = await this.prisma.studentSubject.findMany({
       where: { studentId },
       include: {
         subject: {
-          include: {
-            class: true,
-            teachers: {
-              include: {
-                teacher: {
-                  include: {
-                    user: {
-                      select: {
-                        id: true,
-                        firstName: true,
-                        lastName: true,
-                        email: true,
-                      },
-                    },
-                  },
-                },
+          select: {
+            id: true,
+            name: true,
+            code: true,
+            description: true,
+            classId: true,
+            class: {
+              select: {
+                id: true,
+                name: true,
+                grade: true,
+              },
+            },
+          },
+        },
+        teacher: {
+          select: {
+            id: true,
+            user: {
+              select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+                email: true,
+              },
+            },
+          },
+        },
+      },
+      orderBy: {
+        createdAt: 'desc',
+      },
+    });
+
+    // Fetch class subjects separately to get all classes for each subject
+    const subjectIds = studentSubjects.map(ss => ss.subject.id);
+    const classSubjects = await this.prisma.classSubject.findMany({
+      where: {
+        subjectId: { in: subjectIds },
+      },
+      include: {
+        class: {
+          select: {
+            id: true,
+            name: true,
+            grade: true,
+          },
+        },
+      },
+    });
+
+    // Fetch teachers for subjects separately
+    const teacherSubjects = await this.prisma.teacherSubject.findMany({
+      where: {
+        subjectId: { in: subjectIds },
+      },
+      include: {
+        teacher: {
+          select: {
+            id: true,
+            user: {
+              select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+                email: true,
               },
             },
           },
         },
       },
     });
+
+    // Combine the data
+    return studentSubjects.map(ss => ({
+      ...ss,
+      subject: {
+        ...ss.subject,
+        classSubjects: classSubjects
+          .filter(cs => cs.subjectId === ss.subject.id)
+          .map(cs => ({ class: cs.class })),
+        teachers: teacherSubjects
+          .filter(ts => ts.subjectId === ss.subject.id)
+          .map(ts => ({ teacher: ts.teacher })),
+      },
+    }));
   }
 }

@@ -940,6 +940,18 @@ export class HomeworkService {
             },
           },
         },
+        teacher: {
+          include: {
+            user: {
+              select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+                email: true,
+              },
+            },
+          },
+        },
       },
     });
   }
@@ -1051,6 +1063,9 @@ export class HomeworkService {
         studentId: student.id,
         subjectId: dto.subjectId,
       },
+      include: {
+        teacher: true,
+      },
     });
 
     if (!enrollment) {
@@ -1079,25 +1094,48 @@ export class HomeworkService {
 
     let selectedTeacherId: string | undefined;
 
-    // If multiple teachers, require teacherId
-    if (availableTeachers.length > 1) {
-      if (!dto.teacherId) {
-        throw new BadRequestException('Multiple teachers teach this subject. Please select a teacher.');
-      }
-
-      // Validate teacherId is one of the available teachers
+    // Check if student has a pre-assigned teacher for this subject
+    if (enrollment.teacherId) {
+      // Validate that the pre-assigned teacher still teaches this subject
       const teacherExists = availableTeachers.some(
-        at => at.teacher.id === dto.teacherId
+        at => at.teacher.id === enrollment.teacherId
       );
 
-      if (!teacherExists) {
-        throw new BadRequestException('Selected teacher does not teach this subject in your class');
+      if (teacherExists) {
+        // Use the pre-assigned teacher
+        selectedTeacherId = enrollment.teacherId;
+      } else {
+        // Pre-assigned teacher no longer teaches this subject, fall back to selection
+        if (availableTeachers.length > 1) {
+          if (!dto.teacherId) {
+            throw new BadRequestException('Your assigned teacher no longer teaches this subject. Please select a teacher.');
+          }
+          selectedTeacherId = dto.teacherId;
+        } else {
+          selectedTeacherId = availableTeachers[0].teacher.id;
+        }
       }
-
-      selectedTeacherId = dto.teacherId;
     } else {
-      // Only one teacher, use their ID
-      selectedTeacherId = availableTeachers[0].teacher.id;
+      // No pre-assigned teacher, use selection logic
+      if (availableTeachers.length > 1) {
+        if (!dto.teacherId) {
+          throw new BadRequestException('Multiple teachers teach this subject. Please select a teacher.');
+        }
+
+        // Validate teacherId is one of the available teachers
+        const teacherExists = availableTeachers.some(
+          at => at.teacher.id === dto.teacherId
+        );
+
+        if (!teacherExists) {
+          throw new BadRequestException('Selected teacher does not teach this subject in your class');
+        }
+
+        selectedTeacherId = dto.teacherId;
+      } else {
+        // Only one teacher, use their ID
+        selectedTeacherId = availableTeachers[0].teacher.id;
+      }
     }
 
     // Upload files if provided

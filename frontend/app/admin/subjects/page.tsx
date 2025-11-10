@@ -32,37 +32,15 @@ interface Subject {
   };
 }
 
-interface Class {
-  id: string;
-  name: string;
-  grade: string;
-}
-
-interface Teacher {
-  id: string;
-  user: {
-    firstName: string;
-    lastName: string;
-  };
-}
-
 export default function SubjectsPage() {
   const { t, locale } = useI18n();
   const router = useRouter();
   const [subjects, setSubjects] = useState<Subject[]>([]);
-  const [classes, setClasses] = useState<Class[]>([]);
-  const [teachers, setTeachers] = useState<Teacher[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
-  const [showTeacherForm, setShowTeacherForm] = useState(false);
   const [editingSubject, setEditingSubject] = useState<Subject | null>(null);
-  const [selectedSubject, setSelectedSubject] = useState<Subject | null>(null);
-  const [selectedClassFilter, setSelectedClassFilter] = useState('');
   const [formData, setFormData] = useState({
     name: '',
-  });
-  const [teacherFormData, setTeacherFormData] = useState({
-    teacherId: '',
   });
   const [user, setUser] = useState<any>(null);
   const [mounted, setMounted] = useState(false);
@@ -82,26 +60,13 @@ export default function SubjectsPage() {
     fetchData();
   }, [router]);
 
-  useEffect(() => {
-    if (!loading) {
-      fetchSubjects();
-    }
-  }, [selectedClassFilter]);
-
   const fetchData = async () => {
-    await Promise.all([
-      fetchClasses(),
-      fetchTeachers(),
-      fetchSubjects(),
-    ]);
+    await fetchSubjects();
   };
 
   const fetchSubjects = async () => {
     try {
-      const url = selectedClassFilter 
-        ? `/subjects?classId=${selectedClassFilter}` 
-        : '/subjects';
-      const data = await apiClient.get(url);
+      const data = await apiClient.get('/subjects');
       setSubjects(data || []);
     } catch (error) {
       console.error('Error fetching subjects:', error);
@@ -109,26 +74,6 @@ export default function SubjectsPage() {
       setError('Failed to load subjects');
     } finally {
       setLoading(false);
-    }
-  };
-
-  const fetchClasses = async () => {
-    try {
-      const data = await apiClient.get('/classes');
-      setClasses(data || []);
-    } catch (error) {
-      console.error('Error fetching classes:', error);
-      setClasses([]);
-    }
-  };
-
-  const fetchTeachers = async () => {
-    try {
-      const data = await apiClient.get('/teachers');
-      setTeachers(data || []);
-    } catch (error) {
-      console.error('Error fetching teachers:', error);
-      setTeachers([]);
     }
   };
 
@@ -157,40 +102,6 @@ export default function SubjectsPage() {
     }
   };
 
-  const handleTeacherSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    try {
-      setError('');
-      await apiClient.post(`/subjects/${selectedSubject?.id}/assign-teacher`, {
-        teacherId: teacherFormData.teacherId,
-        classId: selectedSubject?.classId, // Use the subject's class ID
-      });
-      setSuccess('Teacher assigned successfully!');
-      setTeacherFormData({ teacherId: '' });
-      fetchSubjects();
-      setTimeout(() => setSuccess(''), 3000);
-    } catch (error: any) {
-      console.error('Error assigning teacher:', error);
-      setError(error.response?.data?.message || 'Error assigning teacher');
-    }
-  };
-
-  const handleUnassignTeacher = async (subjectId: string, teacherId: string) => {
-    if (!confirm(t.subjects?.confirmUnassign || 'Are you sure you want to unassign this teacher?')) {
-      return;
-    }
-    try {
-      setError('');
-      const response = await apiClient.delete(`/subjects/${subjectId}/unassign-teacher/${teacherId}`);
-      const message = (response as any)?.message || 'Teacher unassigned successfully!';
-      setSuccess(message);
-      fetchSubjects();
-      setTimeout(() => setSuccess(''), 5000);
-    } catch (error: any) {
-      console.error('Error unassigning teacher:', error);
-      setError(error.response?.data?.message || 'Error unassigning teacher');
-    }
-  };
 
   const handleEdit = (subject: Subject) => {
     setEditingSubject(subject);
@@ -237,8 +148,7 @@ export default function SubjectsPage() {
 
   const filteredSubjects = subjects.filter(subject =>
     subject.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (subject.code && subject.code.toLowerCase().includes(searchTerm.toLowerCase())) ||
-    (subject.class && subject.class.name.toLowerCase().includes(searchTerm.toLowerCase()))
+    (subject.code && subject.code.toLowerCase().includes(searchTerm.toLowerCase()))
   );
 
   if (loading) {
@@ -299,7 +209,7 @@ export default function SubjectsPage() {
                 Subjects Management 📖
               </h2>
               <p className="text-gray-600 text-base sm:text-lg">
-                Manage subjects, assign teachers, and organize your curriculum
+                Manage subjects and organize your curriculum
               </p>
             </div>
           </div>
@@ -307,33 +217,19 @@ export default function SubjectsPage() {
 
         {/* Search and Add Button */}
         <div className={`mb-6 flex flex-col sm:flex-row gap-4 sm:items-center sm:justify-between ${mounted ? 'animate-slide-up stagger-1' : 'opacity-0'}`}>
-          <div className="flex flex-col sm:flex-row gap-4 flex-1">
-            <div className="relative flex-1 max-w-md">
-              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <svg className="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                </svg>
-              </div>
-              <input
-                type="text"
-                placeholder="Search subjects..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="block w-full pl-10 pr-3 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-teal-500 focus:border-transparent transition-all"
-              />
+          <div className="relative flex-1 max-w-md">
+            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+              <svg className="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              </svg>
             </div>
-            <select
-              value={selectedClassFilter}
-              onChange={(e) => setSelectedClassFilter(e.target.value)}
-              className="px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-teal-500 focus:border-transparent transition-all"
-            >
-              <option value="">{t.subjects?.allClasses || 'All Classes'}</option>
-              {(classes || []).map((cls) => (
-                <option key={cls.id} value={cls.id}>
-                  {cls.name} - {cls.grade}
-                </option>
-              ))}
-            </select>
+            <input
+              type="text"
+              placeholder="Search subjects..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="block w-full pl-10 pr-3 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-teal-500 focus:border-transparent transition-all"
+            />
           </div>
           <button
             onClick={() => setShowForm(true)}
@@ -431,18 +327,6 @@ export default function SubjectsPage() {
                 </div>
                 <div className="flex gap-2">
                   <button
-                    onClick={() => {
-                      setSelectedSubject(subject);
-                      setShowTeacherForm(true);
-                    }}
-                    className="p-2 text-teal-600 hover:bg-teal-50 rounded-lg transition-colors"
-                    title="Manage Teachers"
-                  >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z" />
-                    </svg>
-                  </button>
-                  <button
                     onClick={() => handleEdit(subject)}
                     className="p-2 text-teal-600 hover:bg-teal-50 rounded-lg transition-colors"
                     title="Edit"
@@ -464,31 +348,14 @@ export default function SubjectsPage() {
               </div>
               
               <h3 className="text-xl font-bold text-gray-900 mb-2">{subject.name}</h3>
-              <div className="space-y-2 text-sm text-gray-600 mb-4">
-                {subject.code && (
-                  <div className="flex items-center gap-2">
-                    <svg className="w-4 h-4 text-gray-400" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4zm2 6a1 1 0 011-1h6a1 1 0 110 2H7a1 1 0 01-1-1zm1 3a1 1 0 100 2h6a1 1 0 100-2H7z" clipRule="evenodd" />
-                    </svg>
-                    <span className="font-medium">{subject.code}</span>
-                  </div>
-                )}
-                {subject.class ? (
-                  <div className="flex items-center gap-2">
-                    <svg className="w-4 h-4 text-gray-400" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M5 4a3 3 0 00-3 3v6a3 3 0 003 3h10a3 3 0 003-3V7a3 3 0 00-3-3H5zm-1 9v-1h5v2H5a1 1 0 01-1-1zm7 1h4a1 1 0 001-1v-1h-5v2zm0-4h5V8h-5v2zM9 8H4v2h5V8z" clipRule="evenodd" />
-                    </svg>
-                    <span>{subject.class.name} - {subject.class.grade}</span>
-                  </div>
-                ) : (
-                  <div className="flex items-center gap-2">
-                    <svg className="w-4 h-4 text-gray-400" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-                    </svg>
-                    <span className="text-amber-600 italic">No class assigned</span>
-                  </div>
-                )}
-              </div>
+              {subject.code && (
+                <div className="flex items-center gap-2 text-sm text-gray-600 mb-4">
+                  <svg className="w-4 h-4 text-gray-400" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4zm2 6a1 1 0 011-1h6a1 1 0 110 2H7a1 1 0 01-1-1zm1 3a1 1 0 100 2h6a1 1 0 100-2H7z" clipRule="evenodd" />
+                  </svg>
+                  <span className="font-medium">{subject.code}</span>
+                </div>
+              )}
               
               {subject.description && (
                 <p className="text-sm text-gray-500 mb-4 line-clamp-2">{subject.description}</p>
@@ -534,93 +401,6 @@ export default function SubjectsPage() {
         )}
       </main>
 
-      {/* Teacher Assignment Modal */}
-      {showTeacherForm && selectedSubject && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-2xl shadow-xl max-w-md w-full max-h-[90vh] overflow-y-auto">
-            <div className="p-6">
-              <div className="flex items-center justify-between mb-6">
-                <h3 className="text-xl font-bold text-gray-900">
-                  {t.subjects?.manageTeachers || 'Manage Teachers'} - {selectedSubject.name}
-                </h3>
-                <button
-                  onClick={() => {
-                    setShowTeacherForm(false);
-                    setSelectedSubject(null);
-                  }}
-                  className="text-gray-400 hover:text-gray-600"
-                >
-                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
-              </div>
-
-              <div className="mb-4">
-                <h4 className="font-semibold mb-2">{t.subjects?.assignedTeachers || 'Assigned Teachers'}</h4>
-                {selectedSubject.teachers.length > 0 ? (
-                  <ul className="space-y-2">
-                    {(selectedSubject.teachers || []).map((assignment) => (
-                      <li key={assignment.teacher.id} className="flex justify-between items-center bg-gray-50 p-3 rounded-lg">
-                        <span>
-                          {assignment.teacher.user.firstName} {assignment.teacher.user.lastName}
-                        </span>
-                        <button
-                          onClick={() => handleUnassignTeacher(selectedSubject.id, assignment.teacher.id)}
-                          className="text-red-600 hover:text-red-800 text-sm"
-                        >
-                          {t.subjects?.unassign || 'Unassign'}
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
-                ) : (
-                  <p className="text-gray-500">{t.subjects?.noTeachersAssigned || 'No teachers assigned'}</p>
-                )}
-              </div>
-
-              <form onSubmit={handleTeacherSubmit}>
-                <div className="mb-4">
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    {t.subjects?.assignTeacher || 'Assign Teacher'}
-                  </label>
-                  <select
-                    value={teacherFormData.teacherId}
-                    onChange={(e) => setTeacherFormData({ teacherId: e.target.value })}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-teal-500 focus:border-transparent transition-all"
-                    required
-                  >
-                    <option value="">{t.subjects?.selectTeacher || 'Select Teacher'}</option>
-                    {(teachers || []).map((teacher) => (
-                      <option key={teacher.id} value={teacher.id}>
-                        {teacher.user.firstName} {teacher.user.lastName}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div className="flex gap-3">
-                  <button
-                    type="submit"
-                    className="gradient-primary text-white px-4 py-2 rounded-xl hover:shadow-lg transition-all font-medium flex-1"
-                  >
-                    {t.subjects?.assign || 'Assign'}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setShowTeacherForm(false);
-                      setSelectedSubject(null);
-                    }}
-                    className="bg-gray-100 text-gray-700 px-4 py-2 rounded-xl hover:bg-gray-200 transition-all font-medium"
-                  >
-                    {t.subjects?.close || 'Close'}
-                  </button>
-                </div>
-              </form>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

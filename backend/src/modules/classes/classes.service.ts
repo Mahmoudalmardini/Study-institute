@@ -24,7 +24,7 @@ export class ClassesService {
       }
     }
 
-    return this.prisma.class.create({
+    const newClass = await this.prisma.class.create({
       data: createClassDto,
       include: {
         teacher: {
@@ -51,19 +51,32 @@ export class ClassesService {
             },
           },
         },
-        subjects: true,
+        classSubjects: {
+          include: {
+            subject: true,
+          },
+        },
         _count: {
           select: {
             students: true,
-            subjects: true,
+            classSubjects: true,
           },
         },
       },
     });
+
+    return {
+      ...newClass,
+      subjects: newClass.classSubjects.map((cs) => cs.subject),
+      _count: {
+        ...newClass._count,
+        subjects: newClass._count.classSubjects,
+      },
+    };
   }
 
   async findAll() {
-    return this.prisma.class.findMany({
+    const classes = await this.prisma.class.findMany({
       include: {
         teacher: {
           include: {
@@ -80,7 +93,7 @@ export class ClassesService {
         _count: {
           select: {
             students: true,
-            subjects: true,
+            classSubjects: true,
           },
         },
       },
@@ -88,6 +101,15 @@ export class ClassesService {
         createdAt: 'desc',
       },
     });
+
+    // Map to use classSubjects count as subjects count for backward compatibility
+    return classes.map((cls) => ({
+      ...cls,
+      _count: {
+        ...cls._count,
+        subjects: cls._count.classSubjects,
+      },
+    }));
   }
 
   async findOne(id: string) {
@@ -118,7 +140,11 @@ export class ClassesService {
             },
           },
         },
-        subjects: true,
+        classSubjects: {
+          include: {
+            subject: true,
+          },
+        },
       },
     });
 
@@ -126,7 +152,10 @@ export class ClassesService {
       throw new NotFoundException(`Class with ID ${id} not found`);
     }
 
-    return classData;
+    return {
+      ...classData,
+      subjects: classData.classSubjects.map((cs) => cs.subject),
+    };
   }
 
   async update(id: string, updateClassDto: UpdateClassDto) {
@@ -144,7 +173,7 @@ export class ClassesService {
       }
     }
 
-    return this.prisma.class.update({
+    const updatedClass = await this.prisma.class.update({
       where: { id },
       data: updateClassDto,
       include: {
@@ -172,9 +201,18 @@ export class ClassesService {
             },
           },
         },
-        subjects: true,
+        classSubjects: {
+          include: {
+            subject: true,
+          },
+        },
       },
     });
+
+    return {
+      ...updatedClass,
+      subjects: updatedClass.classSubjects.map((cs) => cs.subject),
+    };
   }
 
   async remove(id: string) {
@@ -201,6 +239,130 @@ export class ClassesService {
     return this.prisma.class.delete({
       where: { id },
     });
+  }
+
+  async assignSubjects(classId: string, subjectIds: string[], assignedBy: string) {
+    // Validate class exists
+    await this.findOne(classId);
+
+    // Validate all subjects exist
+    const subjects = await this.prisma.subject.findMany({
+      where: { id: { in: subjectIds } },
+    });
+
+    if (subjects.length !== subjectIds.length) {
+      throw new NotFoundException('One or more subjects not found');
+    }
+
+    // Create or update class-subject relationships using junction table
+    const assignments = await Promise.all(
+      subjectIds.map(async (subjectId) => {
+        // Check if assignment already exists
+        const existing = await this.prisma.classSubject.findUnique({
+          where: {
+            classId_subjectId: {
+              classId,
+              subjectId,
+            },
+          },
+        });
+
+        if (existing) {
+          return existing;
+        }
+
+        // Create new assignment
+        return this.prisma.classSubject.create({
+          data: {
+            classId,
+            subjectId,
+            assignedBy,
+          },
+          include: {
+            subject: true,
+            class: true,
+          },
+        });
+      }),
+    );
+
+    // Return subjects with class information
+    return this.prisma.subject.findMany({
+      where: { id: { in: subjectIds } },
+      include: {
+        classSubjects: {
+          where: { classId },
+          include: {
+            class: true,
+          },
+        },
+      },
+    });
+  }
+
+  async unassignSubject(classId: string, subjectId: string) {
+    // Validate class exists
+    await this.findOne(classId);
+
+    // Validate subject exists
+    const subject = await this.prisma.subject.findUnique({
+      where: { id: subjectId },
+    });
+
+    if (!subject) {
+      throw new NotFoundException(`Subject with ID ${subjectId} not found`);
+    }
+
+    // Check if assignment exists in junction table
+    const assignment = await this.prisma.classSubject.findUnique({
+      where: {
+        classId_subjectId: {
+          classId,
+          subjectId,
+        },
+      },
+    });
+
+    if (!assignment) {
+      throw new BadRequestException('Subject is not assigned to this class');
+    }
+
+    // Remove class-subject relationship from junction table
+    await this.prisma.classSubject.delete({
+      where: {
+        classId_subjectId: {
+          classId,
+          subjectId,
+        },
+      },
+    });
+
+    return subject;
+  }
+
+  async getClassSubjects(classId: string) {
+    // Validate class exists
+    await this.findOne(classId);
+
+    // Return all subjects assigned to this class via junction table
+    const classSubjects = await this.prisma.classSubject.findMany({
+      where: { classId },
+      include: {
+        subject: true,
+        class: true,
+      },
+      orderBy: {
+        subject: {
+          name: 'asc',
+        },
+      },
+    });
+
+    // Map to return subjects with class information
+    return classSubjects.map((cs) => ({
+      ...cs.subject,
+      class: cs.class,
+    }));
   }
 }
 

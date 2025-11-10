@@ -235,7 +235,7 @@ export class SubjectsService {
     });
   }
 
-  async assignTeacher(subjectId: string, teacherId: string, classId: string, assignedBy: string) {
+  async assignTeacher(subjectId: string, teacherId: string, assignedBy: string) {
     // Validate subject exists
     const subject = await this.findOne(subjectId);
 
@@ -245,14 +245,6 @@ export class SubjectsService {
     });
     if (!teacher) {
       throw new NotFoundException(`Teacher with ID ${teacherId} not found`);
-    }
-
-    // Validate class exists
-    const classData = await this.prisma.class.findUnique({
-      where: { id: classId },
-    });
-    if (!classData) {
-      throw new NotFoundException(`Class with ID ${classId} not found`);
     }
 
     // Check if teacher is already assigned to this subject
@@ -268,15 +260,7 @@ export class SubjectsService {
 
     // If teacher is already assigned to this subject, prevent duplicate assignment
     if (existing) {
-      throw new ConflictException('Teacher is already assigned to this subject. Please unassign the teacher first if you want to change the class assignment.');
-    }
-
-    // Update subject to be assigned to the class if not already assigned
-    if (!subject.classId || subject.classId !== classId) {
-      await this.prisma.subject.update({
-        where: { id: subjectId },
-        data: { classId },
-      });
+      throw new ConflictException('Teacher is already assigned to this subject. Please unassign the teacher first.');
     }
 
     return this.prisma.teacherSubject.create({
