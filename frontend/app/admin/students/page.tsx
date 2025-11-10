@@ -237,10 +237,13 @@ export default function StudentsPage() {
           // Set teacher assignments if they exist
           const teacherAssignments: Record<string, string> = {};
           studentSubjects.forEach((ss: any) => {
-            if (ss.teacherId) {
-              teacherAssignments[ss.subjectId] = ss.teacherId;
+            // Extract teacherId from either direct property or nested teacher object
+            const teacherId = ss.teacherId || ss.teacher?.id;
+            if (teacherId) {
+              teacherAssignments[ss.subjectId] = String(teacherId).trim();
             }
           });
+          console.log('Loaded teacher assignments:', teacherAssignments);
           setSubjectTeachers(teacherAssignments);
           
           // Fetch teachers for all enrolled subjects
@@ -276,6 +279,23 @@ export default function StudentsPage() {
       return;
     }
 
+    // Validate that subjects with multiple teachers have a teacher assigned
+    const subjectsMissingTeachers: string[] = [];
+    for (const subjectId of selectedSubjectIds) {
+      const teachers = teachersBySubject[subjectId] || [];
+      if (teachers.length > 1 && !subjectTeachers[subjectId]) {
+        const subject = availableSubjects.find(s => s.id === subjectId);
+        subjectsMissingTeachers.push(subject?.name || subjectId);
+      }
+    }
+
+    if (subjectsMissingTeachers.length > 0) {
+      setError(
+        `Please assign a teacher for the following subjects with multiple teachers: ${subjectsMissingTeachers.join(', ')}`
+      );
+      return;
+    }
+
     try {
       setSaving(true);
       setError('');
@@ -301,10 +321,23 @@ export default function StudentsPage() {
       }
 
       // Enroll subjects with optional teacher assignments
-      const subjectsToEnroll = selectedSubjectIds.map(subjectId => ({
-        subjectId,
-        teacherId: subjectTeachers[subjectId] || undefined,
-      }));
+      const subjectsToEnroll = selectedSubjectIds.map(subjectId => {
+        const teacherId = subjectTeachers[subjectId];
+        // Validate teacherId is a valid UUID-like string (basic validation)
+        const isValidTeacherId = teacherId && 
+          typeof teacherId === 'string' && 
+          teacherId.trim().length > 0 &&
+          teacherId.trim().length >= 10; // Basic validation for UUID
+        
+        const result = {
+          subjectId,
+          // Only include teacherId if it's valid
+          ...(isValidTeacherId ? { teacherId: teacherId.trim() } : {}),
+        };
+        return result;
+      });
+
+      console.log('Enrolling subjects with teachers:', subjectsToEnroll);
 
       const subjectsResponse = await fetch(
         `${process.env.NEXT_PUBLIC_API_URL}/students/${selectedStudent.studentProfile.id}/enroll-subjects`,
@@ -339,7 +372,7 @@ export default function StudentsPage() {
 
   const fetchTeachersForSubject = async (subjectId: string) => {
     if (teachersBySubject[subjectId]) {
-      return; // Already fetched
+      return teachersBySubject[subjectId]; // Already fetched, return cached
     }
     
     setLoadingTeachers(prev => ({ ...prev, [subjectId]: true }));
@@ -347,9 +380,11 @@ export default function StudentsPage() {
       const data = await apiClient.get(`/subjects/${subjectId}/teachers`);
       const teachers = Array.isArray(data) ? data : (data as any)?.data || [];
       setTeachersBySubject(prev => ({ ...prev, [subjectId]: teachers }));
+      return teachers;
     } catch (error) {
       console.error('Error fetching teachers for subject:', error);
       setTeachersBySubject(prev => ({ ...prev, [subjectId]: [] }));
+      return [];
     } finally {
       setLoadingTeachers(prev => ({ ...prev, [subjectId]: false }));
     }
@@ -369,7 +404,20 @@ export default function StudentsPage() {
     } else {
       // Selecting - add to selection and fetch teachers
       setSelectedSubjectIds(prev => [...prev, subjectId]);
-      await fetchTeachersForSubject(subjectId);
+      const teachers = await fetchTeachersForSubject(subjectId);
+      
+      // Auto-assign teacher if there's exactly one teacher for this subject
+      if (teachers.length === 1) {
+        const teacherAssignment = teachers[0];
+        const teacher = teacherAssignment.teacher || teacherAssignment;
+        const teacherId = teacher?.id || teacher?.teacherId;
+        if (teacherId) {
+          setSubjectTeachers(prev => ({
+            ...prev,
+            [subjectId]: String(teacherId).trim(),
+          }));
+        }
+      }
     }
   };
 
@@ -846,10 +894,10 @@ export default function StudentsPage() {
                             <svg className="w-5 h-5 text-purple-600" fill="currentColor" viewBox="0 0 20 20">
                               <path d="M9 6a3 3 0 11-6 0 3 3 0 016 0zM17 6a3 3 0 11-6 0 3 3 0 016 0zM12.93 17c.046-.327.07-.66.07-1a6.97 6.97 0 00-1.5-4.33A5 5 0 0119 16v1h-6.07zM6 11a5 5 0 015 5v1H1v-1a5 5 0 015-5z" />
                             </svg>
-                            Assign Teachers (Optional)
+                            Assign Teachers
                           </h4>
                           <p className="text-sm text-gray-600 mb-4">
-                            If multiple teachers teach the same subject, select which teacher will teach this student. If not selected, the student will need to choose when submitting homework.
+                            For subjects taught by multiple teachers, you must select which teacher will teach this student. The teacher assignment is automatically set for subjects with only one teacher. Students will no longer need to choose teachers when submitting homework.
                           </p>
                           <div className="space-y-3">
                             {selectedSubjectIds.map((subjectId) => {
@@ -858,11 +906,48 @@ export default function StudentsPage() {
                               const isLoading = loadingTeachers[subjectId];
                               const selectedTeacherId = subjectTeachers[subjectId] || '';
 
+                              const studentSubject = selectedStudent?.studentProfile?.subjects?.find(
+                                (ss: any) => ss.subjectId === subjectId || ss.subject?.id === subjectId,
+                              );
+                              const assignedTeacher = studentSubject?.teacher;
+
+                              const teacherOptions = [...teachers];
+                              if (
+                                assignedTeacher &&
+                                !teacherOptions.some((t: any) => {
+                                  const teacher = t.teacher || t;
+                                  return teacher.id === assignedTeacher.id;
+                                })
+                              ) {
+                                teacherOptions.unshift({ teacher: assignedTeacher });
+                              }
+
+                              const hasMultipleTeachers = teacherOptions.length > 1;
+                              const isRequired = hasMultipleTeachers && !selectedTeacherId;
+                              const showAutoAssignedBadge =
+                                teacherOptions.length === 1 &&
+                                !!selectedTeacherId &&
+                                teacherOptions[0] &&
+                                ((teacherOptions[0].teacher || teacherOptions[0]).id === selectedTeacherId);
+
                               return (
-                                <div key={subjectId} className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                                <div
+                                  key={subjectId}
+                                  className={`bg-gray-50 rounded-lg p-4 border ${
+                                    isRequired ? 'border-red-300 bg-red-50' : 'border-gray-200'
+                                  }`}
+                                >
                                   <div className="flex items-start justify-between mb-2">
                                     <div className="flex-1">
-                                      <p className="font-semibold text-gray-900">{subject?.name || 'Unknown Subject'}</p>
+                                      <p className="font-semibold text-gray-900 flex items-center gap-2">
+                                        {subject?.name || 'Unknown Subject'}
+                                        {hasMultipleTeachers && (
+                                          <span className="text-xs text-red-600 font-normal">(Required)</span>
+                                        )}
+                                        {showAutoAssignedBadge && (
+                                          <span className="text-xs text-green-600 font-normal">(Auto-assigned)</span>
+                                        )}
+                                      </p>
                                     </div>
                                   </div>
                                   {isLoading ? (
@@ -870,29 +955,50 @@ export default function StudentsPage() {
                                       <LoadingSpinner size="sm" />
                                       Loading teachers...
                                     </div>
-                                  ) : teachers.length > 0 ? (
-                                    <select
-                                      value={selectedTeacherId}
-                                      onChange={(e) => {
-                                        setSubjectTeachers(prev => ({
-                                          ...prev,
-                                          [subjectId]: e.target.value || '',
-                                        }));
-                                      }}
-                                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white"
-                                    >
-                                      <option value="">-- No teacher assigned (student will choose) --</option>
-                                      {teachers.map((teacherAssignment: any) => {
-                                        const teacher = teacherAssignment.teacher || teacherAssignment;
-                                        return (
-                                          <option key={teacher.id} value={teacher.id}>
-                                            {teacher.user?.firstName || teacher.firstName} {teacher.user?.lastName || teacher.lastName}
-                                          </option>
-                                        );
-                                      })}
-                                    </select>
+                                  ) : teacherOptions.length > 0 ? (
+                                    <>
+                                      <select
+                                        value={selectedTeacherId}
+                                        onChange={(e) => {
+                                          setSubjectTeachers(prev => ({
+                                            ...prev,
+                                            [subjectId]: e.target.value || '',
+                                          }));
+                                        }}
+                                        className={`w-full px-3 py-2 text-sm border rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white ${
+                                          isRequired ? 'border-red-300' : 'border-gray-300'
+                                        }`}
+                                        required={hasMultipleTeachers}
+                                      >
+                                        {hasMultipleTeachers && (
+                                          <option value="">-- Select a teacher (Required) --</option>
+                                        )}
+                                        {teacherOptions.map((teacherAssignment: any) => {
+                                          const teacher = teacherAssignment.teacher || teacherAssignment;
+                                          return (
+                                            <option key={teacher.id} value={teacher.id}>
+                                              {teacher.user?.firstName || teacher.firstName}{' '}
+                                              {teacher.user?.lastName || teacher.lastName}
+                                            </option>
+                                          );
+                                        })}
+                                      </select>
+                                      {isRequired && (
+                                        <p className="text-xs text-red-600 mt-1">
+                                          Please select a teacher for this subject
+                                        </p>
+                                      )}
+                                    </>
                                   ) : (
-                                    <p className="text-sm text-gray-500 italic">No teachers available for this subject</p>
+                                    <div className="text-sm text-gray-500 italic">
+                                      No teachers available for this subject
+                                      {assignedTeacher && (
+                                        <span className="block text-xs text-gray-600 mt-1">
+                                          Current assignment: {assignedTeacher.user?.firstName || assignedTeacher.firstName}{' '}
+                                          {assignedTeacher.user?.lastName || assignedTeacher.lastName}
+                                        </span>
+                                      )}
+                                    </div>
                                   )}
                                 </div>
                               );

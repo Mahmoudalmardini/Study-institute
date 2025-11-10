@@ -28,6 +28,17 @@ export class TeachersService {
                     grade: true,
                   },
                 },
+                classSubjects: {
+                  include: {
+                    class: {
+                      select: {
+                        id: true,
+                        name: true,
+                        grade: true,
+                      },
+                    },
+                  },
+                },
               },
             },
           },
@@ -63,6 +74,11 @@ export class TeachersService {
             subject: {
               include: {
                 class: true,
+                classSubjects: {
+                  include: {
+                    class: true,
+                  },
+                },
               },
             },
           },
@@ -95,6 +111,11 @@ export class TeachersService {
             subject: {
               include: {
                 class: true,
+                classSubjects: {
+                  include: {
+                    class: true,
+                  },
+                },
               },
             },
           },
@@ -118,6 +139,11 @@ export class TeachersService {
         subject: {
           include: {
             class: true,
+            classSubjects: {
+              include: {
+                class: true,
+              },
+            },
             _count: {
               select: {
                 students: true,

@@ -916,12 +916,23 @@ export class HomeworkService {
       });
     }
 
-    return this.prisma.studentSubject.findMany({
+    const studentSubjects = await this.prisma.studentSubject.findMany({
       where: { studentId: student.id },
       include: {
         subject: {
           include: {
             class: true,
+            classSubjects: {
+              include: {
+                class: {
+                  select: {
+                    id: true,
+                    name: true,
+                    grade: true,
+                  },
+                },
+              },
+            },
             teachers: {
               include: {
                 teacher: {
@@ -953,6 +964,25 @@ export class HomeworkService {
           },
         },
       },
+    });
+
+    // Enrich subject with class information (from direct classId or classSubjects)
+    return studentSubjects.map((ss) => {
+      const subject = ss.subject;
+      let classInfo = subject.class;
+      
+      // If no direct class, try to get from classSubjects (take first one if multiple)
+      if (!classInfo && subject.classSubjects && subject.classSubjects.length > 0) {
+        classInfo = subject.classSubjects[0].class;
+      }
+      
+      return {
+        ...ss,
+        subject: {
+          ...subject,
+          class: classInfo,
+        },
+      };
     });
   }
 

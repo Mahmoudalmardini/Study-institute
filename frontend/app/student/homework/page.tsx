@@ -29,15 +29,21 @@ interface Teacher {
   };
 }
 
+interface SubjectClassInfo {
+  id: string;
+  name: string;
+  grade?: string | null;
+}
+
 interface Subject {
   id: string;
   subject: {
     id: string;
     name: string;
-    class: {
-      id: string;
-      name: string;
-    };
+    class?: SubjectClassInfo | null;
+    classSubjects?: Array<{
+      class?: SubjectClassInfo | null;
+    }>;
     teachers: Array<{
       teacher: {
         id: string;
@@ -65,8 +71,6 @@ export default function StudentHomeworkPage() {
   const [myTeachers, setMyTeachers] = useState<Teacher[]>([]);
   const [studentProfileId, setStudentProfileId] = useState<string | null>(null);
   const [mySubjects, setMySubjects] = useState<Subject[]>([]);
-  const [availableTeachers, setAvailableTeachers] = useState<Teacher[]>([]);
-  const [loadingTeachers, setLoadingTeachers] = useState(false);
 
   const [formData, setFormData] = useState({
     title: '',
@@ -77,6 +81,35 @@ export default function StudentHomeworkPage() {
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const resolveSubjectClass = (subject?: { class?: SubjectClassInfo | null; classSubjects?: Array<{ class?: SubjectClassInfo | null }> }) => {
+    if (!subject) {
+      return null;
+    }
+
+    if (subject.class) {
+      return subject.class;
+    }
+
+    if (subject.classSubjects && Array.isArray(subject.classSubjects)) {
+      const match = subject.classSubjects.find(cs => cs?.class);
+      if (match?.class) {
+        return match.class;
+      }
+    }
+
+    return null;
+  };
+
+  const getSubjectClassName = (subject?: { class?: SubjectClassInfo | null; classSubjects?: Array<{ class?: SubjectClassInfo | null }> }) => {
+    const classInfo = resolveSubjectClass(subject);
+    return classInfo?.name || 'N/A';
+  };
+
+  const getSubjectClassGrade = (subject?: { class?: SubjectClassInfo | null; classSubjects?: Array<{ class?: SubjectClassInfo | null }> }) => {
+    const classInfo = resolveSubjectClass(subject);
+    return classInfo?.grade || null;
+  };
 
   useEffect(() => {
     const token = localStorage.getItem('accessToken');
@@ -171,73 +204,6 @@ export default function StudentHomeworkPage() {
     }
   };
 
-  const fetchTeachersForSubject = async (subjectId: string) => {
-    if (!subjectId) {
-      setAvailableTeachers([]);
-      return;
-    }
-
-    setLoadingTeachers(true);
-    try {
-      // First, check if the student has a pre-assigned teacher for this subject
-      const subject = mySubjects.find((s: any) => s.subject?.id === subjectId || s.id === subjectId);
-      const studentSubject = Array.isArray(subject) ? null : subject;
-      
-      // Check if there's a pre-assigned teacher in the student's subject enrollment
-      let preAssignedTeacherId: string | null = null;
-      if (studentSubject && (studentSubject as any).teacherId) {
-        preAssignedTeacherId = (studentSubject as any).teacherId;
-      } else if (studentSubject && (studentSubject as any).teacher) {
-        preAssignedTeacherId = (studentSubject as any).teacher.id;
-      }
-
-      const token = localStorage.getItem('accessToken');
-      const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api'}/homework/subjects/${subjectId}/teachers`,
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-
-      if (response.ok) {
-        const data = await response.json();
-        console.log('Available teachers for subject:', data);
-        // Handle both direct array response and wrapped response
-        const teachers = Array.isArray(data) ? data : (data.data || []);
-        console.log('Processed teachers:', teachers);
-        setAvailableTeachers(teachers);
-        
-        // Auto-select teacher: first check for pre-assigned, then single teacher, otherwise empty
-        if (preAssignedTeacherId) {
-          // Check if pre-assigned teacher is still available
-          const preAssignedTeacher = teachers.find((t: any) => t.id === preAssignedTeacherId);
-          if (preAssignedTeacher) {
-            setFormData(prev => ({ ...prev, teacherId: preAssignedTeacherId! }));
-          } else {
-            // Pre-assigned teacher no longer available, use single teacher or empty
-            if (teachers.length === 1) {
-              setFormData(prev => ({ ...prev, teacherId: teachers[0].id }));
-            } else {
-              setFormData(prev => ({ ...prev, teacherId: '' }));
-            }
-          }
-        } else if (teachers.length === 1) {
-          setFormData(prev => ({ ...prev, teacherId: teachers[0].id }));
-        } else {
-          setFormData(prev => ({ ...prev, teacherId: '' }));
-        }
-      } else {
-        console.error('Failed to fetch teachers:', response.status);
-        const errorData = await response.json().catch(() => ({}));
-        console.error('Error details:', errorData);
-        setAvailableTeachers([]);
-      }
-    } catch (err) {
-      console.error('Error fetching teachers:', err);
-      setAvailableTeachers([]);
-    } finally {
-      setLoadingTeachers(false);
-    }
-  };
-
   const fetchHomework = async () => {
     setLoading(true);
     try {
@@ -321,6 +287,30 @@ export default function StudentHomeworkPage() {
     }
   };
 
+  const handleSubjectSelect = (subjectId: string) => {
+    const enrollment = mySubjects.find(
+      (s: any) => s.subject?.id === subjectId || s.id === subjectId,
+    );
+    const assignedTeacherId =
+      (enrollment as any)?.teacher?.id || (enrollment as any)?.teacherId || '';
+
+    setFormData(prev => ({
+      ...prev,
+      subjectId,
+      teacherId: assignedTeacherId,
+    }));
+  };
+
+  const selectedSubjectEnrollment = formData.subjectId
+    ? mySubjects.find(
+        (s: any) => s.subject?.id === formData.subjectId || s.id === formData.subjectId,
+      )
+    : null;
+  const assignedTeacher = (selectedSubjectEnrollment as any)?.teacher || null;
+  const subjectTeacherCount =
+    (selectedSubjectEnrollment as any)?.subject?.teachers?.length || 0;
+  const multipleTeachersForSubject = subjectTeacherCount > 1;
+
   const openAddForm = () => {
     console.log('Opening add form, mySubjects:', mySubjects);
     console.log('Number of subjects:', (mySubjects || []).length);
@@ -334,7 +324,6 @@ export default function StudentHomeworkPage() {
     setEditingHomework(null);
     setFormData({ title: '', description: '', subjectId: '', teacherId: '' });
     setSelectedFiles([]);
-    setAvailableTeachers([]);
     setShowForm(true);
     setError('');
     setSuccess('');
@@ -358,7 +347,6 @@ export default function StudentHomeworkPage() {
     setEditingHomework(null);
     setFormData({ title: '', description: '', subjectId: '', teacherId: '' });
     setSelectedFiles([]);
-    setAvailableTeachers([]);
     setError('');
   };
 
@@ -377,11 +365,20 @@ export default function StudentHomeworkPage() {
       return;
     }
 
-    // Teacher selection is required only if multiple teachers available
-    if (availableTeachers.length > 1 && !formData.teacherId) {
-      setError('Please select a teacher.');
+    const selectedEnrollment = mySubjects.find(
+      (s: any) => s.subject?.id === formData.subjectId || s.id === formData.subjectId,
+    );
+    const assignedTeacherId =
+      formData.teacherId ||
+      (selectedEnrollment as any)?.teacher?.id ||
+      (selectedEnrollment as any)?.teacherId ||
+      '';
+
+    if (!assignedTeacherId) {
+      setError('No teacher is assigned to this subject. Please contact your administrator.');
       return;
     }
+    setFormData(prev => ({ ...prev, teacherId: assignedTeacherId }));
 
     setSubmitting(true);
 
@@ -394,9 +391,7 @@ export default function StudentHomeworkPage() {
       fd.append('subjectId', formData.subjectId);
       fd.append('title', formData.title);
       fd.append('description', formData.description);
-      if (formData.teacherId) {
-        fd.append('teacherId', formData.teacherId);
-      }
+      fd.append('teacherId', assignedTeacherId);
       selectedFiles.forEach((file) => fd.append('files', file));
 
       const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api'}/homework/submit-to-subject-teacher`, {
@@ -625,18 +620,15 @@ export default function StudentHomeworkPage() {
                 <select
                   id="subject"
                   value={formData.subjectId}
-                  onChange={(e) => {
-                    setFormData({ ...formData, subjectId: e.target.value, teacherId: '' });
-                    fetchTeachersForSubject(e.target.value);
-                  }}
+                  onChange={(e) => handleSubjectSelect(e.target.value)}
                   required
-                  disabled={submitting || loadingTeachers}
+                  disabled={submitting}
                   className="mt-2 w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-300 bg-white"
                 >
                   <option value="">Choose a subject...</option>
                   {(mySubjects || []).map((enrollment) => (
                     <option key={enrollment.subject.id} value={enrollment.subject.id}>
-                      {enrollment.subject.name} - {enrollment.subject.class?.name || 'N/A'}
+                      {enrollment.subject.name} - {getSubjectClassName(enrollment.subject)}
                     </option>
                   ))}
                 </select>
@@ -647,74 +639,55 @@ export default function StudentHomeworkPage() {
                 )}
               </div>
 
-              {/* Teacher Selection - Show if teachers are available and no pre-assigned teacher */}
-              {(() => {
-                // Check if student has a pre-assigned teacher for this subject
-                const subject = mySubjects.find((s: any) => (s.subject?.id === formData.subjectId || s.id === formData.subjectId));
-                const hasPreAssignedTeacher = subject && (
-                  (subject as any).teacherId || 
-                  ((subject as any).teacher && (subject as any).teacher.id)
-                );
-                
-                // Only show teacher selection if:
-                // 1. Subject is selected
-                // 2. Teachers are available
-                // 3. No pre-assigned teacher OR pre-assigned teacher is not in available list
-                const shouldShow = formData.subjectId && 
-                  availableTeachers.length > 0 && 
-                  (!hasPreAssignedTeacher || availableTeachers.length > 1);
-                
-                return shouldShow;
-              })() && (
+              {/* Assigned Teacher Information */}
+              {formData.subjectId && (
                 <div>
-                  <label htmlFor="teacher" className="block text-sm font-medium text-gray-700">
-                    Select Teacher *
-                  </label>
-                  <select
-                    id="teacher"
-                    value={formData.teacherId}
-                    onChange={(e) => setFormData({ ...formData, teacherId: e.target.value })}
-                    required
-                    disabled={submitting}
-                    className="mt-2 w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-300 bg-white"
-                  >
-                    <option value="">Choose a teacher...</option>
-                    {availableTeachers.map((teacher) => (
-                      <option key={teacher.id} value={teacher.id}>
-                        {teacher.user.firstName} {teacher.user.lastName}
-                      </option>
-                    ))}
-                  </select>
-                  <p className="mt-2 text-sm text-gray-500">
-                    {availableTeachers.length > 1 
-                      ? 'Multiple teachers teach this subject. Please select one.'
-                      : 'Select the teacher for this subject.'
-                    }
-                  </p>
-                </div>
-              )}
-
-              {/* Show message if teacher is pre-assigned */}
-              {(() => {
-                const subject = mySubjects.find((s: any) => (s.subject?.id === formData.subjectId || s.id === formData.subjectId));
-                const preAssignedTeacher = subject && ((subject as any).teacher);
-                return formData.subjectId && preAssignedTeacher && formData.teacherId && (
-                  <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                    <p className="text-sm text-blue-800">
-                      <svg className="w-4 h-4 inline mr-1" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
-                      </svg>
-                      Teacher: {preAssignedTeacher.user.firstName} {preAssignedTeacher.user.lastName} (pre-assigned)
-                    </p>
-                  </div>
-                );
-              })()}
-
-              {/* Loading state */}
-              {loadingTeachers && formData.subjectId && (
-                <div className="flex items-center gap-2 text-sm text-gray-600">
-                  <LoadingSpinner size="sm" />
-                  <span>Loading available teachers...</span>
+                  {assignedTeacher ? (
+                    <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                      <p className="text-sm text-blue-800 flex items-center gap-2">
+                        <svg className="w-4 h-4 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                          <path
+                            fillRule="evenodd"
+                            d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z"
+                            clipRule="evenodd"
+                          />
+                        </svg>
+                        Teacher: {assignedTeacher?.user?.firstName} {assignedTeacher?.user?.lastName}{' '}
+                        {multipleTeachersForSubject && '(assigned by admin)'}
+                      </p>
+                      {(() => {
+                        const className = getSubjectClassName(selectedSubjectEnrollment?.subject);
+                        const classGrade = getSubjectClassGrade(selectedSubjectEnrollment?.subject);
+                        if (className === 'N/A' && !classGrade) {
+                          return null;
+                        }
+                        return (
+                          <p className="text-xs text-blue-700 mt-1">
+                            Class: {className}
+                            {classGrade ? ` • Grade: ${classGrade}` : ''}
+                          </p>
+                        );
+                      })()}
+                      {multipleTeachersForSubject && (
+                        <p className="mt-2 text-xs text-blue-700">
+                          This subject is taught by multiple teachers. The administrator has pre-assigned this teacher for your submissions.
+                        </p>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
+                      <p className="text-sm text-red-700 flex items-center gap-2">
+                        <svg className="w-4 h-4 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                          <path
+                            fillRule="evenodd"
+                            d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z"
+                            clipRule="evenodd"
+                          />
+                        </svg>
+                        No teacher is assigned to this subject yet. Please contact your administrator.
+                      </p>
+                    </div>
+                  )}
                 </div>
               )}
 

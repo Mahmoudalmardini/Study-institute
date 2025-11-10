@@ -16,6 +16,13 @@ interface Subject {
     name: string;
     grade?: string;
   };
+  classSubjects?: Array<{
+    class?: {
+      id: string;
+      name: string;
+      grade?: string;
+    } | null;
+  }>;
 }
 
 interface TeacherSubject {
@@ -70,6 +77,23 @@ export default function TeachersPage() {
   const [selectedSubjectIds, setSelectedSubjectIds] = useState<string[]>([]);
   const [loadingClassSubjects, setLoadingClassSubjects] = useState(false);
 
+
+  const resolveSubjectClass = (subject: Subject) => {
+    if (subject?.class) {
+      return subject.class;
+    }
+    const fallback = subject?.classSubjects?.find(cs => cs.class)?.class;
+    return fallback ?? null;
+  };
+
+  const getClassName = (subject: Subject) =>
+    resolveSubjectClass(subject)?.name || 'No Class';
+
+  const getClassGrade = (subject: Subject) =>
+    resolveSubjectClass(subject)?.grade || '';
+
+  const getClassId = (subject: Subject) =>
+    resolveSubjectClass(subject)?.id || null;
 
   useEffect(() => {
     const token = localStorage.getItem('accessToken');
@@ -870,28 +894,33 @@ export default function TeachersPage() {
                                 // Remove duplicates based on subject.id and class.id combination
                                 index === self.findIndex(t => 
                                   t.subject.id === ts.subject.id && 
-                                  t.subject.class?.id === ts.subject.class?.id
+                                  getClassId(t.subject) === getClassId(ts.subject)
                                 )
                               )
-                              .map((ts) => (
-                              <div
-                                key={ts.id}
-                                className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-teal-100 text-teal-800 group"
-                              >
-                                <span title={ts.subject.class?.grade ? `Grade: ${ts.subject.class.grade}` : ''}>
-                                  {ts.subject.name} - {ts.subject.class?.name || 'No Class'}
-                                </span>
-                                <button
-                                  onClick={() => handleDeleteAssignment(teacher.id, ts.id, ts.subject.name, `${teacher.user.firstName} ${teacher.user.lastName}`)}
-                                  className="opacity-0 group-hover:opacity-100 transition-opacity duration-200 hover:bg-teal-200 rounded-full p-0.5"
-                                  title={`Remove ${ts.subject.name} assignment`}
-                                >
-                                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                                  </svg>
-                                </button>
-                              </div>
-                            ))
+                              .map((ts) => {
+                                const subjectClass = resolveSubjectClass(ts.subject);
+                                const className = subjectClass?.name || 'No Class';
+                                const gradeTooltip = subjectClass?.grade ? `Grade: ${subjectClass.grade}` : undefined;
+                                return (
+                                  <div
+                                    key={ts.id}
+                                    className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-teal-100 text-teal-800 group"
+                                  >
+                                    <span title={gradeTooltip}>
+                                      {ts.subject.name} - {className}
+                                    </span>
+                                    <button
+                                      onClick={() => handleDeleteAssignment(teacher.id, ts.id, ts.subject.name, `${teacher.user.firstName} ${teacher.user.lastName}`)}
+                                      className="opacity-0 group-hover:opacity-100 transition-opacity duration-200 hover:bg-teal-200 rounded-full p-0.5"
+                                      title={`Remove ${ts.subject.name} assignment`}
+                                    >
+                                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                      </svg>
+                                    </button>
+                                  </div>
+                                );
+                              })
                           ) : (
                             <span className="text-xs text-gray-400 italic">No subjects assigned</span>
                           )}
@@ -988,34 +1017,39 @@ export default function TeachersPage() {
                             // Remove duplicates based on subject.id and class.id combination
                             index === self.findIndex(t => 
                               t.subject.id === ts.subject.id && 
-                              t.subject.class?.id === ts.subject.class?.id
+                              getClassId(t.subject) === getClassId(ts.subject)
                             )
                           )
-                          .map((ts) => (
-                          <div
-                            key={ts.id}
-                            className="flex items-center justify-between bg-teal-50 rounded-lg p-3 border border-teal-200 group hover:bg-teal-100 transition-colors"
-                          >
-                            <div className="flex-1 min-w-0">
-                              <div className="font-medium text-teal-900 text-sm">
-                                {ts.subject.name}
+                          .map((ts) => {
+                            const subjectClass = resolveSubjectClass(ts.subject);
+                            const className = subjectClass?.name || 'No Class';
+                            const gradeLabel = subjectClass?.grade ? ` • Grade: ${subjectClass.grade}` : '';
+                            return (
+                              <div
+                                key={ts.id}
+                                className="flex items-center justify-between bg-teal-50 rounded-lg p-3 border border-teal-200 group hover:bg-teal-100 transition-colors"
+                              >
+                                <div className="flex-1 min-w-0">
+                                  <div className="font-medium text-teal-900 text-sm">
+                                    {ts.subject.name}
+                                  </div>
+                                  <div className="text-xs text-teal-700">
+                                    Class: {className}
+                                    {gradeLabel}
+                                  </div>
+                                </div>
+                                <button
+                                  onClick={() => handleDeleteAssignment(teacher.id, ts.id, ts.subject.name, `${teacher.user.firstName} ${teacher.user.lastName}`)}
+                                  className="ml-2 p-1.5 text-teal-600 hover:text-red-600 hover:bg-red-100 rounded-full transition-colors"
+                                  title={`Remove ${ts.subject.name} assignment`}
+                                >
+                                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                  </svg>
+                                </button>
                               </div>
-                              <div className="text-xs text-teal-700">
-                                Class: {ts.subject.class?.name || 'No Class'}
-                                {ts.subject.class?.grade && ` • Grade: ${ts.subject.class.grade}`}
-                              </div>
-                            </div>
-                            <button
-                              onClick={() => handleDeleteAssignment(teacher.id, ts.id, ts.subject.name, `${teacher.user.firstName} ${teacher.user.lastName}`)}
-                              className="ml-2 p-1.5 text-teal-600 hover:text-red-600 hover:bg-red-100 rounded-full transition-colors"
-                              title={`Remove ${ts.subject.name} assignment`}
-                            >
-                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                              </svg>
-                            </button>
-                          </div>
-                        ))
+                            );
+                          })
                       ) : (
                         <div className="text-center py-4 text-gray-400">
                           <svg className="w-8 h-8 mx-auto mb-2 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1146,20 +1180,20 @@ export default function TeachersPage() {
                         // Remove duplicates based on subject.id and class.id combination
                         index === self.findIndex(t => 
                           t.subject.id === ts.subject.id && 
-                          t.subject.class?.id === ts.subject.class?.id
+                          getClassId(t.subject) === getClassId(ts.subject)
                         )
                       )
                       .map((ts) => (
                       <div key={ts.id} className="flex items-center justify-between bg-teal-50 p-3 rounded-lg border border-teal-200">
                         <div className="flex-1">
                           <div className="font-medium text-gray-900">
-                            {ts.subject.name} - {ts.subject.class?.name || 'No Class'}
+                            {ts.subject.name} - {getClassName(ts.subject)}
                           </div>
                           {ts.subject.code && (
                             <div className="text-xs text-gray-600">Code: {ts.subject.code}</div>
                           )}
-                          {ts.subject.class?.grade && (
-                            <div className="text-xs text-gray-600">Grade: {ts.subject.class.grade}</div>
+                          {getClassGrade(ts.subject) && (
+                            <div className="text-xs text-gray-600">Grade: {getClassGrade(ts.subject)}</div>
                           )}
                         </div>
                         <div className="flex items-center gap-2">
@@ -1480,10 +1514,10 @@ export default function TeachersPage() {
                     <div>
                       <h4 className="font-medium text-blue-900">Current Assignment</h4>
                       <p className="text-blue-700 text-sm">{editingAssignment.subject.name}</p>
-                      {editingAssignment.subject.class && (
+                      {resolveSubjectClass(editingAssignment.subject) && (
                         <p className="text-blue-600 text-xs">
-                          Class: {editingAssignment.subject.class.name}
-                          {editingAssignment.subject.class.grade && ` - ${editingAssignment.subject.class.grade}`}
+                          Class: {getClassName(editingAssignment.subject)}
+                          {getClassGrade(editingAssignment.subject) && ` - ${getClassGrade(editingAssignment.subject)}`}
                         </p>
                       )}
                     </div>

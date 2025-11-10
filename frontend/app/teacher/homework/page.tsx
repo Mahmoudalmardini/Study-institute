@@ -139,11 +139,19 @@ export default function TeacherHomeworkPage() {
 
       const buildFileUrl = (u: string): string => {
         if (/^https?:\/\//i.test(u)) return u;
-        const cleaned = u.replace(/^\.\/?/, '');
-        // For uploaded files, use the base URL without /api prefix
-        // because ServeStaticModule serves files at /uploads (not /api/uploads)
-        const baseUrl = process.env.NEXT_PUBLIC_API_URL?.replace(/\/api$/, '') || 'http://localhost:3001';
-        return `${baseUrl}/${cleaned}`;
+        const baseUrl =
+          process.env.NEXT_PUBLIC_API_URL?.replace(/\/api$/, '') ||
+          'http://localhost:3001';
+
+        const cleaned = u
+          .replace(/^\.\/?/, '')
+          .replace(/^\/+/, '');
+
+        const withUploads = cleaned.startsWith('uploads/')
+          ? cleaned
+          : `uploads/${cleaned}`;
+
+        return `${baseUrl}/${withUploads}`;
       };
 
       const fileNameFrom = (u: string): string => {

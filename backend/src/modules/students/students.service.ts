@@ -75,7 +75,10 @@ export class StudentsService {
 
     // Enroll student in subjects if provided
     if (subjectIds && subjectIds.length > 0) {
-      await this.enrollSubjects(student.id, subjectIds, user.id);
+      const subjectsForEnrollment = subjectIds.map(subjectId => ({
+        subjectId,
+      }));
+      await this.enrollSubjects(student.id, subjectsForEnrollment, user.id);
     }
 
     return this.findOne(student.id);
@@ -308,14 +311,24 @@ export class StudentsService {
     }
 
     // Validate teachers if provided
-    const teacherIds = subjects.filter(s => s.teacherId).map(s => s.teacherId!);
-    if (teacherIds.length > 0) {
+    const teacherIds = subjects
+      .filter(s => s.teacherId && s.teacherId.trim())
+      .map(s => s.teacherId!.trim());
+    
+    // Remove duplicates for validation
+    const uniqueTeacherIds = [...new Set(teacherIds)];
+    
+    if (uniqueTeacherIds.length > 0) {
       const teachers = await this.prisma.teacher.findMany({
-        where: { id: { in: teacherIds } },
+        where: { id: { in: uniqueTeacherIds } },
       });
 
-      if (teachers.length !== teacherIds.length) {
-        throw new NotFoundException('One or more teachers not found');
+      if (teachers.length !== uniqueTeacherIds.length) {
+        const foundIds = new Set(teachers.map(t => t.id));
+        const missingIds = uniqueTeacherIds.filter(id => !foundIds.has(id));
+        throw new NotFoundException(
+          `One or more teachers not found. Missing teacher IDs: ${missingIds.join(', ')}`
+        );
       }
 
       // Validate that teachers are assigned to the corresponding subjects
@@ -642,7 +655,7 @@ export class StudentsService {
           .filter(cs => cs.subjectId === ss.subject.id)
           .map(cs => ({ class: cs.class })),
         teachers: teacherSubjects
-          .filter(ts => ts.subjectId === ss.subject.id)
+          .filter(ts => ts.subjectId === ss.subjectId)
           .map(ts => ({ teacher: ts.teacher })),
       },
     }));
