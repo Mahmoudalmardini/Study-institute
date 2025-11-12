@@ -97,7 +97,8 @@
     "name": "Name",
     "actions": "Actions",
     "loading": "Loading...",
-    "confirmDelete": "Are you sure you want to delete this subject?"
+    "confirmDelete": "Are you sure you want to delete this subject?",
+    "monthlyCost": "Monthly Cost"
   },
   "teacher": {
     "title": "Teacher Dashboard",
@@ -317,7 +318,19 @@
     "filterByStatus": "Filter by Status",
     "allMonths": "All Months",
     "allYears": "All Years",
-    "allStatuses": "All Statuses"
+    "allStatuses": "All Statuses",
+    "outstandingAmountLabel": "Outstanding Amount",
+    "totalOutstandingBalanceLabel": "Total Outstanding Balance",
+    "paymentAmountExceedsError": "Payment amount cannot exceed outstanding amount ({amount})",
+    "discountAmountExceedsError": "Discount amount cannot exceed total outstanding balance ({amount})",
+    "invalidPaymentAmount": "Please enter a valid payment amount",
+    "invalidDiscountAmount": "Please enter a valid discount amount",
+    "outstandingLabel": "Outstanding",
+    "currentLabel": "Current",
+    "monthWithOutstanding": "month with outstanding balance",
+    "monthsWithOutstanding": "months with outstanding balance",
+    "failedToLoad": "Failed to load installments",
+    "monthNames": ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"]
   },
   "messages": {
     "logoutConfirm": "Are you sure you want to logout?"

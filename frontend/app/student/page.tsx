@@ -196,12 +196,12 @@ export default function StudentDashboard() {
                   <p className="text-sm text-gray-600 mb-2">{t.student.myInstallmentsDesc || 'View monthly payments and outstanding balance'}</p>
                   {outstanding && parseFloat(outstanding.totalOutstanding || '0') > 0 && (
                     <p className="text-sm font-semibold text-red-600">
-                      Outstanding: {parseFloat(outstanding.totalOutstanding || '0').toFixed(2)}
+                      {t.installments?.outstandingLabel || 'Outstanding'}: {parseFloat(outstanding.totalOutstanding || '0').toFixed(2)}
                     </p>
                   )}
                   {currentMonth && (
                     <p className="text-sm text-gray-500">
-                      Current: {parseFloat(currentMonth.installment?.totalAmount || '0').toFixed(2)}
+                      {t.installments?.currentLabel || 'Current'}: {parseFloat(currentMonth.installment?.totalAmount || '0').toFixed(2)}
                     </p>
                   )}
                 </div>

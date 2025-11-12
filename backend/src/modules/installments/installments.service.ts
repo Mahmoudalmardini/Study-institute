@@ -33,7 +33,11 @@ export class InstallmentsService {
     }
 
     // Get start and end of target month
+    // month parameter is 1-12, JavaScript Date uses 0-11 for months
     const monthStart = new Date(year, month - 1, 1);
+    // To get last day of month (1-12), use month+1: new Date(year, month+1, 0)
+    // new Date(year, month, 0) gives last day of (month-1), so we need month+1 to get last day of target month
+    // Example: month=5 (May) -> new Date(2025, 6, 0) = May 31, 2025
     const monthEnd = new Date(year, month, 0, 23, 59, 59, 999);
 
     // Get all subjects the student is enrolled in
@@ -67,15 +71,19 @@ export class InstallmentsService {
     for (const studentSubject of studentSubjects) {
       // Only include if enrolled during or before this month
       if (studentSubject.enrolledAt <= monthEnd) {
-        const installment = studentSubject.subject.monthlyInstallment || 0;
-        if (installment > 0) {
-          totalAmount = totalAmount.add(installment);
-          subjectBreakdown.push({
-            subjectId: studentSubject.subject.id,
-            subjectName: studentSubject.subject.name,
-            amount: new Prisma.Decimal(installment),
-            enrolledAt: studentSubject.enrolledAt,
-          });
+        // monthlyInstallment is a Prisma Decimal, convert it properly
+        const installmentDecimal = studentSubject.subject.monthlyInstallment;
+        if (installmentDecimal) {
+          const installmentAmount = new Prisma.Decimal(installmentDecimal);
+          if (installmentAmount.gt(0)) {
+            totalAmount = totalAmount.add(installmentAmount);
+            subjectBreakdown.push({
+              subjectId: studentSubject.subject.id,
+              subjectName: studentSubject.subject.name,
+              amount: installmentAmount,
+              enrolledAt: studentSubject.enrolledAt,
+            });
+          }
         }
       }
     }
@@ -96,7 +104,7 @@ export class InstallmentsService {
     );
 
     let outstandingFromPrevious = new Prisma.Decimal(0);
-    if (previousInstallment && previousInstallment.outstandingAmount > 0) {
+    if (previousInstallment && previousInstallment.outstandingAmount.gt(0)) {
       outstandingFromPrevious = previousInstallment.outstandingAmount;
       totalAmount = totalAmount.add(outstandingFromPrevious);
     }
@@ -141,6 +149,7 @@ export class InstallmentsService {
     }
 
     // Update or create installment
+    // Always create/update installment even if totalAmount is 0 (student might have subjects without installments yet)
     const installment = await this.prisma.studentInstallment.upsert({
       where: {
         studentId_month_year: {
@@ -160,7 +169,7 @@ export class InstallmentsService {
         month,
         year,
         totalAmount,
-        paidAmount,
+        paidAmount: paidAmount || new Prisma.Decimal(0),
         discountAmount,
         outstandingAmount: outstandingAmount.gte(0) ? outstandingAmount : new Prisma.Decimal(0),
         status,
@@ -184,7 +193,7 @@ export class InstallmentsService {
     month: number,
     year: number,
   ) {
-    return this.prisma.studentInstallment.findUnique({
+    const existing = await this.prisma.studentInstallment.findUnique({
       where: {
         studentId_month_year: {
           studentId,
@@ -192,7 +201,13 @@ export class InstallmentsService {
           year,
         },
       },
-    }) || {
+    });
+    
+    if (existing) {
+      return existing;
+    }
+    
+    return {
       studentId,
       month,
       year,
@@ -212,8 +227,10 @@ export class InstallmentsService {
       where: { id: studentId },
     });
 
+    // Return empty array if student doesn't exist (instead of 404)
+    // This allows the frontend to handle missing students gracefully
     if (!student) {
-      throw new NotFoundException(`Student with ID ${studentId} not found`);
+      return [];
     }
 
     const where: Prisma.StudentInstallmentWhereInput = { studentId };
@@ -268,6 +285,18 @@ export class InstallmentsService {
     if (!student) {
       throw new NotFoundException(
         `Student with ID ${createDiscountDto.studentId} not found`,
+      );
+    }
+
+    // Get total outstanding balance
+    const outstandingBalance = await this.getOutstandingBalance(createDiscountDto.studentId);
+    const totalOutstanding = new Prisma.Decimal(outstandingBalance.totalOutstanding);
+    const discountAmount = new Prisma.Decimal(createDiscountDto.amount);
+
+    // Validate discount amount doesn't exceed total outstanding
+    if (discountAmount.gt(totalOutstanding)) {
+      throw new BadRequestException(
+        `Discount amount (${discountAmount.toString()}) cannot exceed total outstanding balance (${totalOutstanding.toString()})`,
       );
     }
 
@@ -356,6 +385,14 @@ export class InstallmentsService {
       );
     }
 
+    // Validate payment amount doesn't exceed outstanding amount
+    const paymentAmount = new Prisma.Decimal(createPaymentDto.amount);
+    if (paymentAmount.gt(installment.outstandingAmount)) {
+      throw new BadRequestException(
+        `Payment amount (${paymentAmount.toString()}) cannot exceed outstanding amount (${installment.outstandingAmount.toString()})`,
+      );
+    }
+
     // Create payment record
     const payment = await this.prisma.paymentRecord.create({
       data: {
@@ -404,8 +441,14 @@ export class InstallmentsService {
       where: { id: studentId },
     });
 
+    // Return empty data if student doesn't exist (instead of 404)
+    // This allows the frontend to handle missing students gracefully
     if (!student) {
-      throw new NotFoundException(`Student with ID ${studentId} not found`);
+      return {
+        totalOutstanding: '0',
+        installments: [],
+        count: 0,
+      };
     }
 
     const installments = await this.prisma.studentInstallment.findMany({

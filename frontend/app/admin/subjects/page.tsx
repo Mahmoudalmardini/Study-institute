@@ -302,11 +302,15 @@ export default function SubjectsPage() {
                   Monthly Installment Amount
                 </label>
                 <input
-                  type="number"
-                  step="0.01"
-                  min="0"
+                  type="text"
                   value={formData.monthlyInstallment}
-                  onChange={(e) => setFormData({ ...formData, monthlyInstallment: e.target.value })}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    // Allow only numbers and decimal point
+                    if (value === '' || /^\d*\.?\d*$/.test(value)) {
+                      setFormData({ ...formData, monthlyInstallment: value });
+                    }
+                  }}
                   className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-teal-500 focus:border-transparent transition-all"
                   placeholder="0.00"
                 />
@@ -384,6 +388,31 @@ export default function SubjectsPage() {
               
               {subject.description && (
                 <p className="text-sm text-gray-500 mb-4 line-clamp-2">{subject.description}</p>
+              )}
+              
+              {/* Monthly Cost Badge */}
+              {subject.monthlyInstallment !== null && subject.monthlyInstallment !== undefined && (
+                <div className={`mb-4 p-3 rounded-lg border ${
+                  parseFloat(String(subject.monthlyInstallment || 0)) > 0
+                    ? 'bg-gradient-to-br from-blue-50 to-blue-100 border-blue-200'
+                    : 'bg-gradient-to-br from-amber-50 to-amber-100 border-amber-200'
+                }`}>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <svg className={`w-5 h-5 ${parseFloat(String(subject.monthlyInstallment || 0)) > 0 ? 'text-blue-600' : 'text-amber-600'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                      <span className="text-sm font-medium text-gray-700">{t.subjects?.monthlyCost || 'Monthly Cost'}</span>
+                    </div>
+                    <span className={`text-lg font-bold ${
+                      parseFloat(String(subject.monthlyInstallment || 0)) > 0 ? 'text-blue-700' : 'text-amber-700'
+                    }`}>
+                      {typeof subject.monthlyInstallment === 'number' 
+                        ? subject.monthlyInstallment.toFixed(2) 
+                        : parseFloat(String(subject.monthlyInstallment || 0)).toFixed(2)}
+                    </span>
+                  </div>
+                </div>
               )}
               
               <div className="flex gap-4 pt-4 border-t border-gray-100">

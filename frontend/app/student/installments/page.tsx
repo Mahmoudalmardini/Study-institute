@@ -22,20 +22,7 @@ interface User {
   role: string;
 }
 
-const monthNames = [
-  'January',
-  'February',
-  'March',
-  'April',
-  'May',
-  'June',
-  'July',
-  'August',
-  'September',
-  'October',
-  'November',
-  'December',
-];
+// Month names will be loaded from localization
 
 const getStatusColor = (status: InstallmentStatus) => {
   switch (status) {
@@ -104,7 +91,7 @@ export default function StudentInstallmentsPage() {
         router.push('/login');
         return;
       }
-      setError(err?.response?.data?.message || 'Failed to load installments');
+      setError(err?.response?.data?.message || t.installments?.failedToLoad || 'Failed to load installments');
     } finally {
       setLoading(false);
     }
@@ -205,8 +192,9 @@ export default function StudentInstallmentsPage() {
                     </p>
                     <p className="text-sm text-gray-500 mt-2">
                       {outstanding?.count || 0}{' '}
-                      {outstanding?.count === 1 ? 'month' : 'months'} with
-                      outstanding balance
+                      {outstanding?.count === 1 
+                        ? (t.installments?.monthWithOutstanding || 'month with outstanding balance')
+                        : (t.installments?.monthsWithOutstanding || 'months with outstanding balance')}
                     </p>
                   </div>
                   <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center">
@@ -242,7 +230,7 @@ export default function StudentInstallmentsPage() {
                         )}
                       </p>
                       <p className="text-sm text-gray-500 mt-2">
-                        {monthNames[new Date().getMonth()]}{' '}
+                        {(t.installments?.monthNames as string[])?.[new Date().getMonth()] || ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'][new Date().getMonth()]}{' '}
                         {new Date().getFullYear()}
                       </p>
                     </div>
@@ -311,7 +299,7 @@ export default function StudentInstallmentsPage() {
                         <div className="flex-1">
                           <div className="flex items-center gap-3 mb-2">
                             <h3 className="text-lg font-semibold text-gray-900">
-                              {monthNames[installment.month - 1]}{' '}
+                              {(t.installments?.monthNames as string[])?.[installment.month - 1] || ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'][installment.month - 1]}{' '}
                               {installment.year}
                             </h3>
                             <span

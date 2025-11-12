@@ -9,6 +9,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { CreateStudentDto } from './dto/create-student.dto';
 import { UpdateStudentDto } from './dto/update-student.dto';
 import { InstallmentsService } from '../installments/installments.service';
+import { Prisma } from '@prisma/client';
 
 @Injectable()
 export class StudentsService {
@@ -462,17 +463,70 @@ export class StudentsService {
       }),
     );
 
-    // Trigger installment recalculation for current month
+    // Automatically create installments for enrolled subjects
+    // Calculate for the enrollment month and current month if different
     try {
       const now = new Date();
-      await this.installmentsService.calculateMonthlyInstallment(
-        studentId,
-        now.getMonth() + 1,
-        now.getFullYear(),
-      );
+      const currentMonth = now.getMonth() + 1;
+      const currentYear = now.getFullYear();
+
+      // Check if any enrolled subjects have monthly installments
+      const enrolledSubjects = await this.prisma.studentSubject.findMany({
+        where: { studentId },
+        include: {
+          subject: {
+            select: {
+              id: true,
+              monthlyInstallment: true,
+            },
+          },
+        },
+      });
+
+      const hasInstallments = enrolledSubjects.some((es) => {
+        if (!es.subject.monthlyInstallment) return false;
+        // Handle Prisma Decimal properly
+        const amount = new Prisma.Decimal(es.subject.monthlyInstallment);
+        return amount.gt(0);
+      });
+
+      if (hasInstallments) {
+        // Calculate for current month
+        await this.installmentsService.calculateMonthlyInstallment(
+          studentId,
+          currentMonth,
+          currentYear,
+        );
+
+        // Also calculate for enrollment month if different from current month
+        // Use the earliest enrollment date from the newly enrolled subjects
+        const enrollmentDates = enrollments
+          .map((e) => e.enrolledAt || e.createdAt)
+          .filter((d) => d)
+          .map((d) => new Date(d));
+
+        if (enrollmentDates.length > 0) {
+          const earliestEnrollment = new Date(Math.min(...enrollmentDates.map((d) => d.getTime())));
+          const enrollmentMonth = earliestEnrollment.getMonth() + 1;
+          const enrollmentYear = earliestEnrollment.getFullYear();
+
+          // Only calculate for enrollment month if it's different from current month
+          if (enrollmentMonth !== currentMonth || enrollmentYear !== currentYear) {
+            await this.installmentsService.calculateMonthlyInstallment(
+              studentId,
+              enrollmentMonth,
+              enrollmentYear,
+            );
+          }
+        }
+      }
     } catch (error) {
       // Log error but don't fail enrollment if installment calculation fails
-      console.error('Error recalculating installments after enrollment:', error);
+      console.error('Error creating installments after enrollment:', error);
+      // Re-throw only if it's a critical error (not a validation error)
+      if (error instanceof Error && !error.message.includes('not found')) {
+        console.warn('Installment calculation failed, but enrollment succeeded:', error.message);
+      }
     }
 
     return enrollments;
@@ -598,6 +652,7 @@ export class StudentsService {
             name: true,
             code: true,
             description: true,
+            monthlyInstallment: true, // Include monthlyInstallment for installment calculations
             classId: true,
             class: {
               select: {
@@ -666,18 +721,43 @@ export class StudentsService {
       },
     });
 
-    // Combine the data
-    return studentSubjects.map(ss => ({
-      ...ss,
-      subject: {
-        ...ss.subject,
-        classSubjects: classSubjects
-          .filter(cs => cs.subjectId === ss.subject.id)
-          .map(cs => ({ class: cs.class })),
-        teachers: teacherSubjects
-          .filter(ts => ts.subjectId === ss.subjectId)
-          .map(ts => ({ teacher: ts.teacher })),
-      },
-    }));
+    // Combine the data and convert Prisma Decimal to number for JSON serialization
+    return studentSubjects.map(ss => {
+      let monthlyInstallment: number | null = null;
+      const monthlyInstallmentValue = ss.subject.monthlyInstallment;
+      if (monthlyInstallmentValue !== null && monthlyInstallmentValue !== undefined) {
+        // Convert Prisma Decimal to number
+        if (monthlyInstallmentValue instanceof Prisma.Decimal) {
+          monthlyInstallment = monthlyInstallmentValue.toNumber();
+        } else if (typeof monthlyInstallmentValue === 'number') {
+          monthlyInstallment = monthlyInstallmentValue;
+        } else if (typeof monthlyInstallmentValue === 'string') {
+          monthlyInstallment = parseFloat(monthlyInstallmentValue);
+        } else if (typeof monthlyInstallmentValue === 'object' && monthlyInstallmentValue !== null && 'toString' in monthlyInstallmentValue) {
+          monthlyInstallment = parseFloat(String(monthlyInstallmentValue));
+        } else {
+          monthlyInstallment = parseFloat(String(monthlyInstallmentValue));
+        }
+        
+        // Handle NaN
+        if (isNaN(monthlyInstallment)) {
+          monthlyInstallment = null;
+        }
+      }
+      
+      return {
+        ...ss,
+        subject: {
+          ...ss.subject,
+          monthlyInstallment,
+          classSubjects: classSubjects
+            .filter(cs => cs.subjectId === ss.subject.id)
+            .map(cs => ({ class: cs.class })),
+          teachers: teacherSubjects
+            .filter(ts => ts.subjectId === ss.subjectId)
+            .map(ts => ({ teacher: ts.teacher })),
+        },
+      };
+    });
   }
 }

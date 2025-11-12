@@ -97,7 +97,8 @@
     "name": "الاسم",
     "actions": "الإجراءات",
     "loading": "جاري التحميل...",
-    "confirmDelete": "هل أنت متأكد من حذف هذه المادة؟"
+    "confirmDelete": "هل أنت متأكد من حذف هذه المادة؟",
+    "monthlyCost": "التكلفة الشهرية"
   },
   "teacher": {
     "title": "لوحة تحكم المعلم",
@@ -317,7 +318,19 @@
     "filterByStatus": "تصفية حسب الحالة",
     "allMonths": "جميع الأشهر",
     "allYears": "جميع السنوات",
-    "allStatuses": "جميع الحالات"
+    "allStatuses": "جميع الحالات",
+    "outstandingAmountLabel": "المبلغ المستحق",
+    "totalOutstandingBalanceLabel": "إجمالي الرصيد المستحق",
+    "paymentAmountExceedsError": "لا يمكن أن يتجاوز مبلغ الدفعة المبلغ المستحق ({amount})",
+    "discountAmountExceedsError": "لا يمكن أن يتجاوز مبلغ الخصم إجمالي الرصيد المستحق ({amount})",
+    "invalidPaymentAmount": "يرجى إدخال مبلغ دفعة صحيح",
+    "invalidDiscountAmount": "يرجى إدخال مبلغ خصم صحيح",
+    "outstandingLabel": "المستحق",
+    "currentLabel": "الحالي",
+    "monthWithOutstanding": "شهر برصيد مستحق",
+    "monthsWithOutstanding": "أشهر برصيد مستحق",
+    "failedToLoad": "فشل تحميل الأقساط",
+    "monthNames": ["يناير", "فبراير", "مارس", "أبريل", "مايو", "يونيو", "يوليو", "أغسطس", "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر"]
   },
   "messages": {
     "logoutConfirm": "هل أنت متأكد من تسجيل الخروج؟"
