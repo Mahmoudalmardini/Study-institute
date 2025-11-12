@@ -97,6 +97,7 @@ export interface Subject {
   name: string;
   code: string;
   description?: string;
+  monthlyInstallment?: number;
   classId?: string;
   class?: Class;
   createdAt: string;
@@ -298,5 +299,74 @@ export interface MonthlyPayrollRecord {
   totalEntitlement: number | string;
   createdAt: string;
   updatedAt: string;
+}
+
+// Installment types
+export enum InstallmentStatus {
+  PENDING = 'PENDING',
+  PARTIAL = 'PARTIAL',
+  PAID = 'PAID',
+  OVERDUE = 'OVERDUE',
+}
+
+export interface StudentDiscount {
+  id: string;
+  studentId: string;
+  student?: Student;
+  amount: number | string;
+  reason?: string;
+  isActive: boolean;
+  createdBy: string;
+  cancelledAt?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface StudentInstallment {
+  id: string;
+  studentId: string;
+  student?: Student;
+  month: number;
+  year: number;
+  totalAmount: number | string;
+  paidAmount: number | string;
+  outstandingAmount: number | string;
+  discountAmount: number | string;
+  status: InstallmentStatus;
+  createdAt: string;
+  updatedAt: string;
+  payments?: PaymentRecord[];
+}
+
+export interface PaymentRecord {
+  id: string;
+  studentId: string;
+  student?: Student;
+  installmentId: string;
+  installment?: {
+    month: number;
+    year: number;
+  };
+  amount: number | string;
+  paymentDate: string;
+  paymentMethod?: string;
+  notes?: string;
+  recordedBy: string;
+  createdAt: string;
+}
+
+export interface CreateDiscountDto {
+  studentId: string;
+  amount: number;
+  reason?: string;
+}
+
+export interface CreatePaymentDto {
+  studentId: string;
+  installmentId: string;
+  amount: number;
+  paymentDate: string;
+  paymentMethod?: string;
+  notes?: string;
 }
 

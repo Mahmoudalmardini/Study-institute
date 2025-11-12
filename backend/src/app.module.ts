@@ -25,6 +25,7 @@ import { AllExceptionsFilter } from './common/filters/http-exception.filter';
 import { TransformInterceptor } from './common/interceptors/transform.interceptor';
 import { PointsModule } from './modules/points/points.module';
 import { PayrollModule } from './modules/payroll/payroll.module';
+import { InstallmentsModule } from './modules/installments/installments.module';
 
 @Module({
   imports: [
@@ -60,6 +61,7 @@ import { PayrollModule } from './modules/payroll/payroll.module';
     TeachersModule,
     PointsModule,
     PayrollModule,
+    InstallmentsModule,
   ],
   controllers: [AppController],
   providers: [

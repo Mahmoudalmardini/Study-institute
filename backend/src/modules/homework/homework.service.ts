@@ -958,13 +958,7 @@ export class HomeworkService {
             class: true,
             classSubjects: {
               include: {
-                class: {
-                  select: {
-                    id: true,
-                    name: true,
-                    grade: true,
-                  },
-                },
+                class: true,
               },
             },
             teachers: {

@@ -167,3 +167,61 @@ export async function getStudentSubjects(studentId: string) {
   return apiClient.get(`/students/${studentId}/subjects`);
 }
 
+// Installments API
+export async function getStudentInstallments(studentId: string, year?: number) {
+  const params = year ? { year } : undefined;
+  return apiClient.get(`/installments/student/${studentId}`, { params });
+}
+
+export async function getStudentOutstandingBalance(studentId: string) {
+  return apiClient.get(`/installments/student/${studentId}/outstanding`);
+}
+
+export async function calculateInstallment(
+  studentId: string,
+  month: number,
+  year: number,
+) {
+  return apiClient.post(`/installments/student/${studentId}/calculate`, {
+    month,
+    year,
+  });
+}
+
+export async function createDiscount(data: {
+  studentId: string;
+  amount: number;
+  reason?: string;
+}) {
+  return apiClient.post('/installments/discounts', data);
+}
+
+export async function cancelDiscount(discountId: string) {
+  return apiClient.delete(`/installments/discounts/${discountId}`);
+}
+
+export async function recordPayment(data: {
+  studentId: string;
+  installmentId: string;
+  amount: number;
+  paymentDate: string;
+  paymentMethod?: string;
+  notes?: string;
+}) {
+  return apiClient.post('/installments/payments', data);
+}
+
+// Student endpoints
+export async function getMyInstallments(year?: number) {
+  const params = year ? { year } : undefined;
+  return apiClient.get('/installments/my-installments', { params });
+}
+
+export async function getMyOutstanding() {
+  return apiClient.get('/installments/my-outstanding');
+}
+
+export async function getMyCurrentMonthInstallment() {
+  return apiClient.get('/installments/my-current-month');
+}
+

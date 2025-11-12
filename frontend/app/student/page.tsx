@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useI18n } from '@/lib/i18n-context';
 import SettingsMenu from '@/components/SettingsMenu';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
+import { getMyOutstanding, getMyCurrentMonthInstallment } from '@/lib/api-client';
 
 interface User {
   name: string;
@@ -16,6 +17,8 @@ export default function StudentDashboard() {
   const { t } = useI18n();
   const [user, setUser] = useState<User | null>(null);
   const [mounted, setMounted] = useState(false);
+  const [outstanding, setOutstanding] = useState<any>(null);
+  const [currentMonth, setCurrentMonth] = useState<any>(null);
 
   useEffect(() => {
     const token = localStorage.getItem('accessToken');
@@ -25,8 +28,24 @@ export default function StudentDashboard() {
     }
 
     setUser({ name: 'Student', role: 'STUDENT' });
+    fetchInstallmentSummary();
     setMounted(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [router]);
+
+  const fetchInstallmentSummary = async () => {
+    try {
+      const [outstandingData, currentMonthData] = await Promise.all([
+        getMyOutstanding(),
+        getMyCurrentMonthInstallment(),
+      ]);
+      setOutstanding(outstandingData || { totalOutstanding: '0' });
+      setCurrentMonth(currentMonthData || null);
+    } catch (err) {
+      // Silently fail - installments are optional
+      console.error('Failed to load installment summary:', err);
+    }
+  };
 
   const handleLogout = () => {
     const confirmLogout = window.confirm(t.messages.logoutConfirm);
@@ -161,8 +180,39 @@ export default function StudentDashboard() {
               </div>
             </button>
 
+            {/* My Installments Card - Clickable */}
+            <button
+              onClick={() => router.push('/student/installments')}
+              className={`bg-white overflow-hidden rounded-xl hover-lift p-6 sm:p-7 border-2 border-emerald-100 hover:border-emerald-300 group text-start ${mounted ? 'animate-slide-up stagger-4' : 'opacity-0'}`}
+            >
+              <div className="flex items-start justify-between">
+                <div className="flex-1">
+                  <div className="w-12 h-12 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-lg flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+                    <svg className="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                  </div>
+                  <h3 className="text-xl font-bold text-gray-900 mb-2">{t.student.myInstallments || 'My Installments'}</h3>
+                  <p className="text-sm text-gray-600 mb-2">{t.student.myInstallmentsDesc || 'View monthly payments and outstanding balance'}</p>
+                  {outstanding && parseFloat(outstanding.totalOutstanding || '0') > 0 && (
+                    <p className="text-sm font-semibold text-red-600">
+                      Outstanding: {parseFloat(outstanding.totalOutstanding || '0').toFixed(2)}
+                    </p>
+                  )}
+                  {currentMonth && (
+                    <p className="text-sm text-gray-500">
+                      Current: {parseFloat(currentMonth.installment?.totalAmount || '0').toFixed(2)}
+                    </p>
+                  )}
+                </div>
+                <svg className="w-6 h-6 text-emerald-500 flex-shrink-0 ms-2 rtl:rotate-180 group-hover:translate-x-1 rtl:group-hover:-translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                </svg>
+              </div>
+            </button>
+
             {/* Announcements Card */}
-            <div className={`bg-white overflow-hidden rounded-xl hover-lift p-6 sm:p-7 border-2 border-pink-100 hover:border-pink-300 group ${mounted ? 'animate-slide-up stagger-4' : 'opacity-0'}`}>
+            <div className={`bg-white overflow-hidden rounded-xl hover-lift p-6 sm:p-7 border-2 border-pink-100 hover:border-pink-300 group ${mounted ? 'animate-slide-up stagger-5' : 'opacity-0'}`}>
               <div className="w-12 h-12 bg-gradient-to-br from-pink-500 to-rose-500 rounded-lg flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
                 <svg className="w-7 h-7 text-white" fill="currentColor" viewBox="0 0 20 20">
                   <path fillRule="evenodd" d="M18 3a1 1 0 00-1.447-.894L8.763 6H5a3 3 0 000 6h.28l1.771 5.316A1 1 0 008 18h1a1 1 0 001-1v-4.382l6.553 3.276A1 1 0 0018 15V3z" clipRule="evenodd" />
@@ -173,7 +223,7 @@ export default function StudentDashboard() {
             </div>
 
             {/* Evaluations Card */}
-            <div className={`bg-white overflow-hidden rounded-xl hover-lift p-6 sm:p-7 border-2 border-green-100 hover:border-green-300 group ${mounted ? 'animate-slide-up stagger-5' : 'opacity-0'}`}>
+            <div className={`bg-white overflow-hidden rounded-xl hover-lift p-6 sm:p-7 border-2 border-green-100 hover:border-green-300 group ${mounted ? 'animate-slide-up stagger-6' : 'opacity-0'}`}>
               <div className="w-12 h-12 gradient-success rounded-lg flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
                 <svg className="w-7 h-7 text-white" fill="currentColor" viewBox="0 0 20 20">
                   <path fillRule="evenodd" d="M6.267 3.455a3.066 3.066 0 001.745-.723 3.066 3.066 0 013.976 0 3.066 3.066 0 001.745.723 3.066 3.066 0 012.812 2.812c.051.643.304 1.254.723 1.745a3.066 3.066 0 010 3.976 3.066 3.066 0 00-.723 1.745 3.066 3.066 0 01-2.812 2.812 3.066 3.066 0 00-1.745.723 3.066 3.066 0 01-3.976 0 3.066 3.066 0 00-1.745-.723 3.066 3.066 0 01-2.812-2.812 3.066 3.066 0 00-.723-1.745 3.066 3.066 0 010-3.976 3.066 3.066 0 00.723-1.745 3.066 3.066 0 012.812-2.812zm7.44 5.252a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />

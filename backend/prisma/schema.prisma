@@ -57,6 +57,13 @@ enum HourRequestStatus {
   MODIFIED
 }
 
+enum InstallmentStatus {
+  PENDING
+  PARTIAL
+  PAID
+  OVERDUE
+}
+
 model User {
   id        String   @id @default(uuid())
   email     String   @unique
@@ -112,6 +119,9 @@ model Student {
   subjects      StudentSubject[]
   classes       StudentClass[]
   pointTransactions PointTransaction[]
+  discounts     StudentDiscount[]
+  installments  StudentInstallment[]
+  payments      PaymentRecord[]
 
   @@index([userId])
   @@index([classId])
@@ -164,14 +174,15 @@ model Class {
 }
 
 model Subject {
-  id          String   @id @default(uuid())
-  name        String
-  code        String?
-  description String?
-  classId     String?
-  class       Class?   @relation(fields: [classId], references: [id], onDelete: SetNull)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id                String   @id @default(uuid())
+  name              String
+  code              String?
+  description       String?
+  monthlyInstallment Decimal? @db.Decimal(10, 2)
+  classId           String?
+  class             Class?   @relation(fields: [classId], references: [id], onDelete: SetNull)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
 
   grades    Grade[]
   homework  Homework[]
@@ -507,4 +518,66 @@ model MonthlyPayrollRecord {
   @@index([teacherId])
   @@index([year, month])
   @@map("monthly_payroll_records")
+}
+
+model StudentDiscount {
+  id          String    @id @default(uuid())
+  studentId   String
+  student     Student   @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  amount      Decimal   @db.Decimal(10, 2)
+  reason      String?
+  isActive    Boolean   @default(true)
+  createdBy   String    // User ID of admin who created the discount
+  cancelledAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([studentId])
+  @@index([isActive])
+  @@index([createdBy])
+  @@map("student_discounts")
+}
+
+model StudentInstallment {
+  id               String           @id @default(uuid())
+  studentId         String
+  student           Student          @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  month             Int
+  year              Int
+  totalAmount       Decimal          @db.Decimal(10, 2)
+  paidAmount        Decimal          @default(0) @db.Decimal(10, 2)
+  outstandingAmount Decimal          @default(0) @db.Decimal(10, 2)
+  discountAmount    Decimal          @default(0) @db.Decimal(10, 2)
+  status            InstallmentStatus @default(PENDING)
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
+
+  payments PaymentRecord[]
+
+  @@unique([studentId, month, year])
+  @@index([studentId])
+  @@index([year, month])
+  @@index([status])
+  @@index([studentId, year, month])
+  @@map("student_installments")
+}
+
+model PaymentRecord {
+  id            String            @id @default(uuid())
+  studentId     String
+  student       Student           @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  installmentId String
+  installment   StudentInstallment @relation(fields: [installmentId], references: [id], onDelete: Cascade)
+  amount        Decimal           @db.Decimal(10, 2)
+  paymentDate   DateTime
+  paymentMethod String?
+  notes         String?
+  recordedBy    String            // User ID of admin who recorded the payment
+  createdAt     DateTime          @default(now())
+
+  @@index([studentId])
+  @@index([installmentId])
+  @@index([paymentDate])
+  @@index([recordedBy])
+  @@map("payment_records")
 }

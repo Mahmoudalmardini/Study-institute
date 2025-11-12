@@ -2,14 +2,21 @@ import {
   Injectable,
   NotFoundException,
   ConflictException,
+  Inject,
+  forwardRef,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateStudentDto } from './dto/create-student.dto';
 import { UpdateStudentDto } from './dto/update-student.dto';
+import { InstallmentsService } from '../installments/installments.service';
 
 @Injectable()
 export class StudentsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    @Inject(forwardRef(() => InstallmentsService))
+    private installmentsService: InstallmentsService,
+  ) {}
 
   async create(dto: CreateStudentDto) {
     const user = await this.prisma.user.findUnique({
@@ -454,6 +461,19 @@ export class StudentsService {
         });
       }),
     );
+
+    // Trigger installment recalculation for current month
+    try {
+      const now = new Date();
+      await this.installmentsService.calculateMonthlyInstallment(
+        studentId,
+        now.getMonth() + 1,
+        now.getFullYear(),
+      );
+    } catch (error) {
+      // Log error but don't fail enrollment if installment calculation fails
+      console.error('Error recalculating installments after enrollment:', error);
+    }
 
     return enrollments;
   }

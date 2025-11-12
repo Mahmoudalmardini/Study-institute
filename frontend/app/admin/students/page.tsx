@@ -5,7 +5,14 @@ import { useRouter } from 'next/navigation';
 import { useI18n } from '@/lib/i18n-context';
 import SettingsMenu from '@/components/SettingsMenu';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
-import apiClient from '@/lib/api-client';
+import apiClient, {
+  getStudentInstallments,
+  getStudentOutstandingBalance,
+  calculateInstallment,
+  createDiscount,
+  cancelDiscount,
+  recordPayment,
+} from '@/lib/api-client';
 import type { Class, Subject, StudentClass, StudentSubject } from '@/types';
 
 interface Student {
@@ -43,6 +50,21 @@ export default function StudentsPage() {
   const [teachersBySubject, setTeachersBySubject] = useState<Record<string, any[]>>({}); // subjectId -> teachers[]
   const [loadingTeachers, setLoadingTeachers] = useState<Record<string, boolean>>({});
   const [saving, setSaving] = useState(false);
+  const [activeTab, setActiveTab] = useState<'classes' | 'installments'>('classes');
+  const [installments, setInstallments] = useState<any[]>([]);
+  const [outstanding, setOutstanding] = useState<any>(null);
+  const [currentMonth, setCurrentMonth] = useState<any>(null);
+  const [showDiscountForm, setShowDiscountForm] = useState(false);
+  const [showPaymentForm, setShowPaymentForm] = useState(false);
+  const [discountForm, setDiscountForm] = useState({ amount: '', reason: '' });
+  const [paymentForm, setPaymentForm] = useState({ 
+    installmentId: '', 
+    amount: '', 
+    paymentDate: new Date().toISOString().split('T')[0], 
+    paymentMethod: '', 
+    notes: '' 
+  });
+  const [loadingInstallments, setLoadingInstallments] = useState(false);
 
   useEffect(() => {
     const token = localStorage.getItem('accessToken');
@@ -140,6 +162,26 @@ export default function StudentsPage() {
     }
   };
 
+  const fetchInstallmentsData = async (studentId: string) => {
+    if (!studentId || !studentId.startsWith) return; // Check if it's a valid ID format
+    try {
+      setLoadingInstallments(true);
+      const [installmentsData, outstandingData, currentMonthData] = await Promise.all([
+        getStudentInstallments(studentId),
+        getStudentOutstandingBalance(studentId),
+        calculateInstallment(studentId, new Date().getMonth() + 1, new Date().getFullYear()),
+      ]);
+      setInstallments(Array.isArray(installmentsData) ? installmentsData : []);
+      setOutstanding(outstandingData || { totalOutstanding: '0', count: 0 });
+      setCurrentMonth(currentMonthData || null);
+    } catch (err: any) {
+      console.error('Error fetching installments:', err);
+      setError('Failed to load installments data');
+    } finally {
+      setLoadingInstallments(false);
+    }
+  };
+
   const openStudentModal = async (student: Student) => {
     setShowModal(true);
     setModalLoading(true);
@@ -149,6 +191,7 @@ export default function StudentsPage() {
     setSelectedSubjectIds([]);
     setSubjectTeachers({});
     setTeachersBySubject({});
+    setActiveTab('classes');
     
     const token = localStorage.getItem('accessToken');
     
@@ -210,6 +253,8 @@ export default function StudentsPage() {
 
     // Fetch student's class and subjects if they have a profile
     if (studentProfile) {
+      // Fetch installments data
+      fetchInstallmentsData(studentProfile.id);
       try {
         // Fetch full student details
         const studentResponse = await fetch(
@@ -357,6 +402,19 @@ export default function StudentsPage() {
       }
 
       setSuccess('Class and subjects updated successfully!');
+      // Recalculate installments after enrollment
+      if (selectedStudent?.studentProfile?.id) {
+        try {
+          await calculateInstallment(
+            selectedStudent.studentProfile.id,
+            new Date().getMonth() + 1,
+            new Date().getFullYear(),
+          );
+          await fetchInstallmentsData(selectedStudent.studentProfile.id);
+        } catch (err) {
+          console.error('Error recalculating installments:', err);
+        }
+      }
       setTimeout(() => {
         setShowModal(false);
         fetchData();
@@ -732,8 +790,8 @@ export default function StudentsPage() {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50 overflow-hidden">
           <div className="bg-white rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] flex flex-col">
             <div className="sticky top-0 bg-gradient-to-r from-emerald-500 to-green-600 px-6 py-4 rounded-t-2xl">
-              <div className="flex items-center justify-between">
-                <h2 className="text-2xl font-bold text-white">Manage Classes & Subjects</h2>
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-2xl font-bold text-white">Manage Student</h2>
                 <button
                   onClick={() => setShowModal(false)}
                   className="text-white hover:bg-white/20 rounded-lg p-2 transition-colors"
@@ -742,6 +800,34 @@ export default function StudentsPage() {
                   <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                   </svg>
+                </button>
+              </div>
+              {/* Tabs */}
+              <div className="flex gap-2 border-b border-white/20">
+                <button
+                  onClick={() => setActiveTab('classes')}
+                  className={`px-4 py-2 font-medium transition-colors ${
+                    activeTab === 'classes'
+                      ? 'text-white border-b-2 border-white'
+                      : 'text-white/70 hover:text-white'
+                  }`}
+                >
+                  Classes & Subjects
+                </button>
+                <button
+                  onClick={() => {
+                    setActiveTab('installments');
+                    if (selectedStudent?.studentProfile?.id) {
+                      fetchInstallmentsData(selectedStudent.studentProfile.id);
+                    }
+                  }}
+                  className={`px-4 py-2 font-medium transition-colors ${
+                    activeTab === 'installments'
+                      ? 'text-white border-b-2 border-white'
+                      : 'text-white/70 hover:text-white'
+                  }`}
+                >
+                  Installments
                 </button>
               </div>
             </div>
@@ -781,7 +867,7 @@ export default function StudentsPage() {
                 <div className="flex justify-center py-8">
                   <LoadingSpinner size="md" />
                 </div>
-              ) : (
+              ) : activeTab === 'classes' ? (
                 <>
                   {/* Class Section (Single Select) */}
                   <div>
@@ -1044,6 +1130,302 @@ export default function StudentsPage() {
                       )}
                     </button>
                   </div>
+                </>
+              ) : (
+                <>
+                  {/* Installments Tab */}
+                  {loadingInstallments ? (
+                    <div className="flex justify-center py-8">
+                      <LoadingSpinner size="md" />
+                    </div>
+                  ) : (
+                    <div className="space-y-6">
+                      {/* Summary Cards */}
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="bg-gradient-to-br from-red-50 to-red-100 rounded-xl p-6 border border-red-200">
+                          <p className="text-sm text-gray-600 mb-1">
+                            {t.installments?.outstandingBalance || 'Outstanding Balance'}
+                          </p>
+                          <p className="text-3xl font-bold text-gray-900">
+                            {parseFloat(outstanding?.totalOutstanding || '0').toFixed(2)}
+                          </p>
+                        </div>
+                        {currentMonth && (
+                          <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl p-6 border border-blue-200">
+                            <p className="text-sm text-gray-600 mb-1">
+                              {t.installments?.currentMonth || 'Current Month'}
+                            </p>
+                            <p className="text-3xl font-bold text-gray-900">
+                              {parseFloat(currentMonth.installment?.totalAmount || '0').toFixed(2)}
+                            </p>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Action Buttons */}
+                      <div className="flex gap-3">
+                        <button
+                          onClick={() => setShowDiscountForm(true)}
+                          className="px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors font-medium flex items-center gap-2"
+                        >
+                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                          </svg>
+                          {t.installments?.addDiscount || 'Add Discount'}
+                        </button>
+                        <button
+                          onClick={() => {
+                            if (currentMonth?.installment?.id) {
+                              setPaymentForm({
+                                ...paymentForm,
+                                installmentId: currentMonth.installment.id,
+                              });
+                              setShowPaymentForm(true);
+                            }
+                          }}
+                          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium flex items-center gap-2"
+                        >
+                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                          </svg>
+                          {t.installments?.recordPayment || 'Record Payment'}
+                        </button>
+                      </div>
+
+                      {/* Installments List */}
+                      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+                        <div className="p-4 border-b border-gray-200">
+                          <h3 className="text-lg font-semibold text-gray-900">
+                            {t.installments?.paymentHistory || 'Payment History'}
+                          </h3>
+                        </div>
+                        {installments.length === 0 ? (
+                          <div className="p-8 text-center text-gray-500">
+                            {t.installments?.noInstallments || 'No installments found'}
+                          </div>
+                        ) : (
+                          <div className="divide-y divide-gray-200">
+                            {installments.map((installment) => (
+                              <div key={installment.id} className="p-4 hover:bg-gray-50">
+                                <div className="flex items-center justify-between mb-2">
+                                  <div>
+                                    <p className="font-semibold text-gray-900">
+                                      {new Date(installment.year, installment.month - 1).toLocaleDateString('en-US', {
+                                        month: 'long',
+                                        year: 'numeric',
+                                      })}
+                                    </p>
+                                    <span className={`inline-block px-2 py-1 rounded-full text-xs font-medium ${
+                                      installment.status === 'PAID' ? 'bg-green-100 text-green-800' :
+                                      installment.status === 'PARTIAL' ? 'bg-yellow-100 text-yellow-800' :
+                                      installment.status === 'OVERDUE' ? 'bg-red-100 text-red-800' :
+                                      'bg-gray-100 text-gray-800'
+                                    }`}>
+                                      {installment.status}
+                                    </span>
+                                  </div>
+                                </div>
+                                <div className="grid grid-cols-3 gap-4 mt-3 text-sm">
+                                  <div>
+                                    <p className="text-gray-600">Total</p>
+                                    <p className="font-semibold">{parseFloat(String(installment.totalAmount)).toFixed(2)}</p>
+                                  </div>
+                                  <div>
+                                    <p className="text-gray-600">Paid</p>
+                                    <p className="font-semibold text-green-600">{parseFloat(String(installment.paidAmount)).toFixed(2)}</p>
+                                  </div>
+                                  <div>
+                                    <p className="text-gray-600">Outstanding</p>
+                                    <p className="font-semibold text-red-600">{parseFloat(String(installment.outstandingAmount)).toFixed(2)}</p>
+                                  </div>
+                                </div>
+                                {installment.payments && installment.payments.length > 0 && (
+                                  <div className="mt-3 pt-3 border-t border-gray-200">
+                                    <p className="text-xs font-semibold text-gray-700 mb-2">Payments:</p>
+                                    {installment.payments.map((payment: any) => (
+                                      <div key={payment.id} className="text-xs text-gray-600 flex justify-between">
+                                        <span>{parseFloat(String(payment.amount)).toFixed(2)} - {new Date(payment.paymentDate).toLocaleDateString()}</span>
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Discount Form Modal */}
+                  {showDiscountForm && (
+                    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+                      <div className="bg-white rounded-xl p-6 max-w-md w-full">
+                        <h3 className="text-xl font-bold mb-4">{t.installments?.addDiscount || 'Add Discount'}</h3>
+                        <div className="space-y-4">
+                          <div>
+                            <label className="block text-sm font-semibold mb-2">
+                              {t.installments?.discountAmount || 'Discount Amount'}
+                            </label>
+                            <input
+                              type="number"
+                              step="0.01"
+                              min="0"
+                              value={discountForm.amount}
+                              onChange={(e) => setDiscountForm({ ...discountForm, amount: e.target.value })}
+                              className="w-full px-4 py-2 border border-gray-300 rounded-lg"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-sm font-semibold mb-2">
+                              {t.installments?.discountReason || 'Reason (Optional)'}
+                            </label>
+                            <textarea
+                              value={discountForm.reason}
+                              onChange={(e) => setDiscountForm({ ...discountForm, reason: e.target.value })}
+                              className="w-full px-4 py-2 border border-gray-300 rounded-lg"
+                              rows={3}
+                            />
+                          </div>
+                          <div className="flex gap-3">
+                            <button
+                              onClick={async () => {
+                                try {
+                                  await createDiscount({
+                                    studentId: selectedStudent!.studentProfile!.id,
+                                    amount: parseFloat(discountForm.amount),
+                                    reason: discountForm.reason || undefined,
+                                  });
+                                  setSuccess(t.installments?.discountCreated || 'Discount added successfully');
+                                  setShowDiscountForm(false);
+                                  setDiscountForm({ amount: '', reason: '' });
+                                  await fetchInstallmentsData(selectedStudent!.studentProfile!.id);
+                                } catch (err: any) {
+                                  setError(err.response?.data?.message || 'Failed to add discount');
+                                }
+                              }}
+                              className="flex-1 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700"
+                            >
+                              Add
+                            </button>
+                            <button
+                              onClick={() => {
+                                setShowDiscountForm(false);
+                                setDiscountForm({ amount: '', reason: '' });
+                              }}
+                              className="flex-1 px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300"
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Payment Form Modal */}
+                  {showPaymentForm && (
+                    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+                      <div className="bg-white rounded-xl p-6 max-w-md w-full">
+                        <h3 className="text-xl font-bold mb-4">{t.installments?.recordPayment || 'Record Payment'}</h3>
+                        <div className="space-y-4">
+                          <div>
+                            <label className="block text-sm font-semibold mb-2">
+                              {t.installments?.paymentAmount || 'Payment Amount'}
+                            </label>
+                            <input
+                              type="number"
+                              step="0.01"
+                              min="0"
+                              value={paymentForm.amount}
+                              onChange={(e) => setPaymentForm({ ...paymentForm, amount: e.target.value })}
+                              className="w-full px-4 py-2 border border-gray-300 rounded-lg"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-sm font-semibold mb-2">
+                              {t.installments?.paymentDate || 'Payment Date'}
+                            </label>
+                            <input
+                              type="date"
+                              value={paymentForm.paymentDate}
+                              onChange={(e) => setPaymentForm({ ...paymentForm, paymentDate: e.target.value })}
+                              className="w-full px-4 py-2 border border-gray-300 rounded-lg"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-sm font-semibold mb-2">
+                              {t.installments?.paymentMethod || 'Payment Method (Optional)'}
+                            </label>
+                            <input
+                              type="text"
+                              value={paymentForm.paymentMethod}
+                              onChange={(e) => setPaymentForm({ ...paymentForm, paymentMethod: e.target.value })}
+                              className="w-full px-4 py-2 border border-gray-300 rounded-lg"
+                              placeholder="Cash, Bank Transfer, etc."
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-sm font-semibold mb-2">
+                              {t.installments?.paymentNotes || 'Notes (Optional)'}
+                            </label>
+                            <textarea
+                              value={paymentForm.notes}
+                              onChange={(e) => setPaymentForm({ ...paymentForm, notes: e.target.value })}
+                              className="w-full px-4 py-2 border border-gray-300 rounded-lg"
+                              rows={3}
+                            />
+                          </div>
+                          <div className="flex gap-3">
+                            <button
+                              onClick={async () => {
+                                try {
+                                  await recordPayment({
+                                    studentId: selectedStudent!.studentProfile!.id,
+                                    installmentId: paymentForm.installmentId,
+                                    amount: parseFloat(paymentForm.amount),
+                                    paymentDate: paymentForm.paymentDate,
+                                    paymentMethod: paymentForm.paymentMethod || undefined,
+                                    notes: paymentForm.notes || undefined,
+                                  });
+                                  setSuccess(t.installments?.paymentRecorded || 'Payment recorded successfully');
+                                  setShowPaymentForm(false);
+                                  setPaymentForm({
+                                    installmentId: '',
+                                    amount: '',
+                                    paymentDate: new Date().toISOString().split('T')[0],
+                                    paymentMethod: '',
+                                    notes: '',
+                                  });
+                                  await fetchInstallmentsData(selectedStudent!.studentProfile!.id);
+                                } catch (err: any) {
+                                  setError(err.response?.data?.message || 'Failed to record payment');
+                                }
+                              }}
+                              className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                            >
+                              Record
+                            </button>
+                            <button
+                              onClick={() => {
+                                setShowPaymentForm(false);
+                                setPaymentForm({
+                                  installmentId: '',
+                                  amount: '',
+                                  paymentDate: new Date().toISOString().split('T')[0],
+                                  paymentMethod: '',
+                                  notes: '',
+                                });
+                              }}
+                              className="flex-1 px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300"
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </>
               )}
             </div>

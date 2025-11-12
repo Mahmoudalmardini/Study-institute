@@ -1,4 +1,5 @@
-import { IsString, IsNotEmpty, IsOptional } from 'class-validator';
+import { IsString, IsNotEmpty, IsOptional, IsNumber, Min } from 'class-validator';
+import { Type } from 'class-transformer';
 
 export class CreateSubjectDto {
   @IsString()
@@ -12,6 +13,12 @@ export class CreateSubjectDto {
   @IsString()
   @IsOptional()
   description?: string;
+
+  @IsNumber()
+  @IsOptional()
+  @Min(0)
+  @Type(() => Number)
+  monthlyInstallment?: number;
 
   @IsString()
   @IsOptional()

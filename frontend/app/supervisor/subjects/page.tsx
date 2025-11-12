@@ -12,6 +12,7 @@ interface Subject {
   name: string;
   code: string;
   description?: string;
+  monthlyInstallment?: number;
   class: {
     id: string;
     name: string;
@@ -41,6 +42,7 @@ export default function SubjectsPage() {
   const [editingSubject, setEditingSubject] = useState<Subject | null>(null);
   const [formData, setFormData] = useState({
     name: '',
+    monthlyInstallment: '',
   });
   const [user, setUser] = useState<any>(null);
   const [mounted, setMounted] = useState(false);
@@ -83,17 +85,22 @@ export default function SubjectsPage() {
       setError('');
       setSuccess('');
       
+      const submitData = {
+        ...formData,
+        monthlyInstallment: formData.monthlyInstallment ? parseFloat(formData.monthlyInstallment) : undefined,
+      };
+      
       if (editingSubject) {
-        await apiClient.patch(`/subjects/${editingSubject.id}`, formData);
+        await apiClient.patch(`/subjects/${editingSubject.id}`, submitData);
         setSuccess('Subject updated successfully!');
       } else {
-        await apiClient.post('/subjects', formData);
+        await apiClient.post('/subjects', submitData);
         setSuccess('Subject created successfully!');
       }
       
       setShowForm(false);
       setEditingSubject(null);
-      setFormData({ name: '' });
+      setFormData({ name: '', monthlyInstallment: '' });
       fetchSubjects();
       setTimeout(() => setSuccess(''), 3000);
     } catch (error: any) {
@@ -107,6 +114,7 @@ export default function SubjectsPage() {
     setEditingSubject(subject);
     setFormData({
       name: subject.name,
+      monthlyInstallment: subject.monthlyInstallment?.toString() || '',
     });
     setShowForm(true);
     setError('');
@@ -132,7 +140,7 @@ export default function SubjectsPage() {
   const handleCancel = () => {
     setShowForm(false);
     setEditingSubject(null);
-    setFormData({ name: '' });
+    setFormData({ name: '', monthlyInstallment: '' });
     setError('');
     setSuccess('');
   };
@@ -287,6 +295,23 @@ export default function SubjectsPage() {
                 />
                 <p className="mt-2 text-sm text-gray-500">
                   Enter the subject name. Other details can be added later when editing.
+                </p>
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  Monthly Installment Amount
+                </label>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={formData.monthlyInstallment}
+                  onChange={(e) => setFormData({ ...formData, monthlyInstallment: e.target.value })}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-teal-500 focus:border-transparent transition-all"
+                  placeholder="0.00"
+                />
+                <p className="mt-2 text-sm text-gray-500">
+                  Enter the monthly installment amount for this subject (optional).
                 </p>
               </div>
               <div className="flex flex-col sm:flex-row gap-3 pt-4">
