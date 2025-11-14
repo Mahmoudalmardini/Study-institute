@@ -4,7 +4,9 @@
   "description": "Study Institute - Combined Backend and Frontend",
   "private": true,
   "scripts": {
-    "start": "cd /app/backend && npx prisma migrate deploy && cd /app && pm2-runtime start ecosystem.config.js"
+    "start": "./start.sh",
+    "build": "echo 'Build handled by Dockerfile'",
+    "postinstall": "echo 'Dependencies installed in Docker build'"
   },
   "engines": {
     "node": "20.x",

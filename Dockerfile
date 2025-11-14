@@ -67,8 +67,10 @@ COPY --from=frontend-build --chown=appuser:nodejs /app/frontend/package*.json ./
 COPY --from=frontend-build --chown=appuser:nodejs /app/frontend/next.config.ts ./frontend/
 COPY --from=frontend-build --chown=appuser:nodejs /app/frontend/node_modules ./frontend/node_modules
 
-# Copy PM2 ecosystem file
+# Copy PM2 ecosystem file and start script
 COPY --chown=appuser:nodejs ecosystem.config.js ./
+COPY --chown=appuser:nodejs start.sh ./
+RUN chmod +x start.sh
 
 # Generate Prisma Client in production
 WORKDIR /app/backend
@@ -90,5 +92,5 @@ ENTRYPOINT ["dumb-init", "--"]
 # Start both services with PM2
 # Prisma migrations will run via Railway start command override
 WORKDIR /app
-CMD ["pm2-runtime", "start", "ecosystem.config.js"]
+CMD ["./start.sh"]
 
