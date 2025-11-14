@@ -33,6 +33,7 @@ Thumbs.db
 # Scripts (not needed in production)
 *.ps1
 *.sh
+!start.sh
 Makefile
 
 # Docker compose (not needed in image)
