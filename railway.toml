@@ -1,0 +1,9 @@
+# Railway configuration for monorepo
+# This file helps Railway understand the project structure
+# Each service should have its Root Directory set in Railway dashboard:
+# - Backend service: Root Directory = "backend"
+# - Frontend service: Root Directory = "frontend"
+
+[build]
+builder = "NIXPACKS"
+

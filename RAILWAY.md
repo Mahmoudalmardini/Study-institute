@@ -45,21 +45,26 @@ You'll also need to provision:
 
 1. In your Railway project, click **"+ New"**
 2. Select **"GitHub Repo"** (if not already connected) or **"Empty Service"**
-3. If using Empty Service:
+3. **CRITICAL: Set Root Directory**
    - Click on the service
    - Go to **Settings** → **Source**
-   - Connect your GitHub repository
-   - Set **Root Directory** to `backend`
+   - Connect your GitHub repository (if not already connected)
+   - **Set Root Directory to `backend`** (this is essential for monorepo!)
+   - Save the changes
 
-4. **Configure the Service:**
-   - Railway will auto-detect Node.js and use the `nixpacks.toml` configuration
-   - The build will run: `npm ci`, then `npx prisma generate`, then `npm run build`
+4. **Configure the Build (IMPORTANT for Monorepo):**
+   
+   **Recommended: Use Dockerfile** (more reliable for monorepos):
+   - Go to service → **Settings** → **Build**
+   - Change **Builder** from "Nixpacks" to **"Dockerfile"**
+   - Railway will use the Dockerfile in the backend directory
+   - The build will automatically run: `npm ci`, `npx prisma generate`, `npm run build`
    - The start command will run: `npx prisma migrate deploy && node dist/main.js`
    
-   **Alternative: If Nixpacks fails, use Dockerfile:**
-   - Go to service → **Settings** → **Build**
-   - Change **Builder** from "Nixpacks" to "Dockerfile"
-   - Railway will use the Dockerfile in the backend directory
+   **Alternative: Use Nixpacks:**
+   - Ensure Root Directory is set to `backend`
+   - Railway will auto-detect Node.js and use the `nixpacks.toml` configuration
+   - If it fails, switch to Dockerfile (recommended above)
 
 5. **Add Environment Variables:**
    - Go to the service → **Variables** tab
@@ -102,21 +107,26 @@ You'll also need to provision:
 
 1. In your Railway project, click **"+ New"**
 2. Select **"GitHub Repo"** or **"Empty Service"**
-3. If using Empty Service:
+3. **CRITICAL: Set Root Directory**
    - Click on the service
    - Go to **Settings** → **Source**
-   - Connect your GitHub repository
-   - Set **Root Directory** to `frontend`
+   - Connect your GitHub repository (if not already connected)
+   - **Set Root Directory to `frontend`** (this is essential for monorepo!)
+   - Save the changes
 
-4. **Configure the Service:**
-   - Railway will auto-detect Next.js and use the `nixpacks.toml` configuration
-   - The build will run: `npm ci`, then `npm run build`
+4. **Configure the Build (IMPORTANT for Monorepo):**
+   
+   **Recommended: Use Dockerfile** (more reliable for monorepos):
+   - Go to service → **Settings** → **Build**
+   - Change **Builder** from "Nixpacks" to **"Dockerfile"**
+   - Railway will use the Dockerfile in the frontend directory
+   - The build will automatically run: `npm ci`, then `npm run build`
    - The start command will run: `npm start`
    
-   **Alternative: If Nixpacks fails, use Dockerfile:**
-   - Go to service → **Settings** → **Build**
-   - Change **Builder** from "Nixpacks" to "Dockerfile"
-   - Railway will use the Dockerfile in the frontend directory
+   **Alternative: Use Nixpacks:**
+   - Ensure Root Directory is set to `frontend`
+   - Railway will auto-detect Next.js and use the `nixpacks.toml` configuration
+   - If it fails, switch to Dockerfile (recommended above)
 
 5. **Add Environment Variables:**
    - Go to the service → **Variables** tab
@@ -255,15 +265,21 @@ Railway provides free `.railway.app` domains. To use a custom domain:
 
 ### General Issues
 
-**"Error creating build plan with Nixpacks":**
-- This error usually occurs when Nixpacks can't detect the project type
-- **Solution 1**: Use Dockerfile instead:
+**"Error creating build plan with Nixpacks" or "Railpack could not determine how to build the app":**
+- This error occurs when Railway analyzes the root directory instead of the service directory
+- **CRITICAL FIX - Set Root Directory:**
+  1. Go to your service → **Settings** → **Source**
+  2. Verify **Root Directory** is set correctly:
+     - Backend service: Must be `backend` (not empty!)
+     - Frontend service: Must be `frontend` (not empty!)
+  3. Save and redeploy
+- **Solution 1: Use Dockerfile (Recommended for Monorepos):**
   1. Go to service → **Settings** → **Build**
   2. Change **Builder** from "Nixpacks" to "Dockerfile"
-  3. Railway will use the Dockerfile in your root directory
-- **Solution 2**: Verify `nixpacks.toml` exists in the root directory (backend/ or frontend/)
-- **Solution 3**: Check that `package.json` is present and valid
-- **Solution 4**: Try redeploying after pushing the latest code with `nixpacks.toml` files
+  3. Ensure Root Directory is still set (`backend` or `frontend`)
+  4. Redeploy
+- **Solution 2**: Verify `package.json` exists in the service directory (backend/package.json or frontend/package.json)
+- **Solution 3**: Check that Root Directory setting is saved (refresh the page to confirm)
 
 **Service not starting:**
 - Check environment variables are set correctly
