@@ -1,0 +1,14 @@
+{
+  "name": "study-institute",
+  "version": "1.0.0",
+  "description": "Study Institute - Combined Backend and Frontend",
+  "private": true,
+  "scripts": {
+    "start": "cd /app/backend && npx prisma migrate deploy && cd /app && pm2-runtime start ecosystem.config.js"
+  },
+  "engines": {
+    "node": "20.x",
+    "npm": "10.x"
+  }
+}
+
