@@ -52,9 +52,14 @@ You'll also need to provision:
    - Set **Root Directory** to `backend`
 
 4. **Configure the Service:**
-   - Railway will auto-detect Node.js and use the `railway.json` configuration
-   - The build command will run: `npm ci && npx prisma generate && npm run build`
+   - Railway will auto-detect Node.js and use the `nixpacks.toml` configuration
+   - The build will run: `npm ci`, then `npx prisma generate`, then `npm run build`
    - The start command will run: `npx prisma migrate deploy && node dist/main.js`
+   
+   **Alternative: If Nixpacks fails, use Dockerfile:**
+   - Go to service → **Settings** → **Build**
+   - Change **Builder** from "Nixpacks" to "Dockerfile"
+   - Railway will use the Dockerfile in the backend directory
 
 5. **Add Environment Variables:**
    - Go to the service → **Variables** tab
@@ -104,9 +109,14 @@ You'll also need to provision:
    - Set **Root Directory** to `frontend`
 
 4. **Configure the Service:**
-   - Railway will auto-detect Next.js and use the `railway.json` configuration
-   - The build command will run: `npm ci && npm run build`
+   - Railway will auto-detect Next.js and use the `nixpacks.toml` configuration
+   - The build will run: `npm ci`, then `npm run build`
    - The start command will run: `npm start`
+   
+   **Alternative: If Nixpacks fails, use Dockerfile:**
+   - Go to service → **Settings** → **Build**
+   - Change **Builder** from "Nixpacks" to "Dockerfile"
+   - Railway will use the Dockerfile in the frontend directory
 
 5. **Add Environment Variables:**
    - Go to the service → **Variables** tab
@@ -244,6 +254,16 @@ Railway provides free `.railway.app` domains. To use a custom domain:
 - Check build logs for specific errors
 
 ### General Issues
+
+**"Error creating build plan with Nixpacks":**
+- This error usually occurs when Nixpacks can't detect the project type
+- **Solution 1**: Use Dockerfile instead:
+  1. Go to service → **Settings** → **Build**
+  2. Change **Builder** from "Nixpacks" to "Dockerfile"
+  3. Railway will use the Dockerfile in your root directory
+- **Solution 2**: Verify `nixpacks.toml` exists in the root directory (backend/ or frontend/)
+- **Solution 3**: Check that `package.json` is present and valid
+- **Solution 4**: Try redeploying after pushing the latest code with `nixpacks.toml` files
 
 **Service not starting:**
 - Check environment variables are set correctly
