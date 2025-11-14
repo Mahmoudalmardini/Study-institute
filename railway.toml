@@ -1,9 +1,10 @@
 # Railway configuration for monorepo
 # This file helps Railway understand the project structure
-# Each service should have its Root Directory set in Railway dashboard:
-# - Backend service: Root Directory = "backend"
-# - Frontend service: Root Directory = "frontend"
-
-[build]
-builder = "NIXPACKS"
+# 
+# IMPORTANT: Each service MUST have its Root Directory set in Railway dashboard:
+# - Backend service: Root Directory = "backend", Builder = "Dockerfile"
+# - Frontend service: Root Directory = "frontend", Builder = "Dockerfile"
+#
+# This root-level file is for reference only.
+# Railway will use Dockerfile when Root Directory is set correctly.
 

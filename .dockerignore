@@ -1,43 +1,33 @@
-# Git
+# Root level .dockerignore for monorepo
+# Railway will use service-specific Dockerfiles when Root Directory is set
+
+# Ignore everything except what's needed
+node_modules
 .git
 .gitignore
-.gitattributes
-
-# Documentation
 *.md
-README*
-CHANGELOG*
-LICENSE
-DOCKER.md
-SETUP.md
-PROJECT_STATUS.md
-IMPLEMENTATION_SUMMARY.md
-
-# Environment files
 .env
 .env.*
-*.env
-
-# IDE
 .vscode
 .idea
-*.swp
-*.swo
-*~
+dist
+.next
+coverage
+*.log
 .DS_Store
 
-# Docker
-Dockerfile
+# Documentation files
+RAILWAY*.md
+QUICKSTART.md
+CV_*.md
+
+# Scripts
+*.ps1
+*.sh
+Makefile
+
+# Docker files (except the ones we need)
 docker-compose*.yml
-.dockerignore
 
-# CI/CD
-.github
-.gitlab-ci.yml
-.travis.yml
-
-# Temporary files
-*.log
-tmp/
-temp/
-
+# Nginx (not needed for individual services)
+nginx/
