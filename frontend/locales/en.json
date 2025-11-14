@@ -156,7 +156,9 @@
     "announcements": "Announcements",
     "announcementsDesc": "Read announcements",
     "evaluations": "Evaluations",
-    "evaluationsDesc": "View your evaluations"
+    "evaluationsDesc": "View your evaluations",
+    "instituteTerms": "Institute Terms and Conditions",
+    "instituteTermsDesc": "View institute terms and conditions"
   },
   "homework": {
     "title": "My Homework",

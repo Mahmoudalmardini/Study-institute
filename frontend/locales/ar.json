@@ -156,7 +156,9 @@
     "announcements": "الإعلانات",
     "announcementsDesc": "قراءة الإعلانات",
     "evaluations": "التقييمات",
-    "evaluationsDesc": "عرض تقييماتك"
+    "evaluationsDesc": "عرض تقييماتك",
+    "instituteTerms": "شروط وأحكام المعهد",
+    "instituteTermsDesc": "عرض شروط وأحكام المعهد"
   },
   "homework": {
     "title": "واجباتي",

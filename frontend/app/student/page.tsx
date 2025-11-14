@@ -19,6 +19,7 @@ export default function StudentDashboard() {
   const [mounted, setMounted] = useState(false);
   const [outstanding, setOutstanding] = useState<any>(null);
   const [currentMonth, setCurrentMonth] = useState<any>(null);
+  const [showTermsModal, setShowTermsModal] = useState(false);
 
   useEffect(() => {
     const token = localStorage.getItem('accessToken');
@@ -232,9 +233,108 @@ export default function StudentDashboard() {
               <h3 className="text-xl font-bold text-gray-900 mb-2">{t.student.evaluations}</h3>
               <p className="text-sm text-gray-600">{t.student.evaluationsDesc}</p>
             </div>
+
+            {/* Institute Terms and Conditions Card - Clickable */}
+            <button
+              onClick={() => setShowTermsModal(true)}
+              className={`bg-white overflow-hidden rounded-xl hover-lift p-6 sm:p-7 border-2 border-violet-100 hover:border-violet-300 group text-start ${mounted ? 'animate-slide-up stagger-7' : 'opacity-0'}`}
+            >
+              <div className="flex items-start justify-between">
+                <div className="flex-1">
+                  <div className="w-12 h-12 bg-gradient-to-br from-violet-500 to-purple-600 rounded-lg flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+                    <svg className="w-7 h-7 text-white" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4zm2 6a1 1 0 011-1h6a1 1 0 110 2H7a1 1 0 01-1-1zm1 3a1 1 0 100 2h6a1 1 0 100-2H7z" clipRule="evenodd" />
+                    </svg>
+                  </div>
+                  <h3 className="text-xl font-bold text-gray-900 mb-2">{t.student.instituteTerms}</h3>
+                  <p className="text-sm text-gray-600">{t.student.instituteTermsDesc}</p>
+                </div>
+                <svg className="w-6 h-6 text-violet-500 flex-shrink-0 ms-2 rtl:rotate-180 group-hover:translate-x-1 rtl:group-hover:-translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                </svg>
+              </div>
+            </button>
           </div>
         </div>
       </main>
+
+      {/* Terms and Conditions Modal */}
+      {showTermsModal && (
+        <div 
+          className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50 overflow-hidden"
+          onClick={() => setShowTermsModal(false)}
+        >
+          <div 
+            className="bg-white rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] flex flex-col"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="sticky top-0 bg-gradient-to-r from-violet-500 to-purple-600 px-6 py-4 rounded-t-2xl">
+              <div className="flex items-center justify-between">
+                <h2 className="text-2xl font-bold text-white">{t.student.instituteTerms}</h2>
+                <button
+                  onClick={() => setShowTermsModal(false)}
+                  className="text-white hover:bg-white/20 rounded-lg p-2 transition-colors"
+                  aria-label="Close modal"
+                >
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+
+            <div className="p-6 space-y-6 overflow-y-auto flex-1" dir="rtl">
+              <div className="prose prose-lg max-w-none text-gray-800 whitespace-pre-line leading-relaxed">
+                <p className="text-2xl font-bold mb-6 text-center">مركز المتابعة الدراسية نحو ارتقاء علمي وأخلاقي.</p>
+                
+                <p className="text-xl mb-4 text-center">أهلاً ومرحباً بكم</p>
+                <p className="text-xl mb-6 text-center">في مركز المتابعة الدراسية.</p>
+
+                <p className="text-lg mb-6">ابنك في مركز المتابعة الدراسية</p>
+                <p className="text-lg mb-8">أكثر تميزاً وتفوقاً سنصعد على سلم التفوق لنكون رفقاء الدرب.</p>
+
+                <h3 className="text-xl font-bold mb-4">قوانين المركز:</h3>
+
+                <h4 className="text-lg font-semibold mb-3">قوانين تتعلق بمصلحة الابن:</h4>
+
+                <ol className="list-decimal list-inside space-y-3 mb-6">
+                  <li>عندما تجد في ابنك الرغبة في الاجتهاد سجله في مركز المتابعة الدراسية، في حال لم تجد الرغبة لا تنفق نقودك.
+                    <ul className="list-disc list-inside mr-6 mt-2 space-y-1">
+                      <li>الرغبة تعطي النجاح</li>
+                      <li>عدم الرغبة يقود إلى الفشل.</li>
+                    </ul>
+                  </li>
+                  <li>التغييب عن الحصص الدراسية أو التأخر 👈 معلومات اقل 👈 انخفاض نتيجته الدراسية.</li>
+                  <li>التجمع أمام المركز 👈 قلق راحة الجوار 👈 تجاوز القانون</li>
+                  <li>الاحترام للمعلمين والمعلمات خط أحمر، تجاوزه يُؤدي إلى توجيه تنبيه مرة واحدة فقط ثم الفصل النهائي من المركز.</li>
+                  <li>العبث بمقتنيات المعهد 👈 غرامة مالية تُدفع من قبل الطالب.</li>
+                </ol>
+
+                <h4 className="text-lg font-semibold mb-3">قوانين متعلقة بدفع الأقساط:</h4>
+
+                <ol className="list-decimal list-inside space-y-3 mb-6">
+                  <li>حسم 10% في حال تم الدفع عن السنة كاملة، ولا يُعاد أي مبلغ مالي في حال انقطاع الطالب لأي سبب كان.</li>
+                  <li>حسم للأخين بمقدار 5% ولثلاثة أخوة بمقدار 10%.</li>
+                  <li>في حال انقطع الطالب ولم يعد أو انقطع وعاد خلال الشهر، لا يُعاد أي مبلغ مالي ويجب دفع القسط كاملاً.</li>
+                  <li>تسديد القسط كاملاً بموعد أقصاه الرابع من الشهر، في حال التأخر في الدفع لبعد 10 الشهر هناك ضريبة وقدرها 7 آلاف ليرة سورية عن كل يوم تأخير.</li>
+                  <li>يعطل المعهد في العطل الرسمية والعطل الانتصافية ويدفع القسط كاملاً في أشهر العطل.</li>
+                  <li>يُحدد المركز عطلة بعد المذاكرات لتجديد نشاط الطالب.</li>
+                  <li>في حال انتهى الطالب دروسه قبل انتهاء الحصة يحق للمركز إخراجه.</li>
+                  <li>احتمال تعديل الأقساط وزيادتها في حال ارتفع الدولار بشكل يؤثر على اقتصادية مركز المتابعة الدراسية.</li>
+                </ol>
+
+                <h4 className="text-lg font-semibold mb-3">قوانين متعلقة بالمواصلات:</h4>
+
+                <ol className="list-decimal list-inside space-y-3">
+                  <li>احترام السائق واي تجاوز يعرض الطالب للعقوبة.</li>
+                  <li>وقت المذاكرة ممكن أن يُحدد المركز مواعيد تختلف عن مواعيد الباص فيضطر الطالب في هذه الفترة المجيء لوحده.</li>
+                  <li>حصص المراجعة للمذاكرة أو الامتحان أيضاً يمكن أن تُحدد لمواعيد تختلف عن موعد الباص، ممكن أن يضطر الطالب للقدوم والرجوع لوحده في هذه الفترة.</li>
+                </ol>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
