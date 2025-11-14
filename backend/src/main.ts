@@ -8,9 +8,10 @@ async function bootstrap() {
 
   const configService = app.get(ConfigService);
 
-  // Enable CORS
+  // Enable CORS - handle both string and array of origins
+  const corsOrigin = configService.get('cors.origin');
   app.enableCors({
-    origin: configService.get('cors.origin'),
+    origin: corsOrigin,
     credentials: true,
   });
 

@@ -17,8 +17,9 @@ COPY . .
 # Generate Prisma Client
 RUN npx prisma generate
 
-# Expose port
-EXPOSE 3001
+# Expose port (use PORT env var, default to 3001)
+ARG PORT=3001
+EXPOSE ${PORT}
 
 # Default command for development
 CMD ["npm", "run", "start:dev"]
@@ -77,12 +78,13 @@ RUN npx prisma generate
 # Switch to non-root user
 USER nestjs
 
-# Expose port
-EXPOSE 3001
+# Expose port (use PORT env var, default to 3001)
+ARG PORT=3001
+EXPOSE ${PORT}
 
-# Health check
+# Health check (use PORT env var)
 HEALTHCHECK --interval=30s --timeout=3s --start-period=40s --retries=3 \
-    CMD node -e "require('http').get('http://localhost:3001/health', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"
+    CMD node -e "require('http').get('http://localhost:' + (process.env.PORT || 3001) + '/health', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"
 
 # Use dumb-init to handle signals properly
 ENTRYPOINT ["dumb-init", "--"]

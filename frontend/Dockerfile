@@ -13,8 +13,9 @@ RUN npm ci
 # Copy source code
 COPY . .
 
-# Expose port
-EXPOSE 3000
+# Expose port (use PORT env var, default to 3000)
+ARG PORT=3000
+EXPOSE ${PORT}
 
 # Default command for development
 CMD ["npm", "run", "dev"]
@@ -72,12 +73,13 @@ COPY --from=build --chown=nextjs:nodejs /app/next.config.ts ./next.config.ts
 # Switch to non-root user
 USER nextjs
 
-# Expose port
-EXPOSE 3000
+# Expose port (use PORT env var, default to 3000)
+ARG PORT=3000
+EXPOSE ${PORT}
 
-# Health check
+# Health check (use PORT env var)
 HEALTHCHECK --interval=30s --timeout=3s --start-period=40s --retries=3 \
-    CMD node -e "require('http').get('http://localhost:3000', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"
+    CMD node -e "require('http').get('http://localhost:' + (process.env.PORT || 3000), (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"
 
 # Use dumb-init to handle signals properly
 ENTRYPOINT ["dumb-init", "--"]

@@ -1,0 +1,16 @@
+# Railway ignore file for frontend
+node_modules/
+.next/
+*.log
+.env
+.env.local
+.env.*.local
+.git/
+.gitignore
+.vscode/
+.idea/
+*.test.ts
+*.spec.ts
+coverage/
+.DS_Store
+

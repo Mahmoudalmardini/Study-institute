@@ -1,0 +1,18 @@
+# Railway ignore file for backend
+node_modules/
+dist/
+*.log
+.env
+.env.local
+.env.*.local
+uploads/
+*.md
+.git/
+.gitignore
+.vscode/
+.idea/
+*.test.ts
+*.spec.ts
+coverage/
+.DS_Store
+

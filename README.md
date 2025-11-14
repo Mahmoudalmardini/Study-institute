@@ -11,7 +11,11 @@ A full-stack web application for managing an educational institute with role-bas
 
 ## Quick Start
 
-See **[QUICKSTART.md](./QUICKSTART.md)** for instructions on how to start the application.
+### Local Development
+See **[QUICKSTART.md](./QUICKSTART.md)** for instructions on how to start the application locally.
+
+### Railway Deployment
+See **[RAILWAY.md](./RAILWAY.md)** for step-by-step instructions to deploy to Railway.
 
 ## Features
 
