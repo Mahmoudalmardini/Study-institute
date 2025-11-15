@@ -57,7 +57,15 @@ export default function UsersPage() {
   const fetchUsers = async () => {
     try {
       setLoading(true);
+      setError(''); // Clear previous errors
       const token = localStorage.getItem('accessToken');
+      
+      if (!token) {
+        setError('No authentication token found. Please login again.');
+        router.push('/login');
+        return;
+      }
+
       const url = roleFilter
         ? `${process.env.NEXT_PUBLIC_API_URL}/users?role=${roleFilter}`
         : `${process.env.NEXT_PUBLIC_API_URL}/users`;
@@ -65,17 +73,56 @@ export default function UsersPage() {
       const response = await fetch(url, {
         headers: {
           Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
         },
       });
 
-      const data = await response.json();
-      if (response.ok) {
-        setUsers(data.data || []);
-      } else {
-        setError(data.message || t.users.error);
+      // Parse response once (can only be read once)
+      let data;
+      try {
+        data = await response.json();
+      } catch (parseError) {
+        // If JSON parsing fails
+        const errorMessage = response.ok 
+          ? 'Invalid response format from server'
+          : `Error ${response.status}: ${response.statusText || t.users.error}`;
+        setError(errorMessage);
+        setUsers([]);
+        return;
       }
-    } catch (err) {
-      setError(t.users.error);
+
+      // Check if response is OK
+      if (!response.ok) {
+        // Handle error response
+        let errorMessage = data.message || data.error || t.users.error;
+        
+        // Handle specific error codes
+        if (response.status === 401) {
+          errorMessage = 'Unauthorized. Please login again.';
+          setTimeout(() => {
+            localStorage.removeItem('accessToken');
+            localStorage.removeItem('refreshToken');
+            router.push('/login');
+          }, 2000);
+        } else if (response.status === 403) {
+          errorMessage = 'You do not have permission to view users.';
+        } else if (response.status === 500) {
+          errorMessage = 'Server error. Please try again later.';
+        }
+        
+        setError(errorMessage);
+        setUsers([]);
+        return;
+      }
+
+      // Handle successful response - support both { data: [...] } and direct array formats
+      const usersData = data.data || (Array.isArray(data) ? data : []);
+      setUsers(usersData);
+      setError(''); // Clear any previous errors on success
+    } catch (err: any) {
+      console.error('Error fetching users:', err);
+      setError(err.message || t.users.error);
+      setUsers([]);
     } finally {
       setLoading(false);
     }
