@@ -59,12 +59,25 @@ fi
 
 # Verify required files exist before starting
 echo "🔍 Verifying required files..."
-if [ ! -f "/app/backend/dist/main.js" ]; then
-  echo "❌ CRITICAL ERROR: /app/backend/dist/main.js not found!"
+if [ -f "/app/backend/dist/main.js" ]; then
+  echo "✅ Found: /app/backend/dist/main.js"
+elif [ -f "/app/backend/dist/src/main.js" ]; then
+  echo "✅ Found: /app/backend/dist/src/main.js"
+else
+  echo "❌ CRITICAL ERROR: main.js not found in expected locations!"
+  echo "   Checked: /app/backend/dist/main.js"
+  echo "   Checked: /app/backend/dist/src/main.js"
   echo "   This usually means the build failed or files weren't copied correctly."
   echo "   Please check the Docker build logs."
+  echo ""
+  echo "   Directory structure:"
   ls -la /app/backend/ || echo "   /app/backend directory doesn't exist!"
+  echo ""
+  echo "   Dist directory contents:"
   ls -la /app/backend/dist/ || echo "   /app/backend/dist directory doesn't exist!"
+  echo ""
+  echo "   Searching for main.js:"
+  find /app/backend -name "main.js" -type f 2>/dev/null || echo "   main.js not found anywhere!"
   exit 1
 fi
 

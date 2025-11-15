@@ -35,13 +35,17 @@ RUN echo "=== Contents of /app/backend/dist ===" && \
     ls -la /app/backend/ | head -20
 
 # Verify build output exists - check for main.js in dist or dist/src
-RUN if [ ! -f "/app/backend/dist/main.js" ] && [ ! -f "/app/backend/dist/src/main.js" ]; then \
+RUN echo "=== Checking for main.js ===" && \
+    if [ -f "/app/backend/dist/main.js" ]; then \
+      echo "✅ Found: /app/backend/dist/main.js"; \
+    elif [ -f "/app/backend/dist/src/main.js" ]; then \
+      echo "✅ Found: /app/backend/dist/src/main.js"; \
+      echo "⚠️  Note: main.js is in dist/src/, will need to adjust paths"; \
+    else \
       echo "ERROR: dist/main.js or dist/src/main.js not found after build!" && \
       echo "Build output structure:" && \
       (ls -laR /app/backend/dist/ 2>/dev/null | head -100 || echo "dist directory is empty or doesn't exist") && \
       exit 1; \
-    else \
-      echo "✅ Build output verified successfully!"; \
     fi
 
 # Stage 2: Build Frontend
@@ -84,8 +88,25 @@ COPY --from=backend-build --chown=appuser:nodejs /app/backend/package*.json ./ba
 COPY --from=backend-build --chown=appuser:nodejs /app/backend/prisma ./backend/prisma/
 
 # Verify copied files exist
-RUN ls -la /app/backend/dist || (echo "ERROR: dist directory not copied!" && exit 1)
-RUN test -f /app/backend/dist/main.js || (echo "ERROR: dist/main.js not copied!" && exit 1)
+RUN echo "=== Verifying copied files ===" && \
+    ls -la /app/backend/dist/ || (echo "ERROR: dist directory not copied!" && exit 1) && \
+    echo "" && \
+    echo "=== Looking for main.js ===" && \
+    (find /app/backend/dist -name "main.js" -type f 2>/dev/null | head -5 || echo "main.js not found in dist") && \
+    echo "" && \
+    echo "=== Checking dist structure ===" && \
+    (ls -laR /app/backend/dist/ 2>/dev/null | head -30 || echo "Cannot list dist structure")
+
+# Verify main.js exists in either location
+RUN if [ -f "/app/backend/dist/main.js" ]; then \
+      echo "✅ Found: /app/backend/dist/main.js"; \
+    elif [ -f "/app/backend/dist/src/main.js" ]; then \
+      echo "✅ Found: /app/backend/dist/src/main.js"; \
+      echo "⚠️  Will need to use dist/src/main.js in ecosystem.config.js"; \
+    else \
+      echo "❌ ERROR: dist/main.js or dist/src/main.js not found!" && \
+      exit 1; \
+    fi
 
 # Copy frontend built files
 COPY --from=frontend-build --chown=appuser:nodejs /app/frontend/.next ./frontend/.next

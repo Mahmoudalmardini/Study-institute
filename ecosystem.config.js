@@ -5,8 +5,22 @@ module.exports = {
     {
       name: 'backend',
       cwd: '/app/backend',
-      script: 'node',
-      args: 'dist/main.js',
+      // Try dist/main.js first, fallback to dist/src/main.js
+      script: (() => {
+        const fs = require('fs');
+        const path = require('path');
+        const mainJs = path.join(__dirname, 'backend', 'dist', 'main.js');
+        const mainJsSrc = path.join(__dirname, 'backend', 'dist', 'src', 'main.js');
+        
+        if (fs.existsSync(mainJs)) {
+          return mainJs;
+        } else if (fs.existsSync(mainJsSrc)) {
+          return mainJsSrc;
+        } else {
+          // Default fallback
+          return mainJs;
+        }
+      })(),
       env: {
         NODE_ENV: 'production',
         PORT: process.env.BACKEND_PORT || 3001,
