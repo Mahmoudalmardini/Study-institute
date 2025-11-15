@@ -66,8 +66,8 @@ async function bootstrap() {
         // If findAvailablePort fails, try the original port anyway
       }
       
-      await app.listen(port);
-      console.log(`🚀 Application is running on: http://localhost:${port}/api`);
+      await app.listen(port, '0.0.0.0');
+      console.log(`🚀 Application is running on: http://0.0.0.0:${port}/api`);
       // Send ready signal to PM2
       if (process.send) {
         process.send('ready');
