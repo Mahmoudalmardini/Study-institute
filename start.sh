@@ -96,6 +96,23 @@ fi
 
 echo "✅ Required files verified!"
 
+# Stop any existing PM2 processes to avoid port conflicts
+echo "🛑 Stopping any existing PM2 processes..."
+cd /app
+pm2 delete all 2>/dev/null || true
+pm2 kill 2>/dev/null || true
+
+# Kill any processes using port 3001 (backend port)
+echo "🔍 Checking for processes using backend port..."
+BACKEND_PORT=${BACKEND_PORT:-3001}
+if command -v lsof >/dev/null 2>&1; then
+  lsof -ti:${BACKEND_PORT} | xargs kill -9 2>/dev/null || true
+elif command -v fuser >/dev/null 2>&1; then
+  fuser -k ${BACKEND_PORT}/tcp 2>/dev/null || true
+fi
+
+sleep 2
+
 # Start both services with PM2
 echo "🎯 Starting backend and frontend services..."
 cd /app

@@ -24,8 +24,12 @@ module.exports = {
       env: {
         NODE_ENV: 'production',
         // Backend uses internal port (Frontend will proxy /api/* to this)
-        PORT: process.env.BACKEND_PORT || 3001,
+        // Use a fixed internal port that won't conflict with Railway's PORT
+        PORT: 3001,
       },
+      // Prevent PM2 from starting multiple instances
+      instances: 1,
+      exec_mode: 'fork',
       error_file: '/tmp/backend-error.log',
       out_file: '/tmp/backend-out.log',
       log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
@@ -46,6 +50,9 @@ module.exports = {
         BACKEND_INTERNAL_URL: process.env.BACKEND_INTERNAL_URL || 'http://localhost:3001',
         NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL || (typeof window !== 'undefined' ? `${window.location.origin}/api` : '/api'),
       },
+      // Prevent PM2 from starting multiple instances
+      instances: 1,
+      exec_mode: 'fork',
       error_file: '/tmp/frontend-error.log',
       out_file: '/tmp/frontend-out.log',
       log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
