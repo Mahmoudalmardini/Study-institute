@@ -58,10 +58,9 @@ export default function UsersPage() {
     try {
       setLoading(true);
       const token = localStorage.getItem('accessToken');
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || (typeof window !== 'undefined' ? `${window.location.origin}/api` : 'http://localhost:3001/api');
       const url = roleFilter
-        ? `${apiUrl}/users?role=${roleFilter}`
-        : `${apiUrl}/users`;
+        ? `${process.env.NEXT_PUBLIC_API_URL}/users?role=${roleFilter}`
+        : `${process.env.NEXT_PUBLIC_API_URL}/users`;
 
       const response = await fetch(url, {
         headers: {
@@ -140,10 +139,9 @@ export default function UsersPage() {
         return;
       }
 
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || (typeof window !== 'undefined' ? `${window.location.origin}/api` : 'http://localhost:3001/api');
       const url = editingUser
-        ? `${apiUrl}/users/${editingUser.id}`
-        : `${apiUrl}/users`;
+        ? `${process.env.NEXT_PUBLIC_API_URL}/users/${editingUser.id}`
+        : `${process.env.NEXT_PUBLIC_API_URL}/users`;
 
       const method = editingUser ? 'PATCH' : 'POST';
       
@@ -205,9 +203,8 @@ export default function UsersPage() {
 
     try {
       const token = localStorage.getItem('accessToken');
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || (typeof window !== 'undefined' ? `${window.location.origin}/api` : 'http://localhost:3001/api');
       const response = await fetch(
-        `${apiUrl}/users/${userId}`,
+        `${process.env.NEXT_PUBLIC_API_URL}/users/${userId}`,
         {
           method: 'DELETE',
           headers: {
