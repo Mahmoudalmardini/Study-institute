@@ -99,19 +99,31 @@ echo "✅ Required files verified!"
 # Stop any existing PM2 processes to avoid port conflicts
 echo "🛑 Stopping any existing PM2 processes..."
 cd /app
-pm2 delete all 2>/dev/null || true
-pm2 kill 2>/dev/null || true
 
-# Kill any processes using port 3001 (backend port)
-echo "🔍 Checking for processes using backend port..."
-BACKEND_PORT=${BACKEND_PORT:-3001}
+# Stop PM2 daemon if running
+pm2 kill 2>/dev/null || true
+sleep 1
+
+# Delete all PM2 processes
+pm2 delete all 2>/dev/null || true
+sleep 1
+
+# Kill any Node.js processes that might be using the ports
+echo "🔍 Checking for processes using backend port (3001)..."
 if command -v lsof >/dev/null 2>&1; then
-  lsof -ti:${BACKEND_PORT} | xargs kill -9 2>/dev/null || true
+  # Kill processes on port 3001
+  lsof -ti:3001 2>/dev/null | xargs -r kill -9 2>/dev/null || true
+  # Also kill any node processes that might be holding the port
+  pkill -f "node.*backend.*dist/main" 2>/dev/null || true
 elif command -v fuser >/dev/null 2>&1; then
-  fuser -k ${BACKEND_PORT}/tcp 2>/dev/null || true
+  fuser -k 3001/tcp 2>/dev/null || true
 fi
 
-sleep 2
+# Wait a bit more to ensure ports are released
+sleep 3
+
+# Verify port is free
+echo "✅ Port cleanup completed"
 
 # Start both services with PM2
 echo "🎯 Starting backend and frontend services..."

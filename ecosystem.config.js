@@ -36,6 +36,10 @@ module.exports = {
       merge_logs: true,
       autorestart: true,
       max_memory_restart: '500M',
+      // Wait before restarting to avoid port conflicts
+      wait_ready: true,
+      listen_timeout: 10000,
+      kill_timeout: 5000,
     },
     {
       name: 'frontend',
