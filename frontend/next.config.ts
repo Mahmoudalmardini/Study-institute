@@ -9,6 +9,18 @@ const nextConfig: NextConfig = {
   typescript: {
     ignoreBuildErrors: true,
   },
+  // Rewrite API requests to backend (for Railway deployment)
+  async rewrites() {
+    // Get backend URL from environment or use localhost
+    const backendUrl = process.env.BACKEND_INTERNAL_URL || 'http://localhost:3001';
+    
+    return [
+      {
+        source: '/api/:path*',
+        destination: `${backendUrl}/api/:path*`,
+      },
+    ];
+  },
 };
 
 export default nextConfig;

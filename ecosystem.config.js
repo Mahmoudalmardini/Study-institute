@@ -23,8 +23,8 @@ module.exports = {
       })(),
       env: {
         NODE_ENV: 'production',
-        // Use Railway's PORT for backend (this is what Railway routes traffic to)
-        PORT: process.env.PORT || 3001,
+        // Backend uses internal port (Frontend will proxy /api/* to this)
+        PORT: process.env.BACKEND_PORT || 3001,
       },
       error_file: '/tmp/backend-error.log',
       out_file: '/tmp/backend-out.log',
@@ -40,9 +40,11 @@ module.exports = {
       args: 'start',
       env: {
         NODE_ENV: 'production',
-        // Frontend uses a different port (internal only, Railway routes to backend)
-        PORT: process.env.FRONTEND_PORT || 3000,
-        NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api',
+        // Frontend uses Railway's PORT (this is what Railway routes traffic to)
+        PORT: process.env.PORT || 3000,
+        // Backend internal URL for rewrites (Next.js will proxy /api/* to this)
+        BACKEND_INTERNAL_URL: process.env.BACKEND_INTERNAL_URL || 'http://localhost:3001',
+        NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL || (typeof window !== 'undefined' ? `${window.location.origin}/api` : '/api'),
       },
       error_file: '/tmp/frontend-error.log',
       out_file: '/tmp/frontend-out.log',
