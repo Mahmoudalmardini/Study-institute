@@ -7,6 +7,7 @@ import SettingsMenu from '@/components/SettingsMenu';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { apiClient } from '@/lib/api-client';
 
 interface User {
   id: string;
@@ -58,70 +59,49 @@ export default function UsersPage() {
     try {
       setLoading(true);
       setError(''); // Clear previous errors
-      const token = localStorage.getItem('accessToken');
+
+      // Use apiClient which handles the API URL and authentication automatically
+      const url = roleFilter ? `/users?role=${roleFilter}` : '/users';
+      const usersData = await apiClient.get(url);
       
-      if (!token) {
-        setError('No authentication token found. Please login again.');
-        router.push('/login');
-        return;
-      }
-
-      const url = roleFilter
-        ? `${process.env.NEXT_PUBLIC_API_URL}/users?role=${roleFilter}`
-        : `${process.env.NEXT_PUBLIC_API_URL}/users`;
-
-      const response = await fetch(url, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-      });
-
-      // Parse response once (can only be read once)
-      let data;
-      try {
-        data = await response.json();
-      } catch (parseError) {
-        // If JSON parsing fails
-        const errorMessage = response.ok 
-          ? 'Invalid response format from server'
-          : `Error ${response.status}: ${response.statusText || t.users.error}`;
-        setError(errorMessage);
-        setUsers([]);
-        return;
-      }
-
-      // Check if response is OK
-      if (!response.ok) {
-        // Handle error response
-        let errorMessage = data.message || data.error || t.users.error;
+      // Handle both response formats: direct array or wrapped in data property
+      const users = Array.isArray(usersData) ? usersData : (usersData?.data || []);
+      setUsers(users);
+      setError(''); // Clear any previous errors on success
+    } catch (err: any) {
+      console.error('Error fetching users:', err);
+      
+      // Handle error response
+      let errorMessage = t.users.error;
+      
+      if (err.response) {
+        const status = err.response.status;
+        const errorData = err.response.data;
+        
+        errorMessage = errorData?.message || errorData?.error || errorMessage;
         
         // Handle specific error codes
-        if (response.status === 401) {
+        if (status === 401) {
           errorMessage = 'Unauthorized. Please login again.';
           setTimeout(() => {
             localStorage.removeItem('accessToken');
             localStorage.removeItem('refreshToken');
             router.push('/login');
           }, 2000);
-        } else if (response.status === 403) {
+        } else if (status === 403) {
           errorMessage = 'You do not have permission to view users.';
-        } else if (response.status === 500) {
+        } else if (status === 404) {
+          errorMessage = 'Users endpoint not found. Please check API configuration.';
+        } else if (status === 500) {
           errorMessage = 'Server error. Please try again later.';
+        } else {
+          errorMessage = `Error ${status}: ${errorMessage}`;
         }
-        
-        setError(errorMessage);
-        setUsers([]);
-        return;
+      } else if (err.message) {
+        errorMessage = err.message;
       }
-
-      // Handle successful response - support both { data: [...] } and direct array formats
-      const usersData = data.data || (Array.isArray(data) ? data : []);
-      setUsers(usersData);
-      setError(''); // Clear any previous errors on success
-    } catch (err: any) {
-      console.error('Error fetching users:', err);
-      setError(err.message || t.users.error);
+      
+      setError(errorMessage);
       setUsers([]);
     } finally {
       setLoading(false);
@@ -186,12 +166,6 @@ export default function UsersPage() {
         return;
       }
 
-      const url = editingUser
-        ? `${process.env.NEXT_PUBLIC_API_URL}/users/${editingUser.id}`
-        : `${process.env.NEXT_PUBLIC_API_URL}/users`;
-
-      const method = editingUser ? 'PATCH' : 'POST';
-      
       const payload: any = {
         firstName: formData.firstName,
         lastName: formData.lastName,
@@ -204,42 +178,46 @@ export default function UsersPage() {
         payload.password = formData.password;
       }
 
-      console.log('Submitting to:', url);
-      console.log('Method:', method);
-      console.log('Payload:', payload);
-
-      const response = await fetch(url, {
-        method,
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-        body: JSON.stringify(payload),
-      });
-
-      const data = await response.json();
-      console.log('Response:', response.status, data);
-
-      if (response.ok) {
-        setSuccess(editingUser ? t.users.userUpdated : t.users.userAdded);
-        fetchUsers();
-        setTimeout(() => {
-          closeModal();
-        }, 1500);
+      if (editingUser) {
+        // Update existing user
+        await apiClient.patch(`/users/${editingUser.id}`, payload);
+        setSuccess(t.users.userUpdated);
       } else {
-        // More detailed error message
-        if (response.status === 401) {
-          setError('Unauthorized. Please login again.');
+        // Create new user
+        await apiClient.post('/users', payload);
+        setSuccess(t.users.userAdded);
+      }
+
+      fetchUsers();
+      setTimeout(() => {
+        closeModal();
+      }, 1500);
+    } catch (err: any) {
+      console.error('Submit error:', err);
+      
+      let errorMessage = t.users.error;
+      
+      if (err.response) {
+        const status = err.response.status;
+        const errorData = err.response.data;
+        
+        errorMessage = errorData?.message || errorData?.error || errorMessage;
+        
+        if (status === 401) {
+          errorMessage = 'Unauthorized. Please login again.';
           setTimeout(() => {
             router.push('/login');
           }, 2000);
+        } else if (status === 409) {
+          errorMessage = errorData?.message || 'User with this email already exists.';
         } else {
-          setError(data.message || `Error: ${response.status} - ${t.users.error}`);
+          errorMessage = `Error ${status}: ${errorMessage}`;
         }
+      } else if (err.message) {
+        errorMessage = err.message;
       }
-    } catch (err: any) {
-      console.error('Submit error:', err);
-      setError(err.message || t.users.error);
+      
+      setError(errorMessage);
     }
   };
 
@@ -249,27 +227,36 @@ export default function UsersPage() {
     }
 
     try {
-      const token = localStorage.getItem('accessToken');
-      const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/users/${userId}`,
-        {
-          method: 'DELETE',
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
+      await apiClient.delete(`/users/${userId}`);
+      setSuccess(t.users.userDeleted);
+      fetchUsers();
+      setTimeout(() => setSuccess(''), 3000);
+    } catch (err: any) {
+      console.error('Delete error:', err);
+      
+      let errorMessage = t.users.error;
+      
+      if (err.response) {
+        const status = err.response.status;
+        const errorData = err.response.data;
+        
+        errorMessage = errorData?.message || errorData?.error || errorMessage;
+        
+        if (status === 401) {
+          errorMessage = 'Unauthorized. Please login again.';
+          setTimeout(() => {
+            router.push('/login');
+          }, 2000);
+        } else if (status === 404) {
+          errorMessage = 'User not found.';
+        } else {
+          errorMessage = `Error ${status}: ${errorMessage}`;
         }
-      );
-
-      if (response.ok) {
-        setSuccess(t.users.userDeleted);
-        fetchUsers();
-        setTimeout(() => setSuccess(''), 3000);
-      } else {
-        const data = await response.json();
-        setError(data.message || t.users.error);
+      } else if (err.message) {
+        errorMessage = err.message;
       }
-    } catch (err) {
-      setError(t.users.error);
+      
+      setError(errorMessage);
     }
   };
 
