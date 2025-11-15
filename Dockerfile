@@ -20,11 +20,29 @@ COPY backend/ ./
 RUN npx prisma generate
 
 # Build backend
-RUN npm run build
+RUN echo "=== Building backend ===" && \
+    npm run build && \
+    echo "=== Build completed ==="
 
-# Verify build output exists
-RUN ls -la /app/backend/dist || (echo "ERROR: dist directory not found after build!" && exit 1)
-RUN test -f /app/backend/dist/main.js || (echo "ERROR: dist/main.js not found after build!" && exit 1)
+# Debug: Show what was built
+RUN echo "=== Contents of /app/backend/dist ===" && \
+    (ls -la /app/backend/dist/ 2>/dev/null || echo "dist directory not found") && \
+    echo "" && \
+    echo "=== Looking for main.js ===" && \
+    (find /app/backend -name "main.js" -type f 2>/dev/null | head -5 || echo "main.js not found") && \
+    echo "" && \
+    echo "=== Contents of /app/backend ===" && \
+    ls -la /app/backend/ | head -20
+
+# Verify build output exists - check for main.js in dist or dist/src
+RUN if [ ! -f "/app/backend/dist/main.js" ] && [ ! -f "/app/backend/dist/src/main.js" ]; then \
+      echo "ERROR: dist/main.js or dist/src/main.js not found after build!" && \
+      echo "Build output structure:" && \
+      (ls -laR /app/backend/dist/ 2>/dev/null | head -100 || echo "dist directory is empty or doesn't exist") && \
+      exit 1; \
+    else \
+      echo "✅ Build output verified successfully!"; \
+    fi
 
 # Stage 2: Build Frontend
 FROM node:20-alpine AS frontend-build
