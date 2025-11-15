@@ -1,5 +1,5 @@
 // PM2 ecosystem file for running both backend and frontend
-// Railway sets PORT automatically - we'll use it for frontend, backend uses BACKEND_PORT
+// Railway sets PORT automatically - we'll use it for backend, frontend uses different port
 module.exports = {
   apps: [
     {
@@ -23,7 +23,8 @@ module.exports = {
       })(),
       env: {
         NODE_ENV: 'production',
-        PORT: process.env.BACKEND_PORT || 3001,
+        // Use Railway's PORT for backend (this is what Railway routes traffic to)
+        PORT: process.env.PORT || 3001,
       },
       error_file: '/tmp/backend-error.log',
       out_file: '/tmp/backend-out.log',
@@ -39,7 +40,8 @@ module.exports = {
       args: 'start',
       env: {
         NODE_ENV: 'production',
-        PORT: process.env.PORT || 3000, // Railway's PORT for frontend
+        // Frontend uses a different port (internal only, Railway routes to backend)
+        PORT: process.env.FRONTEND_PORT || 3000,
         NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api',
       },
       error_file: '/tmp/frontend-error.log',
