@@ -34,12 +34,16 @@ module.exports = {
       out_file: '/tmp/backend-out.log',
       log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
       merge_logs: true,
+      // Enable autorestart but with limits to prevent infinite loops
       autorestart: true,
       max_memory_restart: '500M',
       // Wait before restarting to avoid port conflicts
       wait_ready: true,
-      listen_timeout: 10000,
-      kill_timeout: 5000,
+      listen_timeout: 30000,
+      kill_timeout: 10000,
+      // Limit restarts to prevent infinite loops
+      max_restarts: 3,
+      min_uptime: '10s',
     },
     {
       name: 'frontend',
