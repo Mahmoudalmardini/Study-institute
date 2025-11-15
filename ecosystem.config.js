@@ -1,5 +1,9 @@
 // PM2 ecosystem file for running both backend and frontend
 // Railway sets PORT automatically - we'll use it for backend, frontend uses different port
+
+// Get PORT from environment (Railway sets this)
+const railwayPort = process.env.PORT || '3000';
+
 module.exports = {
   apps: [
     {
@@ -50,22 +54,23 @@ module.exports = {
       name: 'frontend',
       cwd: '/app/frontend',
       script: 'node_modules/.bin/next',
-      args: 'start -H 0.0.0.0',
-      // Wait for backend to be ready before starting frontend
+      // Use -p to explicitly set port, -H to bind to 0.0.0.0
+      args: `start -p ${railwayPort} -H 0.0.0.0`,
+      // Start frontend after a short delay to ensure backend is ready
       wait_ready: false,
+      // Add a small startup delay
+      min_uptime: '5s',
       // PM2 automatically passes all environment variables from parent process
       env: {
         NODE_ENV: 'production',
-        // Frontend uses Railway's PORT (this is what Railway routes traffic to)
-        // Next.js automatically uses PORT environment variable
-        // PM2 will inherit PORT from parent process (Railway sets it)
+        // Frontend MUST use Railway's PORT (this is what Railway routes traffic to)
+        // Use the PORT that Railway sets (captured at config load time)
+        PORT: railwayPort,
         // Backend is on fixed port 3001
         BACKEND_INTERNAL_URL: process.env.BACKEND_INTERNAL_URL || 'http://localhost:3001',
         NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL || '/api',
         HOSTNAME: '0.0.0.0',
       },
-      // PM2 will automatically pass PORT from parent process
-      // No need to set it explicitly - it will be inherited
       // Prevent PM2 from starting multiple instances
       instances: 1,
       exec_mode: 'fork',

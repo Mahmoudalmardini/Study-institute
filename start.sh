@@ -135,7 +135,12 @@ echo "   Environment variables:"
 echo "   - PORT=${PORT:-not set}"
 echo "   - BACKEND_INTERNAL_URL=${BACKEND_INTERNAL_URL:-http://localhost:3001}"
 echo "   - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL:-/api}"
+echo ""
+echo "   ⚠️  IMPORTANT: Railway routes traffic to PORT=${PORT:-not set}"
+echo "   Frontend MUST listen on this port for the app to work!"
 
 cd /app
+# Export PORT so PM2 can access it
+export PORT=${PORT:-3000}
 exec pm2-runtime start ecosystem.config.js
 
