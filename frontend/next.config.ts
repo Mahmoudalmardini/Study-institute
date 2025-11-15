@@ -11,10 +11,10 @@ const nextConfig: NextConfig = {
   },
   // Rewrite API requests to backend (for Railway deployment)
   async rewrites() {
-    // Get backend URL from environment or use localhost
-    // Backend will try ports 3001, 3002, 3003, etc. if 3001 is in use
-    const backendPort = process.env.BACKEND_PORT || '3001';
-    const backendUrl = process.env.BACKEND_INTERNAL_URL || `http://localhost:${backendPort}`;
+    // Backend uses fixed internal port 3001
+    // The backend will start first and use port 3001 (or 3002 if 3001 is unavailable)
+    // Frontend will proxy to the backend
+    const backendUrl = process.env.BACKEND_INTERNAL_URL || 'http://localhost:3001';
     
     return [
       {

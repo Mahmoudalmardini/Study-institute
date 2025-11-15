@@ -68,6 +68,18 @@ async function bootstrap() {
       
       await app.listen(port, '0.0.0.0');
       console.log(`🚀 Application is running on: http://0.0.0.0:${port}/api`);
+      
+      // Write port to file so frontend can discover it
+      const fs = require('fs');
+      const path = require('path');
+      const portFile = path.join(process.cwd(), '..', 'backend-port.txt');
+      try {
+        fs.writeFileSync(portFile, port.toString(), 'utf8');
+        console.log(`📝 Backend port (${port}) written to ${portFile}`);
+      } catch (err) {
+        console.warn(`⚠️  Could not write port file: ${err}`);
+      }
+      
       // Send ready signal to PM2
       if (process.send) {
         process.send('ready');

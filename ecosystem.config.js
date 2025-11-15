@@ -4,6 +4,9 @@ module.exports = {
   apps: [
     {
       name: 'backend',
+      // Start backend first to ensure it gets port 3001
+      autorestart: true,
+      watch: false,
       cwd: '/app/backend',
       // Try dist/main.js first, fallback to dist/src/main.js
       script: (() => {
@@ -23,10 +26,13 @@ module.exports = {
       })(),
       env: {
         NODE_ENV: 'production',
-        // Backend uses internal port (Frontend will proxy /api/* to this)
-        // Use a fixed internal port that won't conflict with Railway's PORT
+        // Backend uses fixed internal port 3001
+        // This port should not conflict with Railway's PORT (which is for frontend)
         PORT: 3001,
       },
+      // Ensure backend starts first
+      wait_ready: true,
+      listen_timeout: 30000,
       // Prevent PM2 from starting multiple instances
       instances: 1,
       exec_mode: 'fork',
@@ -34,12 +40,7 @@ module.exports = {
       out_file: '/tmp/backend-out.log',
       log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
       merge_logs: true,
-      // Enable autorestart but with limits to prevent infinite loops
-      autorestart: true,
       max_memory_restart: '500M',
-      // Wait before restarting to avoid port conflicts
-      wait_ready: true,
-      listen_timeout: 30000,
       kill_timeout: 10000,
       // Limit restarts to prevent infinite loops
       max_restarts: 3,
@@ -49,17 +50,19 @@ module.exports = {
       name: 'frontend',
       cwd: '/app/frontend',
       script: 'node_modules/.bin/next',
-      args: 'start',
+      args: 'start -H 0.0.0.0',
+      // Wait for backend to be ready before starting frontend
+      wait_ready: false,
       // PM2 automatically passes all environment variables from parent process
-      // But we explicitly set PORT to ensure Next.js uses Railway's PORT
       env: {
         NODE_ENV: 'production',
         // Frontend uses Railway's PORT (this is what Railway routes traffic to)
         // Next.js automatically uses PORT environment variable
         // PM2 will inherit PORT from parent process (Railway sets it)
-        // Backend internal URL for rewrites (Next.js will proxy /api/* to this)
+        // Backend is on fixed port 3001
         BACKEND_INTERNAL_URL: process.env.BACKEND_INTERNAL_URL || 'http://localhost:3001',
         NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL || '/api',
+        HOSTNAME: '0.0.0.0',
       },
       // PM2 will automatically pass PORT from parent process
       // No need to set it explicitly - it will be inherited
