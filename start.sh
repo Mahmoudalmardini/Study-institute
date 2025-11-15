@@ -41,9 +41,17 @@ else
     MIGRATION_COUNT=$((MIGRATION_COUNT + 1))
     echo "   Migration attempt $MIGRATION_COUNT/$MIGRATION_RETRIES..."
     
-    if npx prisma migrate deploy; then
+      if npx prisma migrate deploy; then
       MIGRATION_SUCCESS=true
       echo "✅ Database migrations completed successfully!"
+      
+      # Run database seeding to create admin user
+      echo "🌱 Seeding database..."
+      if npx prisma db seed; then
+        echo "✅ Database seeding completed!"
+      else
+        echo "⚠️  Database seeding failed, but continuing..."
+      fi
     else
       if [ $MIGRATION_COUNT -lt $MIGRATION_RETRIES ]; then
         echo "   Migration failed, retrying in 3 seconds..."
