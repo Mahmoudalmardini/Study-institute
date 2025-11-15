@@ -57,6 +57,24 @@ else
   done
 fi
 
+# Verify required files exist before starting
+echo "🔍 Verifying required files..."
+if [ ! -f "/app/backend/dist/main.js" ]; then
+  echo "❌ CRITICAL ERROR: /app/backend/dist/main.js not found!"
+  echo "   This usually means the build failed or files weren't copied correctly."
+  echo "   Please check the Docker build logs."
+  ls -la /app/backend/ || echo "   /app/backend directory doesn't exist!"
+  ls -la /app/backend/dist/ || echo "   /app/backend/dist directory doesn't exist!"
+  exit 1
+fi
+
+if [ ! -d "/app/frontend/.next" ]; then
+  echo "⚠️  WARNING: /app/frontend/.next not found!"
+  echo "   Frontend may not work correctly."
+fi
+
+echo "✅ Required files verified!"
+
 # Start both services with PM2
 echo "🎯 Starting backend and frontend services..."
 cd /app

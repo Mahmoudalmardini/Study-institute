@@ -22,6 +22,10 @@ RUN npx prisma generate
 # Build backend
 RUN npm run build
 
+# Verify build output exists
+RUN ls -la /app/backend/dist || (echo "ERROR: dist directory not found after build!" && exit 1)
+RUN test -f /app/backend/dist/main.js || (echo "ERROR: dist/main.js not found after build!" && exit 1)
+
 # Stage 2: Build Frontend
 FROM node:20-alpine AS frontend-build
 
@@ -55,10 +59,15 @@ RUN addgroup -g 1001 -S nodejs && \
 WORKDIR /app
 
 # Copy backend built files
+# Verify dist exists before copying
 COPY --from=backend-build --chown=appuser:nodejs /app/backend/dist ./backend/dist
 COPY --from=backend-build --chown=appuser:nodejs /app/backend/node_modules ./backend/node_modules
 COPY --from=backend-build --chown=appuser:nodejs /app/backend/package*.json ./backend/
 COPY --from=backend-build --chown=appuser:nodejs /app/backend/prisma ./backend/prisma/
+
+# Verify copied files exist
+RUN ls -la /app/backend/dist || (echo "ERROR: dist directory not copied!" && exit 1)
+RUN test -f /app/backend/dist/main.js || (echo "ERROR: dist/main.js not copied!" && exit 1)
 
 # Copy frontend built files
 COPY --from=frontend-build --chown=appuser:nodejs /app/frontend/.next ./frontend/.next
