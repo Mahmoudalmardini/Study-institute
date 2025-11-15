@@ -48,16 +48,21 @@ module.exports = {
     {
       name: 'frontend',
       cwd: '/app/frontend',
-      script: 'npm',
+      script: 'node_modules/.bin/next',
       args: 'start',
+      // PM2 automatically passes all environment variables from parent process
+      // But we explicitly set PORT to ensure Next.js uses Railway's PORT
       env: {
         NODE_ENV: 'production',
         // Frontend uses Railway's PORT (this is what Railway routes traffic to)
-        PORT: process.env.PORT || 3000,
+        // Next.js automatically uses PORT environment variable
+        // PM2 will inherit PORT from parent process (Railway sets it)
         // Backend internal URL for rewrites (Next.js will proxy /api/* to this)
         BACKEND_INTERNAL_URL: process.env.BACKEND_INTERNAL_URL || 'http://localhost:3001',
-        NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL || (typeof window !== 'undefined' ? `${window.location.origin}/api` : '/api'),
+        NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL || '/api',
       },
+      // PM2 will automatically pass PORT from parent process
+      // No need to set it explicitly - it will be inherited
       // Prevent PM2 from starting multiple instances
       instances: 1,
       exec_mode: 'fork',

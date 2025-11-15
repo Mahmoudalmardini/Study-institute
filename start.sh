@@ -127,6 +127,15 @@ echo "✅ Port cleanup completed"
 
 # Start both services with PM2
 echo "🎯 Starting backend and frontend services..."
+echo "   Railway PORT: ${PORT:-not set}"
+echo "   Backend will use port: 3001 (internal)"
+echo "   Frontend will use port: ${PORT:-3000} (Railway's PORT)"
+echo ""
+echo "   Environment variables:"
+echo "   - PORT=${PORT:-not set}"
+echo "   - BACKEND_INTERNAL_URL=${BACKEND_INTERNAL_URL:-http://localhost:3001}"
+echo "   - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL:-/api}"
+
 cd /app
 exec pm2-runtime start ecosystem.config.js
 
