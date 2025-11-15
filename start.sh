@@ -125,6 +125,21 @@ sleep 3
 # Verify port is free
 echo "✅ Port cleanup completed"
 
+# Validate PORT environment variable
+echo "🔍 Validating PORT environment variable..."
+if [ -n "$PORT" ] && [ "$PORT" != "3000" ]; then
+  echo "⚠️  WARNING: PORT is set to '$PORT' but should be '3000'"
+  echo "   Railway routes traffic to the PORT environment variable."
+  echo "   Frontend listens on port 3000, so PORT must be 3000."
+  echo "   Please update PORT=3000 in Railway environment variables."
+  echo ""
+  echo "   Current PORT: $PORT"
+  echo "   Expected PORT: 3000"
+  echo ""
+  echo "   Continuing anyway, but Railway may not route traffic correctly..."
+  echo ""
+fi
+
 # Start both services with PM2
 echo "🎯 Starting backend and frontend services..."
 echo "   Backend will use port: 3001 (internal, fixed)"
@@ -135,11 +150,23 @@ echo "   - PORT=${PORT:-not set} (Railway's PORT, should be 3000)"
 echo "   - BACKEND_INTERNAL_URL=${BACKEND_INTERNAL_URL:-http://localhost:3001}"
 echo "   - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL:-/api}"
 echo ""
-echo "   ⚠️  IMPORTANT: Set PORT=3000 in Railway environment variables"
-echo "   Frontend listens on port 3000, Railway should route traffic to PORT=3000"
+if [ -z "$PORT" ] || [ "$PORT" != "3000" ]; then
+  echo "   ⚠️  CRITICAL: Set PORT=3000 in Railway environment variables"
+  echo "   Frontend listens on port 3000, Railway must route traffic to PORT=3000"
+  echo ""
+fi
 
 cd /app
 # Export PORT for reference (frontend uses fixed 3000, but Railway should set PORT=3000)
 export PORT=${PORT:-3000}
+
+# Start both services with PM2 runtime
+# PM2 runtime will keep the container alive and manage both processes
+echo "🚀 Starting services with PM2 runtime..."
+echo "   Services will be available at:"
+echo "   - Backend: http://localhost:3001/api"
+echo "   - Frontend: http://localhost:3000"
+echo "   - Health check: http://localhost:3000/health"
+echo ""
 exec pm2-runtime start ecosystem.config.js
 

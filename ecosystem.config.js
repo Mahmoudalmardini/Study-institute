@@ -57,10 +57,12 @@ module.exports = {
       script: 'node_modules/.bin/next',
       // Use -p to explicitly set port to 3000, -H to bind to 0.0.0.0
       args: `start -p 3000 -H 0.0.0.0`,
-      // Start frontend after a short delay to ensure backend is ready
+      // Wait for backend to be ready before starting frontend
       wait_ready: false,
-      // Add a small startup delay
-      min_uptime: '5s',
+      // Add startup delay to ensure backend is ready first
+      min_uptime: '10s',
+      // Delay frontend startup by 5 seconds to ensure backend is ready
+      // This is handled by PM2's startup sequence (backend starts first)
       // PM2 automatically passes all environment variables from parent process
       env: {
         NODE_ENV: 'production',
@@ -80,6 +82,8 @@ module.exports = {
       merge_logs: true,
       autorestart: true,
       max_memory_restart: '500M',
+      // Increase startup timeout for Next.js
+      listen_timeout: 60000,
     },
   ],
 };
