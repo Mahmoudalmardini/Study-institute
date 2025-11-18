@@ -611,10 +611,10 @@ export class StudentsService {
   }
 
   async getStudentSubjects(studentId: string) {
-    // Validate student exists
+    // Validate student exists and get classId
     const student = await this.prisma.student.findUnique({
       where: { id: studentId },
-      select: { id: true },
+      select: { id: true, classId: true },
     });
 
     if (!student) {
@@ -631,7 +631,6 @@ export class StudentsService {
             name: true,
             code: true,
             description: true,
-            monthlyInstallment: true, // Include monthlyInstallment for installment calculations
             classId: true,
             class: {
               select: {
@@ -661,8 +660,8 @@ export class StudentsService {
       },
     });
 
-    // Fetch class subjects separately to get all classes for each subject
-    const subjectIds = studentSubjects.map(ss => ss.subject.id);
+    // Fetch class subjects separately to get all classes for each subject and installment amounts
+    const subjectIds = studentSubjects.map(ss => ss.subjectId);
     const classSubjects = await this.prisma.classSubject.findMany({
       where: {
         subjectId: { in: subjectIds },
@@ -703,24 +702,32 @@ export class StudentsService {
     // Combine the data and convert Prisma Decimal to number for JSON serialization
     return studentSubjects.map(ss => {
       let monthlyInstallment: number | null = null;
-      const monthlyInstallmentValue = ss.subject.monthlyInstallment;
-      if (monthlyInstallmentValue !== null && monthlyInstallmentValue !== undefined) {
-        // Convert Prisma Decimal to number
-        if (monthlyInstallmentValue instanceof Prisma.Decimal) {
-          monthlyInstallment = monthlyInstallmentValue.toNumber();
-        } else if (typeof monthlyInstallmentValue === 'number') {
-          monthlyInstallment = monthlyInstallmentValue;
-        } else if (typeof monthlyInstallmentValue === 'string') {
-          monthlyInstallment = parseFloat(monthlyInstallmentValue);
-        } else if (typeof monthlyInstallmentValue === 'object' && monthlyInstallmentValue !== null && 'toString' in monthlyInstallmentValue) {
-          monthlyInstallment = parseFloat(String(monthlyInstallmentValue));
-        } else {
-          monthlyInstallment = parseFloat(String(monthlyInstallmentValue));
-        }
+      
+      // Get installment from ClassSubject for the student's class
+      if (student?.classId) {
+        const classSubject = classSubjects.find(
+          cs => cs.subjectId === ss.subjectId && cs.classId === student.classId
+        );
         
-        // Handle NaN
-        if (isNaN(monthlyInstallment)) {
-          monthlyInstallment = null;
+        if (classSubject?.monthlyInstallment) {
+          const monthlyInstallmentValue = classSubject.monthlyInstallment;
+          // Convert Prisma Decimal to number
+          if (monthlyInstallmentValue instanceof Prisma.Decimal) {
+            monthlyInstallment = monthlyInstallmentValue.toNumber();
+          } else if (typeof monthlyInstallmentValue === 'number') {
+            monthlyInstallment = monthlyInstallmentValue;
+          } else if (typeof monthlyInstallmentValue === 'string') {
+            monthlyInstallment = parseFloat(monthlyInstallmentValue);
+          } else if (typeof monthlyInstallmentValue === 'object' && monthlyInstallmentValue !== null && 'toString' in monthlyInstallmentValue) {
+            monthlyInstallment = parseFloat(String(monthlyInstallmentValue));
+          } else {
+            monthlyInstallment = parseFloat(String(monthlyInstallmentValue));
+          }
+          
+          // Handle NaN
+          if (isNaN(monthlyInstallment)) {
+            monthlyInstallment = null;
+          }
         }
       }
       
@@ -730,7 +737,7 @@ export class StudentsService {
           ...ss.subject,
           monthlyInstallment,
           classSubjects: classSubjects
-            .filter(cs => cs.subjectId === ss.subject.id)
+            .filter(cs => cs.subjectId === ss.subjectId)
             .map(cs => ({ class: cs.class })),
           teachers: teacherSubjects
             .filter(ts => ts.subjectId === ss.subjectId)
