@@ -239,7 +239,7 @@ export class StudentsService {
     return student;
   }
 
-  async update(id: string, dto: UpdateStudentDto) {
+  async update(id: string, dto: UpdateStudentDto, updatedBy?: string) {
     const student = await this.prisma.student.findUnique({
       where: { id },
     });
@@ -248,13 +248,48 @@ export class StudentsService {
       throw new NotFoundException('Student not found');
     }
 
-    if (dto.classId) {
-      const classExists = await this.prisma.class.findUnique({
-        where: { id: dto.classId },
-      });
+    if (dto.classId !== undefined) {
+      if (dto.classId) {
+        const classExists = await this.prisma.class.findUnique({
+          where: { id: dto.classId },
+        });
 
-      if (!classExists) {
-        throw new NotFoundException('Class not found');
+        if (!classExists) {
+          throw new NotFoundException('Class not found');
+        }
+      }
+
+      // Also update/create StudentClass junction table record
+      if (dto.classId) {
+        // Remove old class assignments
+        await this.prisma.studentClass.deleteMany({
+          where: { studentId: id },
+        });
+
+        // Create new class assignment
+        const existing = await this.prisma.studentClass.findUnique({
+          where: {
+            studentId_classId: {
+              studentId: id,
+              classId: dto.classId,
+            },
+          },
+        });
+
+        if (!existing) {
+          await this.prisma.studentClass.create({
+            data: {
+              studentId: id,
+              classId: dto.classId,
+              assignedBy: updatedBy || student.id, // Fallback to student id if no user provided
+            },
+          });
+        }
+      } else {
+        // If classId is null, remove all class assignments
+        await this.prisma.studentClass.deleteMany({
+          where: { studentId: id },
+        });
       }
     }
 
@@ -359,13 +394,18 @@ export class StudentsService {
       }
     }
 
-    // Get student's assigned classes
+    // Get student's assigned classes from both StudentClass junction table and classId field
     const studentClasses = await this.prisma.studentClass.findMany({
       where: { studentId },
       select: { classId: true },
     });
 
     const studentClassIds = studentClasses.map((sc) => sc.classId);
+    
+    // Also check if student has a classId directly assigned (for backward compatibility)
+    if (student.classId && !studentClassIds.includes(student.classId)) {
+      studentClassIds.push(student.classId);
+    }
 
     // Validate that student has a class assigned before enrolling subjects
     if (studentClassIds.length === 0) {

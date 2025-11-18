@@ -51,8 +51,12 @@ export class StudentsController {
 
   @Patch(':id')
   @Roles(Role.ADMIN, Role.SUPERVISOR)
-  update(@Param('id') id: string, @Body() updateStudentDto: UpdateStudentDto) {
-    return this.studentsService.update(id, updateStudentDto);
+  update(
+    @Param('id') id: string,
+    @Body() updateStudentDto: UpdateStudentDto,
+    @CurrentUser() user: CurrentUserData,
+  ) {
+    return this.studentsService.update(id, updateStudentDto, user.id);
   }
 
   @Delete(':id')
