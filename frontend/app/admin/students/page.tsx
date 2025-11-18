@@ -136,7 +136,7 @@ export default function StudentsPage() {
         router.push('/login');
         return;
       }
-      setError('Error loading students');
+      setError(t.students?.errorLoadingStudents || 'Error loading students');
     } finally {
       setLoading(false);
     }
@@ -200,7 +200,7 @@ export default function StudentsPage() {
         }
       } catch (err: any) {
         console.error('Error fetching/creating student profile:', err);
-        setError('Unable to load student profile. Please try again.');
+        setError(t.students?.errorLoadingProfile || 'Unable to load student profile. Please try again.');
         setModalLoading(false);
         return;
       }
@@ -261,13 +261,13 @@ export default function StudentsPage() {
 
   const handleSaveChanges = async () => {
     if (!selectedStudent || !selectedStudent.studentProfile?.id) {
-      setError('Student profile not created yet. Please try again.');
+      setError(t.students?.profileNotCreated || 'Student profile not created yet. Please try again.');
       return;
     }
 
     // Validate minimum 1 subject
     if (selectedSubjectIds.length === 0) {
-      setError('At least one subject must be assigned to the student');
+      setError(t.students?.atLeastOneSubject || 'At least one subject must be assigned to the student');
       return;
     }
 
@@ -283,7 +283,7 @@ export default function StudentsPage() {
 
     if (subjectsMissingTeachers.length > 0) {
       setError(
-        `Please assign a teacher for the following subjects with multiple teachers: ${subjectsMissingTeachers.join(', ')}`
+        `${t.students?.assignTeacherForSubjects || 'Please assign a teacher for the following subjects with multiple teachers:'} ${subjectsMissingTeachers.join(', ')}`
       );
       return;
     }
@@ -295,7 +295,7 @@ export default function StudentsPage() {
       
       // Validate that class is selected before enrolling subjects
       if (selectedSubjectIds.length > 0 && !selectedClassId) {
-        setError('Please select a class before assigning subjects to the student');
+        setError(t.students?.selectClassFirst || 'Please select a class before assigning subjects to the student');
         setSaving(false);
         return;
       }
@@ -331,7 +331,7 @@ export default function StudentsPage() {
         { subjects: subjectsToEnroll }
       );
 
-      setSuccess('Class and subjects updated successfully!');
+      setSuccess(t.students?.classSubjectsUpdated || 'Class and subjects updated successfully!');
       // Recalculate installments after enrollment (silently fail if student has no subjects)
       if (selectedStudent?.studentProfile?.id) {
         try {
@@ -457,7 +457,7 @@ export default function StudentsPage() {
               <button
                 onClick={() => router.push('/admin')}
                 className="w-10 h-10 bg-white/20 rounded-lg flex items-center justify-center backdrop-blur-sm hover:bg-white/30 transition-colors flex-shrink-0"
-                aria-label="Back to admin dashboard"
+                aria-label={t.students?.backToDashboard || 'Back to admin dashboard'}
               >
                 <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
@@ -528,16 +528,16 @@ export default function StudentsPage() {
                       {t.users?.email || 'Email'}
                     </th>
                     <th className="px-6 py-4 text-left text-xs font-medium text-white uppercase tracking-wider">
-                      Class
+                      {t.students?.class || 'Class'}
                     </th>
                     <th className="px-6 py-4 text-left text-xs font-medium text-white uppercase tracking-wider">
-                      Subjects
+                      {t.students?.subjects || 'Subjects'}
                     </th>
                     <th className="px-6 py-4 text-left text-xs font-medium text-white uppercase tracking-wider">
                       {t.users?.status || 'Status'}
                     </th>
                     <th className="px-6 py-4 text-left text-xs font-medium text-white uppercase tracking-wider">
-                      Actions
+                      {t.users?.actions || 'Actions'}
                     </th>
                   </tr>
                 </thead>
@@ -568,7 +568,7 @@ export default function StudentsPage() {
                               {student.class.name}
                             </span>
                           ) : (
-                            <span className="text-gray-400 text-xs">No class assigned</span>
+                            <span className="text-gray-400 text-xs">{t.students?.noClass || 'No class assigned'}</span>
                           )}
                         </div>
                       </td>
@@ -584,7 +584,7 @@ export default function StudentsPage() {
                               </span>
                             ))
                           ) : (
-                            <span className="text-gray-400 text-xs">No subjects</span>
+                            <span className="text-gray-400 text-xs">{t.students?.noSubjects || 'No subjects'}</span>
                           )}
                         </div>
                       </td>
@@ -752,7 +752,7 @@ export default function StudentsPage() {
             <div className="p-6 space-y-6 overflow-y-auto flex-1">
               {/* Student Info */}
               <div className="bg-gray-50 rounded-lg p-4">
-                <h3 className="text-sm font-medium text-gray-700 mb-2">Student</h3>
+                <h3 className="text-sm font-medium text-gray-700 mb-2">{t.students?.student || 'Student'}</h3>
                 <div className="flex items-center gap-3">
                   <div className="h-12 w-12 bg-gradient-to-br from-emerald-500 to-green-600 rounded-full flex items-center justify-center">
                     <span className="text-white font-semibold text-lg">

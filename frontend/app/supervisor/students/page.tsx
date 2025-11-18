@@ -239,13 +239,13 @@ export default function SupervisorStudentsPage() {
 
   const handleSaveChanges = async () => {
     if (!selectedStudent || !selectedStudent.studentProfile?.id) {
-      setError('Student profile not created yet. Please try again.');
+      setError(t.students?.profileNotCreated || 'Student profile not created yet. Please try again.');
       return;
     }
 
     // Validate minimum 1 subject
     if (selectedSubjectIds.length === 0) {
-      setError('At least one subject must be assigned to the student');
+      setError(t.students?.atLeastOneSubject || 'At least one subject must be assigned to the student');
       return;
     }
 
@@ -256,7 +256,7 @@ export default function SupervisorStudentsPage() {
       
       // Validate that class is selected before enrolling subjects
       if (selectedSubjectIds.length > 0 && !selectedClassId) {
-        setError('Please select a class before assigning subjects to the student');
+        setError(t.students?.selectClassFirst || 'Please select a class before assigning subjects to the student');
         setSaving(false);
         return;
       }
@@ -279,7 +279,7 @@ export default function SupervisorStudentsPage() {
         { subjects: subjectsToEnroll }
       );
 
-      setSuccess('Class and subjects updated successfully!');
+      setSuccess(t.students?.classSubjectsUpdated || 'Class and subjects updated successfully!');
       setTimeout(() => {
         setShowModal(false);
         fetchData();
@@ -287,7 +287,7 @@ export default function SupervisorStudentsPage() {
       
     } catch (err: any) {
       console.error('Save error:', err);
-      setError(err.message || 'Error saving changes');
+      setError(err.message || t.students?.errorSaving || 'Error saving changes');
     } finally {
       setSaving(false);
     }
