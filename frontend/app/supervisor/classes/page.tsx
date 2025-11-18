@@ -164,7 +164,7 @@ export default function ClassesPage() {
       if (prev.find(s => s.subjectId === subjectId)) {
         return prev.filter(s => s.subjectId !== subjectId);
       } else {
-        return [...prev, { subjectId, monthlyInstallment: undefined }];
+        return [...prev, { subjectId, monthlyInstallment: 0 }];
       }
     });
   };
@@ -197,10 +197,21 @@ export default function ClassesPage() {
         return;
       }
       
+      // Validate that all subjects have monthlyInstallment
+      const subjectsWithoutInstallment = subjectsToAssign.filter(
+        s => s.monthlyInstallment === undefined || s.monthlyInstallment === null || isNaN(Number(s.monthlyInstallment))
+      );
+      
+      if (subjectsWithoutInstallment.length > 0) {
+        setError('Please specify monthly installment amount for all selected subjects');
+        setSubjectModalLoading(false);
+        return;
+      }
+      
       await apiClient.post(`/classes/${selectedClassForSubjects.id}/subjects`, {
         subjects: subjectsToAssign.map(s => ({
           subjectId: s.subjectId,
-          monthlyInstallment: s.monthlyInstallment,
+          monthlyInstallment: Number(s.monthlyInstallment),
         })),
       });
       
@@ -696,9 +707,11 @@ export default function ClassesPage() {
                                 {subject.code && (
                                   <p className="text-sm text-gray-600">{subject.code}</p>
                                 )}
-                                {subject.monthlyInstallment !== undefined && (
+                                {subject.monthlyInstallment !== undefined && subject.monthlyInstallment !== null && (
                                   <p className="text-sm font-medium text-green-700 mt-1">
-                                    ${subject.monthlyInstallment.toFixed(2)}/month
+                                    ${typeof subject.monthlyInstallment === 'number' 
+                                      ? subject.monthlyInstallment.toFixed(2) 
+                                      : parseFloat(String(subject.monthlyInstallment || 0)).toFixed(2)}/month
                                   </p>
                                 )}
                               </div>
@@ -815,12 +828,13 @@ export default function ClassesPage() {
                               {isSelected && (
                                 <div className="mt-3 pt-3 border-t border-blue-200">
                                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                                    Monthly Installment (optional)
+                                    Monthly Installment <span className="text-red-500">*</span>
                                   </label>
                                   <input
                                     type="number"
                                     step="0.01"
                                     min="0"
+                                    required
                                     value={selectedSubject?.monthlyInstallment?.toString() || ''}
                                     onChange={(e) => {
                                       const value = e.target.value;
@@ -831,6 +845,7 @@ export default function ClassesPage() {
                                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                                     placeholder="0.00"
                                   />
+                                  <p className="mt-1 text-xs text-gray-500">Required: Enter the monthly installment amount for this subject in this class</p>
                                 </div>
                               )}
                             </div>

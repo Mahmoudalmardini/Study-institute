@@ -243,7 +243,7 @@ export class ClassesService {
 
   async assignSubjects(
     classId: string,
-    subjects: Array<{ subjectId: string; monthlyInstallment?: number }>,
+    subjects: Array<{ subjectId: string; monthlyInstallment: number }>,
     assignedBy: string,
   ) {
     // Validate class exists
@@ -275,25 +275,22 @@ export class ClassesService {
         });
 
         if (existing) {
-          // Update existing assignment with new installment if provided
-          if (monthlyInstallment !== undefined) {
-            return this.prisma.classSubject.update({
-              where: {
-                classId_subjectId: {
-                  classId,
-                  subjectId,
-                },
+          // Update existing assignment with new installment
+          return this.prisma.classSubject.update({
+            where: {
+              classId_subjectId: {
+                classId,
+                subjectId,
               },
-              data: {
-                monthlyInstallment: monthlyInstallment !== null ? monthlyInstallment : null,
-              },
-              include: {
-                subject: true,
-                class: true,
-              },
-            });
-          }
-          return existing;
+            },
+            data: {
+              monthlyInstallment: monthlyInstallment,
+            },
+            include: {
+              subject: true,
+              class: true,
+            },
+          });
         }
 
         // Create new assignment
@@ -302,7 +299,7 @@ export class ClassesService {
             classId,
             subjectId,
             assignedBy,
-            monthlyInstallment: monthlyInstallment !== undefined ? monthlyInstallment : null,
+            monthlyInstallment: monthlyInstallment,
           },
           include: {
             subject: true,
