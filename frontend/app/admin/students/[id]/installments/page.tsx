@@ -568,10 +568,18 @@ export default function StudentInstallmentsPage() {
                         </div>
                         <div>
                           <p className="text-sm text-gray-600">
-                            {t.installments?.outstandingAmount || 'Outstanding'}
+                            {parseFloat(String(installment.outstandingAmount || 0)) < 0
+                              ? t.installments?.overpaidLabel || 'Overpaid'
+                              : t.installments?.outstandingAmount || 'Outstanding'}
                           </p>
-                          <p className="text-lg font-semibold text-red-600">
-                            {formatCurrency(installment.outstandingAmount)}
+                          <p className={`text-lg font-semibold ${
+                            parseFloat(String(installment.outstandingAmount || 0)) < 0
+                              ? 'text-green-600'
+                              : 'text-red-600'
+                          }`}>
+                            {parseFloat(String(installment.outstandingAmount || 0)) < 0
+                              ? formatCurrency(Math.abs(parseFloat(String(installment.outstandingAmount || 0))))
+                              : formatCurrency(installment.outstandingAmount)}
                           </p>
                         </div>
                         {parseFloat(String(installment.discountAmount || 0)) > 0 && (

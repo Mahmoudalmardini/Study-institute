@@ -748,9 +748,19 @@ export default function InstallmentsPage() {
                               </p>
                             </div>
                             <div>
-                              <p className="text-gray-600">Outstanding</p>
-                              <p className="font-semibold text-red-600">
-                                {formatCurrency(installment.outstandingAmount)}
+                              <p className="text-gray-600">
+                                {parseFloat(String(installment.outstandingAmount || 0)) < 0
+                                  ? t.installments?.overpaidLabel || 'Overpaid'
+                                  : t.installments?.outstandingLabel || 'Outstanding'}
+                              </p>
+                              <p className={`font-semibold ${
+                                parseFloat(String(installment.outstandingAmount || 0)) < 0
+                                  ? 'text-green-600'
+                                  : 'text-red-600'
+                              }`}>
+                                {parseFloat(String(installment.outstandingAmount || 0)) < 0
+                                  ? formatCurrency(Math.abs(parseFloat(String(installment.outstandingAmount || 0))))
+                                  : formatCurrency(installment.outstandingAmount)}
                               </p>
                             </div>
                             {parseFloat(String(installment.discountAmount || 0)) > 0 && (
@@ -793,9 +803,23 @@ export default function InstallmentsPage() {
               {t.installments?.recordPayment || 'Record Payment'}
             </h3>
             <div className="space-y-4">
-              <div className="mb-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+              <div className={`mb-3 p-3 border rounded-lg ${
+                selectedInstallmentOutstanding < 0
+                  ? 'bg-green-50 border-green-200'
+                  : 'bg-blue-50 border-blue-200'
+              }`}>
                 <p className="text-sm text-gray-600">
-                  {t.installments?.outstandingAmountLabel || 'Outstanding Amount'}: <span className="font-bold text-blue-600">{formatCurrency(selectedInstallmentOutstanding)}</span>
+                  {selectedInstallmentOutstanding < 0
+                    ? t.installments?.overpaidLabel || 'Overpaid Amount'
+                    : t.installments?.outstandingAmountLabel || 'Outstanding Amount'}: <span className={`font-bold ${
+                      selectedInstallmentOutstanding < 0
+                        ? 'text-green-600'
+                        : 'text-blue-600'
+                    }`}>
+                      {selectedInstallmentOutstanding < 0
+                        ? formatCurrency(Math.abs(selectedInstallmentOutstanding))
+                        : formatCurrency(selectedInstallmentOutstanding)}
+                    </span>
                 </p>
               </div>
               <div>
@@ -806,18 +830,13 @@ export default function InstallmentsPage() {
                   type="number"
                   step="0.01"
                   min="0"
-                  max={selectedInstallmentOutstanding}
                   value={paymentForm.amount}
                   onChange={(e) => setPaymentForm({ ...paymentForm, amount: e.target.value })}
-                  className={`w-full px-4 py-2 border rounded-lg ${
-                    paymentForm.amount && parseFloat(paymentForm.amount) > selectedInstallmentOutstanding
-                      ? 'border-red-500 bg-red-50'
-                      : 'border-gray-300'
-                  }`}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg"
                 />
                 {paymentForm.amount && parseFloat(paymentForm.amount) > selectedInstallmentOutstanding && (
-                  <p className="mt-1 text-sm text-red-600">
-                    {(t.installments?.paymentAmountExceedsError || 'Payment amount cannot exceed outstanding amount ({amount})').replace('{amount}', formatCurrency(selectedInstallmentOutstanding))}
+                  <p className="mt-1 text-sm text-blue-600">
+                    {t.installments?.overpaymentInfo || 'Payment exceeds outstanding amount. Excess will be applied to future installments.'}
                   </p>
                 )}
               </div>
@@ -863,10 +882,6 @@ export default function InstallmentsPage() {
                       setError(t.installments?.invalidPaymentAmount || 'Please enter a valid payment amount');
                       return;
                     }
-                    if (paymentAmount > selectedInstallmentOutstanding) {
-                      setError((t.installments?.paymentAmountExceedsError || 'Payment amount cannot exceed outstanding amount ({amount})').replace('{amount}', formatCurrency(selectedInstallmentOutstanding)));
-                      return;
-                    }
                     try {
                       await recordPayment({
                         studentId: selectedStudent.studentProfile!.id,
@@ -891,7 +906,7 @@ export default function InstallmentsPage() {
                       setError(err.response?.data?.message || 'Failed to record payment');
                     }
                   }}
-                  disabled={!paymentForm.amount || isNaN(parseFloat(paymentForm.amount)) || parseFloat(paymentForm.amount) <= 0 || parseFloat(paymentForm.amount) > selectedInstallmentOutstanding}
+                  disabled={!paymentForm.amount || isNaN(parseFloat(paymentForm.amount)) || parseFloat(paymentForm.amount) <= 0}
                   className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
                 >
                   Record

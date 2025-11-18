@@ -143,9 +143,17 @@ export class InstallmentsService {
     );
 
     let outstandingFromPrevious = new Prisma.Decimal(0);
-    if (previousInstallment && previousInstallment.outstandingAmount.gt(0)) {
-      outstandingFromPrevious = previousInstallment.outstandingAmount;
-      totalAmount = totalAmount.add(outstandingFromPrevious);
+    if (previousInstallment) {
+      const prevOutstanding = previousInstallment.outstandingAmount;
+      if (prevOutstanding.gt(0)) {
+        // Positive outstanding: add to current month's total
+        outstandingFromPrevious = prevOutstanding;
+        totalAmount = totalAmount.add(outstandingFromPrevious);
+      } else if (prevOutstanding.lt(0)) {
+        // Negative outstanding (overpayment): subtract from current month's total
+        outstandingFromPrevious = prevOutstanding;
+        totalAmount = totalAmount.add(outstandingFromPrevious); // Adding negative = subtracting
+      }
     }
 
     // Get active discounts
@@ -424,14 +432,6 @@ export class InstallmentsService {
       );
     }
 
-    // Validate payment amount doesn't exceed outstanding amount
-    const paymentAmount = new Prisma.Decimal(createPaymentDto.amount);
-    if (paymentAmount.gt(installment.outstandingAmount)) {
-      throw new BadRequestException(
-        `Payment amount (${paymentAmount.toString()}) cannot exceed outstanding amount (${installment.outstandingAmount.toString()})`,
-      );
-    }
-
     // Create payment record
     const payment = await this.prisma.paymentRecord.create({
       data: {
@@ -451,6 +451,7 @@ export class InstallmentsService {
     const outstandingAmount = finalAmount.minus(newPaidAmount);
 
     let status: 'PENDING' | 'PARTIAL' | 'PAID' | 'OVERDUE' = installment.status;
+    // If paid amount is greater than or equal to final amount (including overpayment), mark as PAID
     if (newPaidAmount.gte(finalAmount)) {
       status = 'PAID';
     } else if (newPaidAmount.gt(0)) {
@@ -461,7 +462,8 @@ export class InstallmentsService {
       where: { id: createPaymentDto.installmentId },
       data: {
         paidAmount: newPaidAmount,
-        outstandingAmount: outstandingAmount.gte(0) ? outstandingAmount : new Prisma.Decimal(0),
+        // Allow negative outstanding amounts (overpayment)
+        outstandingAmount,
         status,
       },
     });
