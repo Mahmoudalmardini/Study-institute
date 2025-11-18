@@ -42,7 +42,6 @@ export default function SubjectsPage() {
   const [editingSubject, setEditingSubject] = useState<Subject | null>(null);
   const [formData, setFormData] = useState({
     name: '',
-    monthlyInstallment: '',
   });
   const [user, setUser] = useState<any>(null);
   const [mounted, setMounted] = useState(false);
@@ -87,7 +86,6 @@ export default function SubjectsPage() {
       
       const submitData = {
         ...formData,
-        monthlyInstallment: formData.monthlyInstallment ? parseFloat(formData.monthlyInstallment) : undefined,
       };
       
       if (editingSubject) {
@@ -100,7 +98,7 @@ export default function SubjectsPage() {
       
       setShowForm(false);
       setEditingSubject(null);
-      setFormData({ name: '', monthlyInstallment: '' });
+      setFormData({ name: '' });
       fetchSubjects();
       setTimeout(() => setSuccess(''), 3000);
     } catch (error: any) {
@@ -114,7 +112,6 @@ export default function SubjectsPage() {
     setEditingSubject(subject);
     setFormData({
       name: subject.name,
-      monthlyInstallment: subject.monthlyInstallment?.toString() || '',
     });
     setShowForm(true);
     setError('');
@@ -140,7 +137,7 @@ export default function SubjectsPage() {
   const handleCancel = () => {
     setShowForm(false);
     setEditingSubject(null);
-    setFormData({ name: '', monthlyInstallment: '' });
+    setFormData({ name: '' });
     setError('');
     setSuccess('');
   };
@@ -295,27 +292,6 @@ export default function SubjectsPage() {
                 />
                 <p className="mt-2 text-sm text-gray-500">
                   Enter the subject name. Other details can be added later when editing.
-                </p>
-              </div>
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Monthly Installment Amount
-                </label>
-                <input
-                  type="text"
-                  value={formData.monthlyInstallment}
-                  onChange={(e) => {
-                    const value = e.target.value;
-                    // Allow only numbers and decimal point
-                    if (value === '' || /^\d*\.?\d*$/.test(value)) {
-                      setFormData({ ...formData, monthlyInstallment: value });
-                    }
-                  }}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-teal-500 focus:border-transparent transition-all"
-                  placeholder="0.00"
-                />
-                <p className="mt-2 text-sm text-gray-500">
-                  Enter the monthly installment amount for this subject (optional).
                 </p>
               </div>
               <div className="flex flex-col sm:flex-row gap-3 pt-4">

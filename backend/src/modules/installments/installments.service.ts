@@ -26,6 +26,9 @@ export class InstallmentsService {
     // Validate student exists
     const student = await this.prisma.student.findUnique({
       where: { id: studentId },
+      include: {
+        class: true,
+      },
     });
 
     if (!student) {
@@ -53,7 +56,6 @@ export class InstallmentsService {
           select: {
             id: true,
             name: true,
-            monthlyInstallment: true,
           },
         },
       },
@@ -68,22 +70,59 @@ export class InstallmentsService {
       enrolledAt: Date;
     }> = [];
 
-    for (const studentSubject of studentSubjects) {
-      // Only include if enrolled during or before this month
-      if (studentSubject.enrolledAt <= monthEnd) {
-        // monthlyInstallment is a Prisma Decimal, convert it properly
-        const installmentDecimal = studentSubject.subject.monthlyInstallment;
-        if (installmentDecimal) {
-          const installmentAmount = new Prisma.Decimal(installmentDecimal);
-          if (installmentAmount.gt(0)) {
-            totalAmount = totalAmount.add(installmentAmount);
-            subjectBreakdown.push({
-              subjectId: studentSubject.subject.id,
-              subjectName: studentSubject.subject.name,
-              amount: installmentAmount,
-              enrolledAt: studentSubject.enrolledAt,
-            });
+    // If student has no class, skip installment calculation for subjects (log warning)
+    if (!student.classId) {
+      console.warn(
+        `Student ${studentId} has no class assigned. Skipping installment calculation.`,
+      );
+      // Still create installment record with 0 amount
+    } else {
+      // Get all class-subject relationships for the student's class
+      const classSubjects = await this.prisma.classSubject.findMany({
+        where: {
+          classId: student.classId,
+        },
+        include: {
+          subject: {
+            select: {
+              id: true,
+              name: true,
+            },
+          },
+        },
+      });
+
+      // Create a map for quick lookup
+      const classSubjectMap = new Map(
+        classSubjects.map((cs) => [cs.subjectId, cs]),
+      );
+
+      for (const studentSubject of studentSubjects) {
+        // Only include if enrolled during or before this month
+        if (studentSubject.enrolledAt <= monthEnd) {
+          // Look up the class-subject relationship to get the installment amount
+          const classSubject = classSubjectMap.get(studentSubject.subjectId);
+
+          if (classSubject && classSubject.monthlyInstallment) {
+            const installmentAmount = new Prisma.Decimal(
+              classSubject.monthlyInstallment,
+            );
+            if (installmentAmount.gt(0)) {
+              totalAmount = totalAmount.add(installmentAmount);
+              subjectBreakdown.push({
+                subjectId: studentSubject.subject.id,
+                subjectName: studentSubject.subject.name,
+                amount: installmentAmount,
+                enrolledAt: studentSubject.enrolledAt,
+              });
+            }
+          } else if (classSubject === undefined) {
+            // Subject is enrolled but not assigned to the student's class
+            console.warn(
+              `Subject ${studentSubject.subjectId} (${studentSubject.subject.name}) is enrolled for student ${studentId} but not assigned to class ${student.classId}. Skipping installment.`,
+            );
           }
+          // If classSubject exists but monthlyInstallment is null/0, skip (no charge)
         }
       }
     }

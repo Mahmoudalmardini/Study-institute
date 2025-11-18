@@ -465,59 +465,38 @@ export class StudentsService {
 
     // Automatically create installments for enrolled subjects
     // Calculate for the enrollment month and current month if different
+    // The calculation method will check ClassSubject relationships for installment amounts
     try {
       const now = new Date();
       const currentMonth = now.getMonth() + 1;
       const currentYear = now.getFullYear();
 
-      // Check if any enrolled subjects have monthly installments
-      const enrolledSubjects = await this.prisma.studentSubject.findMany({
-        where: { studentId },
-        include: {
-          subject: {
-            select: {
-              id: true,
-              monthlyInstallment: true,
-            },
-          },
-        },
-      });
+      // Calculate for current month (will handle cases with no installments gracefully)
+      await this.installmentsService.calculateMonthlyInstallment(
+        studentId,
+        currentMonth,
+        currentYear,
+      );
 
-      const hasInstallments = enrolledSubjects.some((es) => {
-        if (!es.subject.monthlyInstallment) return false;
-        // Handle Prisma Decimal properly
-        const amount = new Prisma.Decimal(es.subject.monthlyInstallment);
-        return amount.gt(0);
-      });
+      // Also calculate for enrollment month if different from current month
+      // Use the earliest enrollment date from the newly enrolled subjects
+      const enrollmentDates = enrollments
+        .map((e) => e.enrolledAt || e.createdAt)
+        .filter((d) => d)
+        .map((d) => new Date(d));
 
-      if (hasInstallments) {
-        // Calculate for current month
-        await this.installmentsService.calculateMonthlyInstallment(
-          studentId,
-          currentMonth,
-          currentYear,
-        );
+      if (enrollmentDates.length > 0) {
+        const earliestEnrollment = new Date(Math.min(...enrollmentDates.map((d) => d.getTime())));
+        const enrollmentMonth = earliestEnrollment.getMonth() + 1;
+        const enrollmentYear = earliestEnrollment.getFullYear();
 
-        // Also calculate for enrollment month if different from current month
-        // Use the earliest enrollment date from the newly enrolled subjects
-        const enrollmentDates = enrollments
-          .map((e) => e.enrolledAt || e.createdAt)
-          .filter((d) => d)
-          .map((d) => new Date(d));
-
-        if (enrollmentDates.length > 0) {
-          const earliestEnrollment = new Date(Math.min(...enrollmentDates.map((d) => d.getTime())));
-          const enrollmentMonth = earliestEnrollment.getMonth() + 1;
-          const enrollmentYear = earliestEnrollment.getFullYear();
-
-          // Only calculate for enrollment month if it's different from current month
-          if (enrollmentMonth !== currentMonth || enrollmentYear !== currentYear) {
-            await this.installmentsService.calculateMonthlyInstallment(
-              studentId,
-              enrollmentMonth,
-              enrollmentYear,
-            );
-          }
+        // Only calculate for enrollment month if it's different from current month
+        if (enrollmentMonth !== currentMonth || enrollmentYear !== currentYear) {
+          await this.installmentsService.calculateMonthlyInstallment(
+            studentId,
+            enrollmentMonth,
+            enrollmentYear,
+          );
         }
       }
     } catch (error) {

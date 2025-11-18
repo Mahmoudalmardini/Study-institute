@@ -61,9 +61,11 @@ export default function ClassesPage() {
   const [showSubjectModal, setShowSubjectModal] = useState(false);
   const [selectedClassForSubjects, setSelectedClassForSubjects] = useState<Class | null>(null);
   const [allSubjects, setAllSubjects] = useState<Subject[]>([]);
-  const [assignedSubjects, setAssignedSubjects] = useState<Subject[]>([]);
-  const [selectedSubjectIds, setSelectedSubjectIds] = useState<string[]>([]);
+  const [assignedSubjects, setAssignedSubjects] = useState<Array<Subject & { monthlyInstallment?: number }>>([]);
+  const [selectedSubjects, setSelectedSubjects] = useState<Array<{ subjectId: string; monthlyInstallment?: number }>>([]);
   const [subjectModalLoading, setSubjectModalLoading] = useState(false);
+  const [editingInstallmentSubjectId, setEditingInstallmentSubjectId] = useState<string | null>(null);
+  const [editingInstallmentValue, setEditingInstallmentValue] = useState<string>('');
 
   useEffect(() => {
     const token = localStorage.getItem('accessToken');
@@ -130,7 +132,7 @@ export default function ClassesPage() {
     setError('');
     setSuccess('');
     // Clear selected subjects when opening modal
-    setSelectedSubjectIds([]);
+    setSelectedSubjects([]);
     
     try {
       await Promise.all([
@@ -150,19 +152,31 @@ export default function ClassesPage() {
     setSelectedClassForSubjects(null);
     setAllSubjects([]);
     setAssignedSubjects([]);
-    setSelectedSubjectIds([]);
+    setSelectedSubjects([]);
+    setEditingInstallmentSubjectId(null);
+    setEditingInstallmentValue('');
     setError('');
     setSuccess('');
   };
 
   const toggleSubject = (subjectId: string) => {
-    setSelectedSubjectIds(prev => {
-      if (prev.includes(subjectId)) {
-        return prev.filter(id => id !== subjectId);
+    setSelectedSubjects(prev => {
+      if (prev.find(s => s.subjectId === subjectId)) {
+        return prev.filter(s => s.subjectId !== subjectId);
       } else {
-        return [...prev, subjectId];
+        return [...prev, { subjectId, monthlyInstallment: undefined }];
       }
     });
+  };
+
+  const updateSubjectInstallment = (subjectId: string, value: string) => {
+    setSelectedSubjects(prev => 
+      prev.map(s => 
+        s.subjectId === subjectId 
+          ? { ...s, monthlyInstallment: value === '' ? undefined : parseFloat(value) }
+          : s
+      )
+    );
   };
 
   const handleAssignSubjects = async () => {
@@ -173,8 +187,8 @@ export default function ClassesPage() {
       setSubjectModalLoading(true);
       
       // Only assign subjects that are not already assigned
-      const subjectsToAssign = selectedSubjectIds.filter(
-        id => !assignedSubjects.find(as => as.id === id)
+      const subjectsToAssign = selectedSubjects.filter(
+        s => !assignedSubjects.find(as => as.id === s.subjectId)
       );
       
       if (subjectsToAssign.length === 0) {
@@ -184,33 +198,55 @@ export default function ClassesPage() {
       }
       
       await apiClient.post(`/classes/${selectedClassForSubjects.id}/subjects`, {
-        subjectIds: subjectsToAssign,
+        subjects: subjectsToAssign.map(s => ({
+          subjectId: s.subjectId,
+          monthlyInstallment: s.monthlyInstallment,
+        })),
       });
       
-      // Get the newly assigned subjects from allSubjects
-      const newlyAssignedSubjects = allSubjects.filter(subject => 
-        subjectsToAssign.includes(subject.id)
-      );
-      
-      // Update assignedSubjects immediately
-      setAssignedSubjects(prev => [...prev, ...newlyAssignedSubjects]);
-      
-      // Update classes state to reflect new subject count
-      setClasses(prev => prev.map(cls => 
-        cls.id === selectedClassForSubjects.id
-          ? { ...cls, _count: { ...cls._count, subjects: (cls._count?.subjects || 0) + subjectsToAssign.length } }
-          : cls
-      ));
+      // Refresh assigned subjects to get updated data with installments
+      await handleOpenSubjectModal(selectedClassForSubjects);
       
       setSuccess('Subjects assigned successfully!');
       // Clear selected subjects after successful assignment
-      setSelectedSubjectIds([]);
+      setSelectedSubjects([]);
       setTimeout(() => setSuccess(''), 3000);
     } catch (error: any) {
       console.error('Error assigning subjects:', error);
       setError(error.response?.data?.message || 'Error assigning subjects');
     } finally {
       setSubjectModalLoading(false);
+    }
+  };
+
+  const handleUpdateInstallment = async (subjectId: string) => {
+    if (!selectedClassForSubjects) return;
+    
+    try {
+      setError('');
+      const value = editingInstallmentValue === '' ? null : parseFloat(editingInstallmentValue);
+      
+      await apiClient.patch(
+        `/classes/${selectedClassForSubjects.id}/subjects/${subjectId}/installment`,
+        { monthlyInstallment: value }
+      );
+      
+      // Update local state
+      setAssignedSubjects(prev =>
+        prev.map(s =>
+          s.id === subjectId
+            ? { ...s, monthlyInstallment: value ?? undefined }
+            : s
+        )
+      );
+      
+      setEditingInstallmentSubjectId(null);
+      setEditingInstallmentValue('');
+      setSuccess('Installment updated successfully!');
+      setTimeout(() => setSuccess(''), 3000);
+    } catch (error: any) {
+      console.error('Error updating installment:', error);
+      setError(error.response?.data?.message || 'Error updating installment');
     }
   };
 
@@ -652,23 +688,79 @@ export default function ClassesPage() {
                         {assignedSubjects.map((subject) => (
                           <div
                             key={subject.id}
-                            className="p-4 bg-green-50 border-2 border-green-200 rounded-lg flex items-center justify-between"
+                            className="p-4 bg-green-50 border-2 border-green-200 rounded-lg"
                           >
-                            <div className="flex-1">
-                              <p className="font-semibold text-gray-900">{subject.name}</p>
-                              {subject.code && (
-                                <p className="text-sm text-gray-600">{subject.code}</p>
-                              )}
+                            <div className="flex items-center justify-between mb-2">
+                              <div className="flex-1">
+                                <p className="font-semibold text-gray-900">{subject.name}</p>
+                                {subject.code && (
+                                  <p className="text-sm text-gray-600">{subject.code}</p>
+                                )}
+                                {subject.monthlyInstallment !== undefined && (
+                                  <p className="text-sm font-medium text-green-700 mt-1">
+                                    ${subject.monthlyInstallment.toFixed(2)}/month
+                                  </p>
+                                )}
+                              </div>
+                              <button
+                                onClick={() => handleUnassignSubject(subject.id)}
+                                className="ml-2 text-red-600 hover:text-red-800 p-1"
+                                title="Unassign"
+                              >
+                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                              </button>
                             </div>
-                            <button
-                              onClick={() => handleUnassignSubject(subject.id)}
-                              className="ml-2 text-red-600 hover:text-red-800 p-1"
-                              title="Unassign"
-                            >
-                              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                              </svg>
-                            </button>
+                            {editingInstallmentSubjectId === subject.id ? (
+                              <div className="mt-3 pt-3 border-t border-green-200">
+                                <label className="block text-sm font-medium text-gray-700 mb-1">
+                                  Monthly Installment
+                                </label>
+                                <div className="flex gap-2">
+                                  <input
+                                    type="number"
+                                    step="0.01"
+                                    min="0"
+                                    value={editingInstallmentValue}
+                                    onChange={(e) => {
+                                      const value = e.target.value;
+                                      if (value === '' || /^\d*\.?\d*$/.test(value)) {
+                                        setEditingInstallmentValue(value);
+                                      }
+                                    }}
+                                    className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                                    placeholder="0.00"
+                                    autoFocus
+                                  />
+                                  <button
+                                    onClick={() => handleUpdateInstallment(subject.id)}
+                                    className="px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                                  >
+                                    Save
+                                  </button>
+                                  <button
+                                    onClick={() => {
+                                      setEditingInstallmentSubjectId(null);
+                                      setEditingInstallmentValue('');
+                                    }}
+                                    className="px-3 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors"
+                                  >
+                                    Cancel
+                                  </button>
+                                </div>
+                              </div>
+                            ) : (
+                              <button
+                                onClick={() => {
+                                  setEditingInstallmentSubjectId(subject.id);
+                                  setEditingInstallmentValue(subject.monthlyInstallment?.toString() || '');
+                                }}
+                                className="mt-2 text-sm text-blue-600 hover:text-blue-800 font-medium"
+                              >
+                                {subject.monthlyInstallment !== undefined ? 'Edit Installment' : 'Set Installment'}
+                              </button>
+                            )}
                           </div>
                         ))}
                       </div>
@@ -681,36 +773,69 @@ export default function ClassesPage() {
                       <svg className="w-5 h-5 text-blue-600" fill="currentColor" viewBox="0 0 20 20">
                         <path d="M9 4.804A7.968 7.968 0 005.5 4c-1.255 0-2.443.29-3.5.804v10A7.969 7.969 0 015.5 14c1.669 0 3.218.51 4.5 1.385A7.962 7.962 0 0114.5 14c1.255 0 2.443.29 3.5.804v-10A7.968 7.968 0 0014.5 4c-1.255 0-2.443.29-3.5.804V12a1 1 0 11-2 0V4.804z" />
                       </svg>
-                      Available Subjects ({selectedSubjectIds.length} selected)
+                      Available Subjects ({selectedSubjects.length} selected)
                     </h3>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 max-h-96 overflow-y-auto p-2">
+                    <div className="space-y-3 max-h-96 overflow-y-auto p-2">
                       {allSubjects
                         .filter(subject => !assignedSubjects.find(as => as.id === subject.id))
-                        .map((subject) => (
-                          <button
-                            key={subject.id}
-                            onClick={() => toggleSubject(subject.id)}
-                            className={`p-4 rounded-lg border-2 transition-all text-left min-h-[60px] ${
-                              selectedSubjectIds.includes(subject.id)
-                                ? 'border-blue-500 bg-blue-50 shadow-md'
-                                : 'border-gray-200 hover:border-blue-300 bg-white'
-                            }`}
-                          >
-                            <div className="flex items-center justify-between">
-                              <div className="flex-1">
-                                <p className="font-semibold text-gray-900">{subject.name}</p>
-                                {subject.code && (
-                                  <p className="text-sm text-gray-600">{subject.code}</p>
-                                )}
+                        .map((subject) => {
+                          const isSelected = selectedSubjects.find(s => s.subjectId === subject.id);
+                          const selectedSubject = selectedSubjects.find(s => s.subjectId === subject.id);
+                          return (
+                            <div
+                              key={subject.id}
+                              className={`p-4 rounded-lg border-2 transition-all ${
+                                isSelected
+                                  ? 'border-blue-500 bg-blue-50 shadow-md'
+                                  : 'border-gray-200 bg-white'
+                              }`}
+                            >
+                              <div className="flex items-center justify-between mb-2">
+                                <div className="flex-1">
+                                  <p className="font-semibold text-gray-900">{subject.name}</p>
+                                  {subject.code && (
+                                    <p className="text-sm text-gray-600">{subject.code}</p>
+                                  )}
+                                </div>
+                                <button
+                                  onClick={() => toggleSubject(subject.id)}
+                                  className="ml-2"
+                                >
+                                  {isSelected ? (
+                                    <svg className="w-5 h-5 text-blue-600" fill="currentColor" viewBox="0 0 20 20">
+                                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                                    </svg>
+                                  ) : (
+                                    <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                                    </svg>
+                                  )}
+                                </button>
                               </div>
-                              {selectedSubjectIds.includes(subject.id) && (
-                                <svg className="w-5 h-5 text-blue-600" fill="currentColor" viewBox="0 0 20 20">
-                                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                                </svg>
+                              {isSelected && (
+                                <div className="mt-3 pt-3 border-t border-blue-200">
+                                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                                    Monthly Installment (optional)
+                                  </label>
+                                  <input
+                                    type="number"
+                                    step="0.01"
+                                    min="0"
+                                    value={selectedSubject?.monthlyInstallment?.toString() || ''}
+                                    onChange={(e) => {
+                                      const value = e.target.value;
+                                      if (value === '' || /^\d*\.?\d*$/.test(value)) {
+                                        updateSubjectInstallment(subject.id, value);
+                                      }
+                                    }}
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                    placeholder="0.00"
+                                  />
+                                </div>
                               )}
                             </div>
-                          </button>
-                        ))}
+                          );
+                        })}
                     </div>
                     {allSubjects.filter(subject => !assignedSubjects.find(as => as.id === subject.id)).length === 0 && (
                       <p className="text-center text-gray-500 py-8">All subjects are already assigned to this class</p>
@@ -729,10 +854,10 @@ export default function ClassesPage() {
               </button>
               <button
                 onClick={handleAssignSubjects}
-                disabled={subjectModalLoading || selectedSubjectIds.length === 0}
+                disabled={subjectModalLoading || selectedSubjects.length === 0}
                 className="gradient-primary text-white px-6 py-2 rounded-xl hover:shadow-lg transition-all font-medium disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {subjectModalLoading ? 'Assigning...' : `Assign ${selectedSubjectIds.length} Subject${selectedSubjectIds.length !== 1 ? 's' : ''}`}
+                {subjectModalLoading ? 'Assigning...' : `Assign ${selectedSubjects.length} Subject${selectedSubjects.length !== 1 ? 's' : ''}`}
               </button>
             </div>
           </div>

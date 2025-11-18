@@ -241,22 +241,29 @@ export class ClassesService {
     });
   }
 
-  async assignSubjects(classId: string, subjectIds: string[], assignedBy: string) {
+  async assignSubjects(
+    classId: string,
+    subjects: Array<{ subjectId: string; monthlyInstallment?: number }>,
+    assignedBy: string,
+  ) {
     // Validate class exists
     await this.findOne(classId);
 
+    // Extract subject IDs
+    const subjectIds = subjects.map((s) => s.subjectId);
+
     // Validate all subjects exist
-    const subjects = await this.prisma.subject.findMany({
+    const existingSubjects = await this.prisma.subject.findMany({
       where: { id: { in: subjectIds } },
     });
 
-    if (subjects.length !== subjectIds.length) {
+    if (existingSubjects.length !== subjectIds.length) {
       throw new NotFoundException('One or more subjects not found');
     }
 
     // Create or update class-subject relationships using junction table
     const assignments = await Promise.all(
-      subjectIds.map(async (subjectId) => {
+      subjects.map(async ({ subjectId, monthlyInstallment }) => {
         // Check if assignment already exists
         const existing = await this.prisma.classSubject.findUnique({
           where: {
@@ -268,6 +275,24 @@ export class ClassesService {
         });
 
         if (existing) {
+          // Update existing assignment with new installment if provided
+          if (monthlyInstallment !== undefined) {
+            return this.prisma.classSubject.update({
+              where: {
+                classId_subjectId: {
+                  classId,
+                  subjectId,
+                },
+              },
+              data: {
+                monthlyInstallment: monthlyInstallment !== null ? monthlyInstallment : null,
+              },
+              include: {
+                subject: true,
+                class: true,
+              },
+            });
+          }
           return existing;
         }
 
@@ -277,6 +302,7 @@ export class ClassesService {
             classId,
             subjectId,
             assignedBy,
+            monthlyInstallment: monthlyInstallment !== undefined ? monthlyInstallment : null,
           },
           include: {
             subject: true,
@@ -362,7 +388,61 @@ export class ClassesService {
     return classSubjects.map((cs) => ({
       ...cs.subject,
       class: cs.class,
+      monthlyInstallment: cs.monthlyInstallment,
     }));
+  }
+
+  async updateClassSubjectInstallment(
+    classId: string,
+    subjectId: string,
+    monthlyInstallment: number | null,
+  ) {
+    // Validate class exists
+    await this.findOne(classId);
+
+    // Validate subject exists
+    const subject = await this.prisma.subject.findUnique({
+      where: { id: subjectId },
+    });
+
+    if (!subject) {
+      throw new NotFoundException(`Subject with ID ${subjectId} not found`);
+    }
+
+    // Check if assignment exists
+    const assignment = await this.prisma.classSubject.findUnique({
+      where: {
+        classId_subjectId: {
+          classId,
+          subjectId,
+        },
+      },
+    });
+
+    if (!assignment) {
+      throw new NotFoundException(
+        'Subject is not assigned to this class. Please assign it first.',
+      );
+    }
+
+    // Update the installment
+    const updated = await this.prisma.classSubject.update({
+      where: {
+        classId_subjectId: {
+          classId,
+          subjectId,
+        },
+      },
+      data: {
+        monthlyInstallment: monthlyInstallment !== undefined ? monthlyInstallment : null,
+      },
+      include: {
+        subject: true,
+        class: true,
+      },
+    });
+
+    return updated;
   }
 }
 

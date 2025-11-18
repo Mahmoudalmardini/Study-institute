@@ -178,7 +178,6 @@ model Subject {
   name              String
   code              String?
   description       String?
-  monthlyInstallment Decimal? @db.Decimal(10, 2)
   classId           String?
   class             Class?   @relation(fields: [classId], references: [id], onDelete: SetNull)
   createdAt         DateTime @default(now())
@@ -431,15 +430,16 @@ model StudentClass {
 }
 
 model ClassSubject {
-  id          String   @id @default(uuid())
-  classId     String
-  class       Class    @relation(fields: [classId], references: [id], onDelete: Cascade)
-  subjectId   String
-  subject     Subject  @relation(fields: [subjectId], references: [id], onDelete: Cascade)
-  assignedBy  String   // User ID of admin/supervisor who made the assignment
-  assignedAt  DateTime @default(now())
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id                String   @id @default(uuid())
+  classId           String
+  class             Class    @relation(fields: [classId], references: [id], onDelete: Cascade)
+  subjectId         String
+  subject           Subject  @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  monthlyInstallment Decimal? @db.Decimal(10, 2)
+  assignedBy        String   // User ID of admin/supervisor who made the assignment
+  assignedAt        DateTime @default(now())
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
 
   @@unique([classId, subjectId])
   @@index([classId])

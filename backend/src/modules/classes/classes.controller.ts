@@ -12,6 +12,7 @@ import { ClassesService } from './classes.service';
 import { CreateClassDto } from './dto/create-class.dto';
 import { UpdateClassDto } from './dto/update-class.dto';
 import { AssignSubjectsDto } from './dto/assign-subjects.dto';
+import { UpdateClassSubjectInstallmentDto } from './dto/update-class-subject-installment.dto';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
@@ -63,7 +64,7 @@ export class ClassesController {
   ) {
     return this.classesService.assignSubjects(
       id,
-      assignSubjectsDto.subjectIds,
+      assignSubjectsDto.subjects,
       user.id,
     );
   }
@@ -81,6 +82,20 @@ export class ClassesController {
   @Roles(Role.ADMIN, Role.SUPERVISOR, Role.TEACHER)
   getClassSubjects(@Param('id') id: string) {
     return this.classesService.getClassSubjects(id);
+  }
+
+  @Patch(':id/subjects/:subjectId/installment')
+  @Roles(Role.ADMIN, Role.SUPERVISOR)
+  updateClassSubjectInstallment(
+    @Param('id') id: string,
+    @Param('subjectId') subjectId: string,
+    @Body() updateDto: UpdateClassSubjectInstallmentDto,
+  ) {
+    return this.classesService.updateClassSubjectInstallment(
+      id,
+      subjectId,
+      updateDto.monthlyInstallment ?? null,
+    );
   }
 }
 

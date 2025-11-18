@@ -1,9 +1,22 @@
-import { IsArray, IsString, ArrayNotEmpty } from 'class-validator';
+import { IsArray, IsString, IsNumber, IsOptional, ArrayNotEmpty, Min, ValidateNested } from 'class-validator';
+import { Type } from 'class-transformer';
+
+class SubjectAssignmentDto {
+  @IsString()
+  subjectId: string;
+
+  @IsNumber()
+  @IsOptional()
+  @Min(0)
+  @Type(() => Number)
+  monthlyInstallment?: number;
+}
 
 export class AssignSubjectsDto {
   @IsArray()
   @ArrayNotEmpty()
-  @IsString({ each: true })
-  subjectIds: string[];
+  @ValidateNested({ each: true })
+  @Type(() => SubjectAssignmentDto)
+  subjects: SubjectAssignmentDto[];
 }
 
