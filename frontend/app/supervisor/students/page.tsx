@@ -164,55 +164,24 @@ export default function SupervisorStudentsPage() {
             if (studentProfile) {
               console.log('Found existing profile from students list:', studentProfile);
             } else {
-              // If we still can't find it, create a minimal profile object to proceed
-                      console.log('Creating minimal profile object to proceed...');
-                      studentProfile = {
-                        id: `temp-${student.id}`,
-                        userId: student.id,
-                        classId: null,
-                        subjects: [],
-                        createdAt: new Date().toISOString(),
-                        updatedAt: new Date().toISOString(),
-                      };
-                    }
-                  }
-                } catch (finalErr) {
-                  console.error('Final fetch error:', finalErr);
-                  // Create a minimal profile object to proceed
-                  studentProfile = {
-                    id: `temp-${student.id}`,
-                    userId: student.id,
-                    classId: null,
-                    subjects: [],
-                    createdAt: new Date().toISOString(),
-                    updatedAt: new Date().toISOString(),
-                  };
-                }
-              } else {
-                console.error('Retry failed:', retryRes.status);
-                setError('Unable to create or retrieve student profile. Please try again.');
-                setModalLoading(false);
-                return;
-              }
-            } catch (retryErr) {
-              console.error('Retry error:', retryErr);
-              setError('Unable to create or retrieve student profile. Please try again.');
+              // If we still can't find it, show error
+              console.error('Profile exists but cannot be retrieved');
+              setError('Student profile exists but could not be retrieved. Please refresh the page.');
               setModalLoading(false);
               return;
             }
+          } catch (fetchErr) {
+            console.error('Error fetching existing profile:', fetchErr);
+            setError('Unable to retrieve student profile. Please try again.');
+            setModalLoading(false);
+            return;
           }
         } else {
-          const errorData = await createRes.json().catch(() => ({}));
-          console.error('Failed to create profile:', createRes.status, errorData);
-          setError(`Failed to create student profile. ${errorData.message || 'Please ensure the student user exists and try again.'}`);
+          console.error('Error creating student profile:', createErr);
+          setError('Unable to create student profile. Please try again.');
           setModalLoading(false);
           return;
         }
-      } catch (err) {
-        console.error('Error creating student profile:', err);
-        setError('Error creating student profile. Please try again.');
-        setModalLoading(false);
-        return;
       }
     }
 
