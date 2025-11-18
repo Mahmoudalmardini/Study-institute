@@ -367,24 +367,33 @@ export class StudentsService {
 
     const studentClassIds = studentClasses.map((sc) => sc.classId);
 
-    // Validate subjects belong to student's assigned classes (if student has classes)
-    if (studentClassIds.length > 0) {
-      // Get subjects assigned to classes via ClassSubject junction table
-      const classSubjects = await this.prisma.classSubject.findMany({
-        where: { classId: { in: studentClassIds } },
-        select: { subjectId: true },
-      });
-      const validSubjectIds = classSubjects.map(cs => cs.subjectId);
-
-      const invalidSubjects = subjectRecords.filter(
-        (subject) => !validSubjectIds.includes(subject.id),
+    // Validate that student has a class assigned before enrolling subjects
+    if (studentClassIds.length === 0) {
+      throw new ConflictException(
+        'Student must be assigned to a class before enrolling in subjects. Please assign a class to the student first.',
       );
+    }
 
-      if (invalidSubjects.length > 0) {
-        throw new ConflictException(
-          `Some subjects do not belong to student's assigned classes: ${invalidSubjects.map((s) => s.name).join(', ')}`,
-        );
-      }
+    // Validate subjects belong to student's assigned classes
+    // Get subjects assigned to classes via ClassSubject junction table
+    const classSubjects = await this.prisma.classSubject.findMany({
+      where: { classId: { in: studentClassIds } },
+      select: { subjectId: true },
+    });
+    const validSubjectIds = classSubjects.map(cs => cs.subjectId);
+
+    const invalidSubjects = subjectRecords.filter(
+      (subject) => !validSubjectIds.includes(subject.id),
+    );
+
+    if (invalidSubjects.length > 0) {
+      const classNames = await this.prisma.class.findMany({
+        where: { id: { in: studentClassIds } },
+        select: { name: true },
+      });
+      throw new ConflictException(
+        `The following subjects are not assigned to the student's class(es) (${classNames.map(c => c.name).join(', ')}): ${invalidSubjects.map((s) => s.name).join(', ')}. Please ensure these subjects are assigned to the student's class on the Classes page.`,
+      );
     }
 
     // Remove existing enrollments not in the new list

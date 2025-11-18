@@ -63,41 +63,22 @@ export default function SupervisorStudentsPage() {
         return;
       }
 
-      // Fetch all users with STUDENT role
-      const studentsRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/users?role=STUDENT`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-
-      if (studentsRes.status === 401) {
-        localStorage.removeItem('accessToken');
-        localStorage.removeItem('refreshToken');
-        router.push('/login');
-        return;
-      }
-
-      const studentsData = await studentsRes.json();
+      // Fetch all users with STUDENT role using apiClient
+      const studentsData = await apiClient.get('/users?role=STUDENT');
       
       // For each student user, try to get their student profile with classes and subjects
       const studentsWithProfiles = await Promise.all(
-        (studentsData.data || []).map(async (user: any) => {
+        ((studentsData as any)?.data || studentsData || []).map(async (user: any) => {
           try {
-            const profileRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/students`, {
-              headers: { Authorization: `Bearer ${token}` },
-            });
-            const profileData = await profileRes.json();
-            const studentProfile = (profileData.data || []).find((s: any) => s.userId === user.id);
+            const profileData = await apiClient.get('/students');
+            const profileArray = Array.isArray(profileData) ? profileData : ((profileData as any)?.data || []);
+            const studentProfile = profileArray.find((s: any) => s.userId === user.id);
             
             let subjects = [];
             if (studentProfile) {
               try {
-                const subjectsRes = await fetch(
-                  `${process.env.NEXT_PUBLIC_API_URL}/students/${studentProfile.id}/subjects`,
-                  { headers: { Authorization: `Bearer ${token}` } }
-                );
-                if (subjectsRes.ok) {
-                  const subjectsData = await subjectsRes.json();
-                  subjects = subjectsData.data || [];
-                }
+                const subjectsData = await apiClient.get(`/students/${studentProfile.id}/subjects`);
+                subjects = Array.isArray(subjectsData) ? subjectsData : ((subjectsData as any)?.data || []);
               } catch (err) {
                 console.error('Error fetching subjects for student:', err);
               }
@@ -117,19 +98,13 @@ export default function SupervisorStudentsPage() {
       
       setStudents(studentsWithProfiles);
 
-      // Fetch all classes
-      const classesRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/classes`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const classesData = await classesRes.json();
-      setAllClasses(classesData.data || []);
+      // Fetch all classes using apiClient
+      const classesData = await apiClient.get('/classes');
+      setAllClasses(Array.isArray(classesData) ? classesData : ((classesData as any)?.data || []));
 
-      // Fetch all subjects
-      const subjectsRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/subjects`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const subjectsData = await subjectsRes.json();
-      setAllSubjects(subjectsData.data || []);
+      // Fetch all subjects using apiClient
+      const subjectsData = await apiClient.get('/subjects');
+      setAllSubjects(Array.isArray(subjectsData) ? subjectsData : ((subjectsData as any)?.data || []));
 
     } catch (err) {
       console.error('Error fetching data:', err);
@@ -156,19 +131,14 @@ export default function SupervisorStudentsPage() {
     
     if (!studentProfile) {
       try {
-        // Try to get all students and find this one
-        const studentsRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/students`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
+        // Try to get all students and find this one using apiClient
+        const studentsData = await apiClient.get('/students');
+        const studentsArray = Array.isArray(studentsData) ? studentsData : ((studentsData as any)?.data || []);
+        const existingProfile = studentsArray.find((s: any) => s.userId === student.id);
         
-        if (studentsRes.ok) {
-          const studentsData = await studentsRes.json();
-          const existingProfile = (studentsData.data || []).find((s: any) => s.userId === student.id);
-          
-          if (existingProfile) {
-            studentProfile = existingProfile;
-            console.log('Found existing student profile:', studentProfile);
-          }
+        if (existingProfile) {
+          studentProfile = existingProfile;
+          console.log('Found existing student profile:', studentProfile);
         }
       } catch (err) {
         console.error('Error checking for existing profile:', err);
@@ -179,80 +149,22 @@ export default function SupervisorStudentsPage() {
     if (!studentProfile) {
       console.log('Creating student profile for user:', student.id);
       try {
-        const createRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/students`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({
-            userId: student.id,
-          }),
+        studentProfile = await apiClient.post('/students', {
+          userId: student.id,
         });
-        
-        if (createRes.ok) {
-          const createData = await createRes.json();
-          studentProfile = createData.data || createData;
-          console.log('Student profile created:', studentProfile);
-        } else if (createRes.status === 409) {
+        console.log('Student profile created:', studentProfile);
+      } catch (createErr: any) {
+        if (createErr.response?.status === 409) {
           // Profile already exists, try to fetch it directly
           console.log('Profile already exists, fetching it...');
           try {
-            // First try to get the profile from the response if it contains the created profile
-            const errorData = await createRes.json().catch(() => ({}));
-            if (errorData.data) {
-              studentProfile = errorData.data;
-              console.log('Found profile in error response:', studentProfile);
+            const studentsData = await apiClient.get('/students');
+            const studentsArray = Array.isArray(studentsData) ? studentsData : ((studentsData as any)?.data || []);
+            studentProfile = studentsArray.find((s: any) => s.userId === student.id);
+            if (studentProfile) {
+              console.log('Found existing profile from students list:', studentProfile);
             } else {
-              // If not in error response, try to fetch all students and find the one we need
-              const fetchRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/students`, {
-                headers: { Authorization: `Bearer ${token}` },
-              });
-              if (fetchRes.ok) {
-                const fetchData = await fetchRes.json();
-                studentProfile = (fetchData.data || []).find((s: any) => s.userId === student.id);
-                if (studentProfile) {
-                  console.log('Found existing profile from students list:', studentProfile);
-                }
-              }
-            }
-          } catch (fetchErr) {
-            console.error('Error fetching existing profile:', fetchErr);
-          }
-          
-          if (!studentProfile) {
-            // If we still can't find the profile, try to create it again with a different approach
-            console.log('Profile not found, attempting to create again...');
-            try {
-              const retryRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/students`, {
-                method: 'POST',
-                headers: {
-                  'Content-Type': 'application/json',
-                  Authorization: `Bearer ${token}`,
-                },
-                body: JSON.stringify({
-                  userId: student.id,
-                }),
-              });
-              
-              if (retryRes.ok) {
-                const retryData = await retryRes.json();
-                studentProfile = retryData.data || retryData;
-                console.log('Successfully created profile on retry:', studentProfile);
-              } else if (retryRes.status === 409) {
-                // Profile exists but we still can't find it, try one more time to fetch it
-                console.log('Profile exists on retry, trying to fetch it one more time...');
-                try {
-                  const finalFetchRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/students`, {
-                    headers: { Authorization: `Bearer ${token}` },
-                  });
-                  if (finalFetchRes.ok) {
-                    const finalFetchData = await finalFetchRes.json();
-                    studentProfile = (finalFetchData.data || []).find((s: any) => s.userId === student.id);
-                    if (studentProfile) {
-                      console.log('Found profile in final fetch:', studentProfile);
-                    } else {
-                      // If we still can't find it, create a minimal profile object to proceed
+              // If we still can't find it, create a minimal profile object to proceed
                       console.log('Creating minimal profile object to proceed...');
                       studentProfile = {
                         id: `temp-${student.id}`,
@@ -312,51 +224,42 @@ export default function SupervisorStudentsPage() {
     // Fetch student's class and subjects if they have a profile
     if (studentProfile) {
       try {
-        // Fetch full student details
-        const studentResponse = await fetch(
-          `${process.env.NEXT_PUBLIC_API_URL}/students/${studentProfile.id}`,
-          { headers: { Authorization: `Bearer ${token}` } }
-        );
+        // Fetch full student details using apiClient
+        const studentData = await apiClient.get(`/students/${studentProfile.id}`);
+        const fullStudent = studentData.data || studentData;
+        setSelectedClassId(fullStudent.classId || '');
         
-        if (studentResponse.ok) {
-          const studentData = await studentResponse.json();
-          const fullStudent = studentData.data || studentData;
-          setSelectedClassId(fullStudent.classId || '');
-        }
+        // Fetch subjects using apiClient
+        const studentSubjects = await apiClient.get(`/students/${studentProfile.id}/subjects`);
+        const subjectsArray = Array.isArray(studentSubjects) ? studentSubjects : (studentSubjects as any)?.data || [];
+        setSelectedSubjectIds(subjectsArray.map((ss: any) => ss.subjectId || ss.subject?.id));
         
-        // Fetch subjects
-        const subjectsResponse = await fetch(
-          `${process.env.NEXT_PUBLIC_API_URL}/students/${studentProfile.id}/subjects`,
-          { headers: { Authorization: `Bearer ${token}` } }
-        );
-        
-        if (subjectsResponse.ok) {
-          const subjectsData = await subjectsResponse.json();
-          const studentSubjects = subjectsData.data || [];
-          setSelectedSubjectIds(studentSubjects.map((ss: StudentSubject) => ss.subjectId));
-          
-          // Set teacher assignments if they exist
-          const teacherAssignments: Record<string, string> = {};
-          studentSubjects.forEach((ss: any) => {
-            if (ss.teacherId) {
-              teacherAssignments[ss.subjectId] = ss.teacherId;
-            }
-          });
-          setSubjectTeachers(teacherAssignments);
-          
-          // Fetch teachers for all enrolled subjects
-          for (const ss of studentSubjects) {
-            await fetchTeachersForSubject(ss.subjectId);
+        // Set teacher assignments if they exist
+        const teacherAssignments: Record<string, string> = {};
+        subjectsArray.forEach((ss: any) => {
+          const teacherId = ss.teacherId || ss.teacher?.id;
+          const subjectId = ss.subjectId || ss.subject?.id;
+          if (teacherId && subjectId) {
+            teacherAssignments[subjectId] = String(teacherId).trim();
           }
-          
-          setSelectedStudent({
-            ...student,
-            studentProfile: {
-              ...studentProfile,
-              subjects: studentSubjects,
-            }
-          });
+        });
+        setSubjectTeachers(teacherAssignments);
+        
+        // Fetch teachers for all enrolled subjects
+        for (const ss of subjectsArray) {
+          const subjectId = ss.subjectId || ss.subject?.id;
+          if (subjectId) {
+            await fetchTeachersForSubject(subjectId);
+          }
         }
+        
+        setSelectedStudent({
+          ...student,
+          studentProfile: {
+            ...studentProfile,
+            subjects: subjectsArray,
+          }
+        });
       } catch (err) {
         console.error('Error fetching student class/subjects:', err);
       }
@@ -381,25 +284,19 @@ export default function SupervisorStudentsPage() {
       setSaving(true);
       setError('');
       setSuccess('');
-      const token = localStorage.getItem('accessToken');
       
-      // Update class (single class assignment)
-      const classResponse = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/students/${selectedStudent.studentProfile.id}`,
-        {
-          method: 'PATCH',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({ classId: selectedClassId || null }),
-        }
-      );
-
-      if (!classResponse.ok) {
-        const data = await classResponse.json();
-        throw new Error(data.message || 'Error updating class');
+      // Validate that class is selected before enrolling subjects
+      if (selectedSubjectIds.length > 0 && !selectedClassId) {
+        setError('Please select a class before assigning subjects to the student');
+        setSaving(false);
+        return;
       }
+      
+      // Update class (single class assignment) using apiClient
+      await apiClient.patch(
+        `/students/${selectedStudent.studentProfile.id}`,
+        { classId: selectedClassId || null }
+      );
 
       // Enroll subjects with optional teacher assignments
       const subjectsToEnroll = selectedSubjectIds.map(subjectId => ({
@@ -407,22 +304,11 @@ export default function SupervisorStudentsPage() {
         teacherId: subjectTeachers[subjectId] || undefined,
       }));
 
-      const subjectsResponse = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/students/${selectedStudent.studentProfile.id}/enroll-subjects`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({ subjects: subjectsToEnroll }),
-        }
+      // Enroll subjects using apiClient
+      await apiClient.post(
+        `/students/${selectedStudent.studentProfile.id}/enroll-subjects`,
+        { subjects: subjectsToEnroll }
       );
-
-      if (!subjectsResponse.ok) {
-        const data = await subjectsResponse.json();
-        throw new Error(data.message || 'Error enrolling subjects');
-      }
 
       setSuccess('Class and subjects updated successfully!');
       setTimeout(() => {
@@ -892,6 +778,14 @@ export default function SupervisorStudentsPage() {
                         Subjects ({selectedSubjectIds.length} selected)
                         <span className="text-xs text-red-600 font-normal">(Minimum 1 required)</span>
                       </h3>
+                      {!selectedClassId && (
+                        <p className="text-sm text-amber-600 bg-amber-50 p-2 rounded-lg mt-2">
+                          <svg className="w-4 h-4 inline mr-1" fill="currentColor" viewBox="0 0 20 20">
+                            <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                          </svg>
+                          Please select a class first to see available subjects
+                        </p>
+                      )}
                       {selectedClassId && selectedSubjectIds.length === 0 && (
                         <p className="text-sm text-amber-600 bg-amber-50 p-2 rounded-lg mt-2">
                           <svg className="w-4 h-4 inline mr-1" fill="currentColor" viewBox="0 0 20 20">
@@ -917,11 +811,12 @@ export default function SupervisorStudentsPage() {
                           <button
                             key={subject.id}
                             onClick={() => toggleSubject(subject.id)}
+                            disabled={!selectedClassId}
                             className={`p-4 rounded-lg border-2 transition-all text-left min-h-[60px] ${
                               selectedSubjectIds.includes(subject.id)
                                 ? 'border-indigo-500 bg-indigo-50 shadow-md'
                                 : 'border-gray-200 hover:border-indigo-300 bg-white'
-                            }`}
+                            } ${!selectedClassId ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
                           >
                             <div className="flex items-center justify-between">
                               <div className="flex-1">
@@ -939,6 +834,39 @@ export default function SupervisorStudentsPage() {
                           </button>
                         ))}
                       </div>
+
+                      {/* Monthly Installment Preview */}
+                      {selectedClassId && selectedSubjectIds.length > 0 && (
+                        <div className="mt-4 p-4 bg-gradient-to-r from-emerald-50 to-teal-50 border-2 border-emerald-200 rounded-lg">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              <svg className="w-5 h-5 text-emerald-600" fill="currentColor" viewBox="0 0 20 20">
+                                <path d="M8.433 7.418c.155-.103.346-.196.567-.267v1.698a2.305 2.305 0 01-.567-.267C8.07 8.34 8 8.114 8 8c0-.114.07-.34.433-.582zM11 12.849v-1.698c.22.071.412.164.567.267.364.243.433.468.433.582 0 .114-.07.34-.433.582a2.305 2.305 0 01-.567.267z" />
+                                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-13a1 1 0 10-2 0v.092a4.535 4.535 0 00-1.676.662C6.602 6.234 6 7.009 6 8c0 .99.602 1.765 1.324 2.246.48.32 1.054.545 1.676.662v1.941c-.391-.127-.68-.317-.843-.504a1 1 0 10-1.51 1.31c.562.649 1.413 1.076 2.353 1.253V15a1 1 0 102 0v-.092a4.535 4.535 0 001.676-.662C13.398 13.766 14 12.991 14 12c0-.99-.602-1.765-1.324-2.246A4.535 4.535 0 0011 9.092V7.151c.391.127.68.317.843.504a1 1 0 101.511-1.31c-.563-.649-1.413-1.076-2.354-1.253V5z" clipRule="evenodd" />
+                              </svg>
+                              <span className="font-semibold text-gray-900">Estimated Monthly Installment:</span>
+                            </div>
+                            <span className="text-2xl font-bold text-emerald-600">
+                              ${(() => {
+                                const total = selectedSubjectIds.reduce((sum, subjectId) => {
+                                  const subject = availableSubjects.find(s => s.id === subjectId);
+                                  const installment = subject?.monthlyInstallment;
+                                  if (typeof installment === 'number') {
+                                    return sum + installment;
+                                  } else if (typeof installment === 'string') {
+                                    return sum + parseFloat(installment) || 0;
+                                  }
+                                  return sum;
+                                }, 0);
+                                return total.toFixed(2);
+                              })()}
+                            </span>
+                          </div>
+                          <p className="text-xs text-gray-600 mt-2">
+                            This is the total monthly installment based on selected subjects. The actual amount will be calculated automatically when subjects are enrolled.
+                          </p>
+                        </div>
+                      )}
 
                       {/* Teacher Selection for Selected Subjects */}
                       {selectedSubjectIds.length > 0 && (
