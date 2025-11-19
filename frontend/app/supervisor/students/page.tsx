@@ -63,40 +63,63 @@ export default function SupervisorStudentsPage() {
         return;
       }
 
-      // Fetch all users with STUDENT role using apiClient
-      const studentsData = await apiClient.get('/users?role=STUDENT');
+      // Fetch all users with STUDENT role and student profiles in parallel
+      const [usersRes, studentsRes] = await Promise.all([
+        apiClient.get('/users?role=STUDENT'),
+        apiClient.get('/students'),
+      ]);
       
-      // For each student user, try to get their student profile with classes and subjects
-      const studentsWithProfiles = await Promise.all(
-        ((studentsData as any)?.data || studentsData || []).map(async (user: any) => {
-          try {
-            const profileData = await apiClient.get('/students');
-            const profileArray = Array.isArray(profileData) ? profileData : ((profileData as any)?.data || []);
-            const studentProfile = profileArray.find((s: any) => s.userId === user.id);
-            
-            let subjects = [];
-            if (studentProfile) {
-              try {
-                const subjectsData = await apiClient.get(`/students/${studentProfile.id}/subjects`);
-                subjects = Array.isArray(subjectsData) ? subjectsData : ((subjectsData as any)?.data || []);
-              } catch (err) {
-                console.error('Error fetching subjects for student:', err);
-              }
-            }
-            
-            return {
-              ...user,
-              studentProfile: studentProfile || null,
-              subjects: subjects,
-              class: studentProfile?.class || null,
-            };
-          } catch {
-            return { ...user, studentProfile: null, subjects: [], class: null };
-          }
-        })
+      const users = Array.isArray(usersRes) ? usersRes : (usersRes as any)?.data || [];
+      const studentProfiles = Array.isArray(studentsRes) ? studentsRes : (studentsRes as any)?.data || [];
+      
+      // Create a map of userId -> studentProfile for fast lookup
+      const profileMap = new Map(
+        studentProfiles.map((profile: any) => [profile.userId, profile])
       );
       
+      // Match users with profiles
+      const studentsWithProfiles = users.map((user: any) => {
+        const studentProfile = profileMap.get(user.id);
+        return {
+          ...user,
+          studentProfile: studentProfile || null,
+          subjects: [], // Will be loaded in parallel batches
+          class: studentProfile?.class || null,
+        };
+      });
+      
       setStudents(studentsWithProfiles);
+      
+      // Load subjects for students with profiles in parallel batches (max 10 concurrent)
+      const studentsWithProfilesList = studentsWithProfiles.filter(s => s.studentProfile);
+      if (studentsWithProfilesList.length > 0) {
+        const batchSize = 10; // Process 10 students at a time
+        const studentsWithSubjects = [...studentsWithProfiles];
+        
+        for (let i = 0; i < studentsWithProfilesList.length; i += batchSize) {
+          const batch = studentsWithProfilesList.slice(i, i + batchSize);
+          const subjectPromises = batch.map(async (student) => {
+            try {
+              const subjectsData = await apiClient.get(`/students/${student.studentProfile.id}/subjects`);
+              const studentSubjects = Array.isArray(subjectsData) ? subjectsData : (subjectsData as any)?.data || [];
+              return { studentId: student.id, subjects: studentSubjects };
+            } catch (err: any) {
+              console.error(`Error fetching subjects for student ${student.id}:`, err);
+              return { studentId: student.id, subjects: [] };
+            }
+          });
+          
+          const results = await Promise.all(subjectPromises);
+          results.forEach(({ studentId, subjects }) => {
+            const studentIndex = studentsWithSubjects.findIndex(s => s.id === studentId);
+            if (studentIndex >= 0) {
+              studentsWithSubjects[studentIndex].subjects = subjects;
+            }
+          });
+        }
+        
+        setStudents(studentsWithSubjects);
+      }
 
       // Fetch all classes using apiClient
       const classesData = await apiClient.get('/classes');

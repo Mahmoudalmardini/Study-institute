@@ -83,18 +83,49 @@ export default function StudentsPage() {
         studentProfiles.map((profile: any) => [profile.userId, profile])
       );
 
-      // Match users with profiles - subjects will be loaded lazily when modal opens
+      // Match users with profiles
       const studentsWithProfiles = users.map((user: any) => {
         const studentProfile = profileMap.get(user.id);
         return {
           ...user,
           studentProfile: studentProfile || null,
-          subjects: [], // Load subjects lazily when modal opens
+          subjects: [], // Will be loaded in parallel batches
           class: studentProfile?.class || null,
         };
       });
       
       setStudents(studentsWithProfiles);
+      
+      // Load subjects for students with profiles in parallel batches (max 10 concurrent)
+      const studentsWithProfilesList = studentsWithProfiles.filter(s => s.studentProfile);
+      if (studentsWithProfilesList.length > 0) {
+        const batchSize = 10; // Process 10 students at a time
+        const studentsWithSubjects = [...studentsWithProfiles];
+        
+        for (let i = 0; i < studentsWithProfilesList.length; i += batchSize) {
+          const batch = studentsWithProfilesList.slice(i, i + batchSize);
+          const subjectPromises = batch.map(async (student) => {
+            try {
+              const subjectsData = await apiClient.get(`/students/${student.studentProfile.id}/subjects`);
+              const studentSubjects = Array.isArray(subjectsData) ? subjectsData : (subjectsData as any)?.data || [];
+              return { studentId: student.id, subjects: studentSubjects };
+            } catch (err: any) {
+              console.error(`Error fetching subjects for student ${student.id}:`, err);
+              return { studentId: student.id, subjects: [] };
+            }
+          });
+          
+          const results = await Promise.all(subjectPromises);
+          results.forEach(({ studentId, subjects }) => {
+            const studentIndex = studentsWithSubjects.findIndex(s => s.id === studentId);
+            if (studentIndex >= 0) {
+              studentsWithSubjects[studentIndex].subjects = subjects;
+            }
+          });
+        }
+        
+        setStudents(studentsWithSubjects);
+      }
       setAllClasses(classes);
       setAllSubjects(subjects);
 
