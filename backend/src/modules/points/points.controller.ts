@@ -6,7 +6,7 @@ import { Roles } from '../../common/decorators/roles.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import type { CurrentUserData } from '../../common/decorators/current-user.decorator';
 import { Role } from '@prisma/client';
-import { IsInt, IsOptional, IsString, IsUUID, NotEquals } from 'class-validator';
+import { IsInt, IsOptional, IsString, IsUUID, NotEquals, IsArray } from 'class-validator';
 import { Type } from 'class-transformer';
 
 class CreatePointDto {
@@ -68,5 +68,35 @@ export class PointsController {
 				.then(() => this.pointsService.listTransactions(studentId, lim, cursor));
 		}
 		return this.pointsService.listTransactions(studentId, lim, cursor);
+	}
+
+	@Post('students/batch-summaries')
+	@Roles(Role.ADMIN, Role.SUPERVISOR, Role.TEACHER)
+	async getBatchSummaries(@CurrentUser() user: CurrentUserData, @Body() body: { studentIds: string[]; date?: string }) {
+		const { studentIds, date } = body;
+		if (!Array.isArray(studentIds) || studentIds.length === 0) {
+			return {};
+		}
+		// Limit batch size to prevent abuse
+		const limitedIds = studentIds.slice(0, 100);
+		
+		// For teachers, filter to only students they can access
+		if (user.role === 'TEACHER') {
+			const accessibleIds: string[] = [];
+			for (const studentId of limitedIds) {
+				try {
+					await this.pointsService['assertTeacherCanModifyStudent'](user.id, studentId);
+					accessibleIds.push(studentId);
+				} catch {
+					// Skip students teacher cannot access
+				}
+			}
+			if (accessibleIds.length === 0) {
+				return {};
+			}
+			return this.pointsService.getBatchSummaries(accessibleIds, date);
+		}
+		
+		return this.pointsService.getBatchSummaries(limitedIds, date);
 	}
 }

@@ -163,6 +163,10 @@ export async function getPointSummary(studentId: string, date?: string) {
   return apiClient.get(`/points/students/${studentId}/summary`, { params });
 }
 
+export async function getBatchPointSummaries(studentIds: string[], date?: string) {
+  return apiClient.post('/points/students/batch-summaries', { studentIds, date });
+}
+
 export async function getMyPointSummary(date?: string) {
   const params = date ? { date } : undefined;
   return apiClient.get('/points/me/summary', { params });

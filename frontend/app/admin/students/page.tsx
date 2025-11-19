@@ -83,48 +83,18 @@ export default function StudentsPage() {
         studentProfiles.map((profile: any) => [profile.userId, profile])
       );
 
-      // Match users with profiles first (no subjects yet to avoid rate limits)
+      // Match users with profiles - subjects will be loaded lazily when modal opens
       const studentsWithProfiles = users.map((user: any) => {
         const studentProfile = profileMap.get(user.id);
         return {
           ...user,
           studentProfile: studentProfile || null,
-          subjects: [], // Load subjects lazily when needed (modal opens)
+          subjects: [], // Load subjects lazily when modal opens
           class: studentProfile?.class || null,
         };
       });
       
-      // Fetch subjects sequentially for students that have profiles to avoid rate limits
-      // We do this in a loop instead of Promise.all to throttle requests
-      const studentsWithSubjects = [];
-      for (let i = 0; i < studentsWithProfiles.length; i++) {
-        const student = studentsWithProfiles[i];
-        
-        if (student.studentProfile) {
-          try {
-            // Small delay between requests to avoid rate limiting (100ms)
-            if (i > 0) {
-              await new Promise(resolve => setTimeout(resolve, 100));
-            }
-            
-            const subjectsData = await apiClient.get(`/students/${student.studentProfile.id}/subjects`);
-            const studentSubjects = Array.isArray(subjectsData) ? subjectsData : (subjectsData as any)?.data || [];
-            student.subjects = studentSubjects;
-          } catch (err: any) {
-            // If rate limited or other error, continue with empty subjects
-            if (err.response?.status === 429) {
-              console.warn(`Rate limited for student ${student.studentProfile.id}, subjects will load on demand`);
-            } else {
-              console.error('Error fetching subjects for student:', err);
-            }
-            student.subjects = [];
-          }
-        }
-        
-        studentsWithSubjects.push(student);
-      }
-      
-      setStudents(studentsWithSubjects);
+      setStudents(studentsWithProfiles);
       setAllClasses(classes);
       setAllSubjects(subjects);
 

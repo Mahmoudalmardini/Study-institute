@@ -10,7 +10,7 @@ import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import apiClient from '@/lib/api-client';
-import { createPoint, getPointSummary, getStudentSubjects } from '@/lib/api-client';
+import { createPoint, getPointSummary, getBatchPointSummaries, getStudentSubjects } from '@/lib/api-client';
 import type { Subject } from '@/types';
 
 interface Student {
@@ -59,33 +59,28 @@ export default function SupervisorPointsPage() {
         }));
         if (mounted) setStudents(mappedStudents);
         
-        // Load summaries for all students
+        // Load summaries for all students using batch endpoint
         if (mounted && mappedStudents.length > 0) {
-          const summaries: Record<string, { total: number; daily: number; bySubject: { subjectId: string | null; subjectName: string; total: number; daily: number }[] }> = {};
-          // Load summaries sequentially with longer delay to avoid rate limits
-          for (const student of mappedStudents) {
-            try {
-              // Increased delay to 200ms between requests to avoid 429 errors
-              await new Promise(resolve => setTimeout(resolve, 200));
-              const summary = await getPointSummary(student.id) as any;
-              if (mounted && summary) {
-                summaries[student.id] = { 
-                  total: summary.total || 0, 
-                  daily: summary.daily || 0,
-                  bySubject: summary.bySubject || []
-                };
-              }
-            } catch (err: any) {
-              // Handle 429 errors gracefully
-              if (err?.response?.status === 429) {
-                // Wait longer if rate limited
-                await new Promise(resolve => setTimeout(resolve, 2000));
-              }
-              // Silently fail for individual summaries
-              if (mounted) summaries[student.id] = { total: 0, daily: 0, bySubject: [] };
+          try {
+            const studentIds = mappedStudents.map(s => s.id);
+            const batchSummaries = await getBatchPointSummaries(studentIds) as any;
+            if (mounted && batchSummaries) {
+              // Ensure all students have a summary entry (default to empty if missing)
+              const summaries: Record<string, { total: number; daily: number; bySubject: { subjectId: string | null; subjectName: string; total: number; daily: number }[] }> = {};
+              mappedStudents.forEach(student => {
+                summaries[student.id] = batchSummaries[student.id] || { total: 0, daily: 0, bySubject: [] };
+              });
+              setStudentSummaries(summaries);
             }
+          } catch (err: any) {
+            console.error('Failed to load batch summaries:', err);
+            // Fallback: set empty summaries for all students
+            const summaries: Record<string, { total: number; daily: number; bySubject: { subjectId: string | null; subjectName: string; total: number; daily: number }[] }> = {};
+            mappedStudents.forEach(student => {
+              summaries[student.id] = { total: 0, daily: 0, bySubject: [] };
+            });
+            if (mounted) setStudentSummaries(summaries);
           }
-          if (mounted) setStudentSummaries(summaries);
         }
       } catch (e: any) {
         if (mounted) setError(e?.response?.data?.message || 'Failed to load');
