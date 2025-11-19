@@ -242,16 +242,6 @@ export default function SupervisorDashboard() {
               <p className="text-sm text-gray-600">View analytics and reports</p>
             </div>
 
-            {/* Announcements Card */}
-            <div className={`bg-white overflow-hidden rounded-xl hover-lift p-6 sm:p-7 border-2 border-red-100 hover:border-red-300 group ${mounted ? 'animate-slide-up stagger-7' : 'opacity-0'}`}>
-              <div className="w-12 h-12 bg-gradient-to-br from-red-500 to-pink-500 rounded-lg flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
-                <svg className="w-7 h-7 text-white" fill="currentColor" viewBox="0 0 20 20">
-                  <path fillRule="evenodd" d="M18 3a1 1 0 00-1.447-.894L8.763 6H5a3 3 0 000 6h.28l1.771 5.316A1 1 0 008 18h1a1 1 0 001-1v-4.382l6.553 3.276A1 1 0 0018 15V3z" clipRule="evenodd" />
-                </svg>
-              </div>
-              <h3 className="text-xl font-bold text-gray-900 mb-2">Announcements</h3>
-              <p className="text-sm text-gray-600">View important announcements</p>
-            </div>
           </div>
         </div>
       </main>

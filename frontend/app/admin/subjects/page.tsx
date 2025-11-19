@@ -72,7 +72,7 @@ export default function SubjectsPage() {
     } catch (error) {
       console.error('Error fetching subjects:', error);
       setSubjects([]);
-      setError('Failed to load subjects');
+      setError(t.subjects?.failedToLoad || 'Failed to load subjects');
     } finally {
       setLoading(false);
     }
@@ -90,10 +90,10 @@ export default function SubjectsPage() {
       
       if (editingSubject) {
         await apiClient.patch(`/subjects/${editingSubject.id}`, submitData);
-        setSuccess('Subject updated successfully!');
+        setSuccess(t.subjects?.subjectUpdated || 'Subject updated successfully!');
       } else {
         await apiClient.post('/subjects', submitData);
-        setSuccess('Subject created successfully!');
+        setSuccess(t.subjects?.subjectCreated || 'Subject created successfully!');
       }
       
       setShowForm(false);
@@ -103,7 +103,7 @@ export default function SubjectsPage() {
       setTimeout(() => setSuccess(''), 3000);
     } catch (error: any) {
       console.error('Error saving subject:', error);
-      setError(error.response?.data?.message || 'Error saving subject');
+      setError(error.response?.data?.message || t.subjects?.errorSaving || 'Error saving subject');
     }
   };
 
@@ -125,12 +125,12 @@ export default function SubjectsPage() {
     try {
       setError('');
       await apiClient.delete(`/subjects/${id}`);
-      setSuccess('Subject deleted successfully!');
+      setSuccess(t.subjects?.subjectDeleted || 'Subject deleted successfully!');
       fetchSubjects();
       setTimeout(() => setSuccess(''), 3000);
     } catch (error: any) {
       console.error('Error deleting subject:', error);
-      setError(error.response?.data?.message || 'Error deleting subject');
+      setError(error.response?.data?.message || t.subjects?.errorDeleting || 'Error deleting subject');
     }
   };
 
@@ -187,7 +187,7 @@ export default function SubjectsPage() {
               </div>
               <h1 className="text-lg sm:text-xl font-bold text-white truncate">
                 <span className="hidden sm:inline">{t.common.appName} - </span>
-                Subjects Management
+                {t.subjects?.title || 'Subjects Management'}
               </h1>
             </div>
             <div className="flex items-center gap-2 sm:gap-4 flex-shrink-0">
@@ -211,10 +211,10 @@ export default function SubjectsPage() {
             </div>
             <div className="flex-1">
               <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2">
-                Subjects Management 📖
+                {t.subjects?.title || 'Subjects Management'} 📖
               </h2>
               <p className="text-gray-600 text-base sm:text-lg">
-                Manage subjects and organize your curriculum
+                {t.subjects?.titleDesc || 'Manage subjects and organize your curriculum'}
               </p>
             </div>
           </div>
@@ -230,7 +230,7 @@ export default function SubjectsPage() {
             </div>
             <input
               type="text"
-              placeholder="Search subjects..."
+              placeholder={t.subjects?.searchPlaceholder || 'Search subjects...'}
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="block w-full pl-10 pr-3 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-teal-500 focus:border-transparent transition-all"
@@ -394,11 +394,11 @@ export default function SubjectsPage() {
               <div className="flex gap-4 pt-4 border-t border-gray-100">
                 <div className="flex-1 text-center">
                   <div className="text-2xl font-bold text-teal-600">{subject._count?.students || 0}</div>
-                  <div className="text-xs text-gray-500 uppercase tracking-wide">Students</div>
+                  <div className="text-xs text-gray-500 uppercase tracking-wide">{t.subjects?.students || 'Students'}</div>
                 </div>
                 <div className="flex-1 text-center">
                   <div className="text-2xl font-bold text-green-600">{subject._count?.teachers || 0}</div>
-                  <div className="text-xs text-gray-500 uppercase tracking-wide">Teachers</div>
+                  <div className="text-xs text-gray-500 uppercase tracking-wide">{t.subjects?.teachers || 'Teachers'}</div>
                 </div>
               </div>
             </div>
@@ -414,17 +414,17 @@ export default function SubjectsPage() {
               </svg>
             </div>
             <h3 className="text-xl font-semibold text-gray-900 mb-2">
-              {searchTerm ? 'No subjects found' : 'No subjects yet'}
+              {searchTerm ? (t.subjects?.noSubjects || 'No subjects found') : (t.subjects?.noSubjects || 'No subjects yet')}
             </h3>
             <p className="text-gray-600 mb-6">
-              {searchTerm ? 'Try adjusting your search terms' : 'Get started by creating your first subject'}
+              {searchTerm ? (t.subjects?.tryAdjustingSearch || 'Try adjusting your search terms') : (t.subjects?.getStarted || 'Get started by creating your first subject')}
             </p>
             {!searchTerm && (
               <button
                 onClick={() => setShowForm(true)}
                 className="gradient-primary text-white px-6 py-3 rounded-xl hover:shadow-lg transition-all font-medium"
               >
-                Create First Subject
+                {t.subjects?.createFirstSubject || 'Create First Subject'}
               </button>
             )}
           </div>

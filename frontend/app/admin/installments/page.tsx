@@ -482,11 +482,11 @@ export default function InstallmentsPage() {
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-2">
-                Search Students
+                {t.installments?.searchStudents || 'Search Students'}
               </label>
               <input
                 type="text"
-                placeholder="Search by name or email..."
+                placeholder={t.installments?.searchPlaceholder || 'Search by name or email...'}
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg"
@@ -541,10 +541,10 @@ export default function InstallmentsPage() {
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg"
               >
                 <option value="all">{t.installments?.allStatuses || 'All Statuses'}</option>
-                <option value="pending">Pending</option>
-                <option value="partial">Partial</option>
-                <option value="paid">Paid</option>
-                <option value="overdue">Overdue</option>
+                <option value="pending">{t.installments?.statusPending || 'Pending'}</option>
+                <option value="partial">{t.installments?.statusPartial || 'Partial'}</option>
+                <option value="paid">{t.installments?.statusPaid || 'Paid'}</option>
+                <option value="overdue">{t.installments?.statusOverdue || 'Overdue'}</option>
               </select>
             </div>
           </div>
@@ -673,7 +673,7 @@ export default function InstallmentsPage() {
                         >
                           <div className="flex flex-col">
                             <span className="text-gray-700 font-medium">{item.subjectName}</span>
-                            <span className="text-xs text-gray-500">Monthly Cost</span>
+                            <span className="text-xs text-gray-500">{t.installments?.monthlyCost || 'Monthly Cost'}</span>
                           </div>
                           <span className={`font-semibold ${item.amount === 0 ? 'text-amber-600' : 'text-gray-900'}`}>
                             {formatCurrency(item.amount)}
@@ -742,7 +742,7 @@ export default function InstallmentsPage() {
                               <p className="font-semibold">{formatCurrency(installment.totalAmount)}</p>
                             </div>
                             <div>
-                              <p className="text-gray-600">Paid</p>
+                              <p className="text-gray-600">{t.installments?.paid || 'Paid'}</p>
                               <p className="font-semibold text-green-600">
                                 {formatCurrency(installment.paidAmount)}
                               </p>

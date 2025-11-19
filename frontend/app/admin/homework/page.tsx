@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import SettingsMenu from '@/components/SettingsMenu';
+import apiClient from '@/lib/api-client';
 
 interface PendingSubmission {
   id: string;
@@ -76,39 +77,31 @@ export default function AdminHomeworkReviewPage() {
 
   const fetchPendingSubmissions = async () => {
     setLoading(true);
+    setError('');
     try {
-      const token = localStorage.getItem('accessToken');
-      const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/homework/submissions/pending-review`,
-        {
-          headers: { 'Authorization': `Bearer ${token}` },
-        }
-      );
-
-      if (!response.ok) {
-        if (response.status === 401) {
-          localStorage.clear();
-          router.push('/login');
-          return;
-        }
-        throw new Error('Failed to fetch pending submissions');
-      }
-
-      const data = await response.json();
+      const data = await apiClient.get('/homework/submissions/pending-review');
       console.log('Pending submissions response:', data);
       
       // Handle both array response and wrapped object response
       if (Array.isArray(data)) {
         setSubmissions(data);
-      } else if (data.data && Array.isArray(data.data)) {
+      } else if (data && Array.isArray(data.data)) {
         setSubmissions(data.data);
+      } else if (data && data.submissions && Array.isArray(data.submissions)) {
+        setSubmissions(data.submissions);
       } else {
         console.error('Unexpected response format:', data);
         setSubmissions([]);
       }
-    } catch (err) {
-      const error = err as Error;
-      setError(error.message || 'Failed to load pending submissions');
+    } catch (err: any) {
+      console.error('Error fetching pending submissions:', err);
+      if (err.response?.status === 401) {
+        localStorage.clear();
+        router.push('/login');
+        return;
+      }
+      const errorMessage = err.response?.data?.message || err.message || 'Failed to load pending submissions';
+      setError(errorMessage);
       setSubmissions([]);
     } finally {
       setLoading(false);
@@ -144,37 +137,32 @@ export default function AdminHomeworkReviewPage() {
     }
 
     setSubmitting(true);
+    setError('');
+    setSuccess('');
 
     try {
-      const token = localStorage.getItem('accessToken');
-      const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/homework/submissions/${selectedSubmission?.id}/admin-review`,
+      await apiClient.post(
+        `/homework/submissions/${selectedSubmission?.id}/admin-review`,
         {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            evaluation: reviewForm.evaluation,
-            feedback: reviewForm.feedback,
-          }),
+          evaluation: reviewForm.evaluation,
+          feedback: reviewForm.feedback,
         }
       );
 
-      if (response.ok) {
-        setSuccess('Review submitted successfully! Student will be notified.');
-        fetchPendingSubmissions();
-        setTimeout(() => {
-          closeReviewModal();
-        }, 1500);
-      } else {
-        const errorData = await response.json();
-        setError(errorData.message || 'Failed to submit review');
+      setSuccess('Review submitted successfully! Student will be notified.');
+      fetchPendingSubmissions();
+      setTimeout(() => {
+        closeReviewModal();
+      }, 1500);
+    } catch (err: any) {
+      console.error('Error submitting review:', err);
+      if (err.response?.status === 401) {
+        localStorage.clear();
+        router.push('/login');
+        return;
       }
-    } catch (err) {
-      const error = err as Error;
-      setError(error.message || 'An error occurred');
+      const errorMessage = err.response?.data?.message || err.message || 'Failed to submit review';
+      setError(errorMessage);
     } finally {
       setSubmitting(false);
     }

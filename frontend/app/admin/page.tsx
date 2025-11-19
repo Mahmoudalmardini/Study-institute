@@ -166,8 +166,8 @@ export default function AdminDashboard() {
                       <path d="M9 4.804A7.968 7.968 0 005.5 4c-1.255 0-2.443.29-3.5.804v10A7.969 7.969 0 015.5 14c1.669 0 3.218.51 4.5 1.385A7.962 7.962 0 0114.5 14c1.255 0 2.443.29 3.5.804v-10A7.968 7.968 0 0014.5 4c-1.255 0-2.443.29-3.5.804V12a1 1 0 11-2 0V4.804z" />
                     </svg>
                   </div>
-                  <h3 className="text-xl font-bold text-gray-900 mb-2">Subjects</h3>
-                  <p className="text-sm text-gray-600">Manage subjects & curriculum</p>
+                  <h3 className="text-xl font-bold text-gray-900 mb-2">{t.admin.subjects}</h3>
+                  <p className="text-sm text-gray-600">{t.admin.subjectsDesc}</p>
                 </div>
                 <svg className="w-6 h-6 text-teal-500 flex-shrink-0 ms-2 rtl:rotate-180 group-hover:translate-x-1 rtl:group-hover:-translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
@@ -210,8 +210,8 @@ export default function AdminDashboard() {
                       <path d="M9 4.804A7.968 7.968 0 005.5 4c-1.255 0-2.443.29-3.5.804v10A7.969 7.969 0 015.5 14c1.669 0 3.218.51 4.5 1.385A7.962 7.962 0 0114.5 14c1.255 0 2.443.29 3.5.804v-10A7.968 7.968 0 0014.5 4c-1.255 0-2.443.29-3.5.804V12a1 1 0 11-2 0V4.804z" />
                     </svg>
                   </div>
-                  <h3 className="text-xl font-bold text-gray-900 mb-2">Review Homework</h3>
-                  <p className="text-sm text-gray-600">Review and approve teacher evaluations</p>
+                  <h3 className="text-xl font-bold text-gray-900 mb-2">{t.admin.reviewHomework || 'Review Homework'}</h3>
+                  <p className="text-sm text-gray-600">{t.admin.reviewHomeworkDesc || 'Review and approve teacher evaluations'}</p>
                 </div>
                 <svg className="w-6 h-6 text-orange-500 flex-shrink-0 ms-2 rtl:rotate-180 group-hover:translate-x-1 rtl:group-hover:-translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
@@ -253,7 +253,7 @@ export default function AdminDashboard() {
                     </svg>
                   </div>
                   <h3 className="text-xl font-bold text-gray-900 mb-2">{t.installments?.title || 'Installments'}</h3>
-                  <p className="text-sm text-gray-600">Manage student monthly installments and payments</p>
+                  <p className="text-sm text-gray-600">{t.admin.installmentsDesc || 'Manage student monthly installments and payments'}</p>
                 </div>
                 <svg className="w-6 h-6 text-emerald-500 flex-shrink-0 ms-2 rtl:rotate-180 group-hover:translate-x-1 rtl:group-hover:-translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
@@ -274,8 +274,8 @@ export default function AdminDashboard() {
                       <path fillRule="evenodd" d="M18 9H2v5a2 2 0 002 2h12a2 2 0 002-2V9zM4 13a1 1 0 011-1h1a1 1 0 110 2H5a1 1 0 01-1-1zm5-1a1 1 0 100 2h1a1 1 0 100-2H9z" clipRule="evenodd" />
                     </svg>
                   </div>
-                  <h3 className="text-xl font-bold text-gray-900 mb-2">Payroll</h3>
-                  <p className="text-sm text-gray-600">Manage teacher salaries and hour requests</p>
+                  <h3 className="text-xl font-bold text-gray-900 mb-2">{t.admin.payroll || 'Payroll'}</h3>
+                  <p className="text-sm text-gray-600">{t.admin.payrollDesc || 'Manage teacher salaries and hour requests'}</p>
                 </div>
                 <svg className="w-6 h-6 text-yellow-500 flex-shrink-0 ms-2 rtl:rotate-180 group-hover:translate-x-1 rtl:group-hover:-translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
@@ -283,16 +283,6 @@ export default function AdminDashboard() {
               </div>
             </button>
 
-            {/* Announcements Card */}
-            <div className={`bg-white overflow-hidden rounded-xl hover-lift p-6 sm:p-7 border-2 border-red-100 hover:border-red-300 group ${mounted ? 'animate-slide-up stagger-9' : 'opacity-0'}`}>
-              <div className="w-12 h-12 bg-gradient-to-br from-red-500 to-pink-500 rounded-lg flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
-                <svg className="w-7 h-7 text-white" fill="currentColor" viewBox="0 0 20 20">
-                  <path fillRule="evenodd" d="M18 3a1 1 0 00-1.447-.894L8.763 6H5a3 3 0 000 6h.28l1.771 5.316A1 1 0 008 18h1a1 1 0 001-1v-4.382l6.553 3.276A1 1 0 0018 15V3z" clipRule="evenodd" />
-                </svg>
-              </div>
-              <h3 className="text-xl font-bold text-gray-900 mb-2">{t.admin.announcements}</h3>
-              <p className="text-sm text-gray-600">{t.admin.announcementsDesc}</p>
-            </div>
           </div>
         </div>
       </main>

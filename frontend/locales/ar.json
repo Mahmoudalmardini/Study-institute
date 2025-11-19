@@ -36,6 +36,8 @@
     "teachersDesc": "إدارة المعلمين",
     "homework": "الواجبات",
     "homeworkDesc": "عرض جميع الواجبات",
+    "reviewHomework": "مراجعة الواجبات",
+    "reviewHomeworkDesc": "مراجعة والموافقة على تقييمات المعلمين",
     "grades": "الدرجات",
     "gradesDesc": "عرض جميع الدرجات",
     "announcements": "الإعلانات",
@@ -43,9 +45,13 @@
     "classes": "الصفوف",
     "classesDesc": "إدارة الصفوف",
     "subjects": "المواد",
-    "subjectsDesc": "إدارة المواد الدراسية",
+    "subjectsDesc": "إدارة المواد والمناهج الدراسية",
     "points": "إدارة النقاط",
-    "pointsDesc": "إدارة نقاط الطلاب والمكافآت"
+    "pointsDesc": "إدارة نقاط الطلاب والمكافآت",
+    "payroll": "الرواتب",
+    "payrollDesc": "إدارة رواتب المعلمين وطلبات الساعات",
+    "installments": "الأقساط",
+    "installmentsDesc": "إدارة الأقساط الشهرية والمدفوعات للطلاب"
   },
   "classes": {
     "addClass": "إضافة صف",
@@ -69,6 +75,8 @@
     "confirmDelete": "هل أنت متأكد من حذف هذا الصف؟"
   },
   "subjects": {
+    "title": "إدارة المواد",
+    "titleDesc": "إدارة المواد وتنظيم المناهج الدراسية",
     "addSubject": "إضافة مادة",
     "editSubject": "تعديل مادة",
     "addNewSubject": "إضافة مادة جديدة",
@@ -98,7 +106,20 @@
     "actions": "الإجراءات",
     "loading": "جاري التحميل...",
     "confirmDelete": "هل أنت متأكد من حذف هذه المادة؟",
-    "monthlyCost": "التكلفة الشهرية"
+    "monthlyCost": "التكلفة الشهرية",
+    "searchPlaceholder": "البحث عن المواد...",
+    "noSubjects": "لا توجد مواد",
+    "subjectCreated": "تم إنشاء المادة بنجاح!",
+    "subjectUpdated": "تم تحديث المادة بنجاح!",
+    "subjectDeleted": "تم حذف المادة بنجاح!",
+    "errorSaving": "خطأ في حفظ المادة",
+    "errorDeleting": "خطأ في حذف المادة",
+    "failedToLoad": "فشل تحميل المواد",
+    "tryAdjustingSearch": "حاول تعديل مصطلحات البحث",
+    "getStarted": "ابدأ بإنشاء أول مادة",
+    "createFirstSubject": "إنشاء أول مادة",
+    "updateSubject": "تحديث المادة",
+    "createSubject": "إنشاء المادة"
   },
   "teacher": {
     "title": "لوحة تحكم المعلم",
@@ -453,7 +474,14 @@
     "monthNames": ["يناير", "فبراير", "مارس", "أبريل", "مايو", "يونيو", "يوليو", "أغسطس", "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر"],
     "overpaidLabel": "مدفوع زائد",
     "overpaidAmount": "المبلغ المدفوع زائد",
-    "overpaymentInfo": "يتجاوز مبلغ الدفعة المبلغ المستحق. سيتم تطبيق الفائض على الأقساط المستقبلية."
+    "overpaymentInfo": "يتجاوز مبلغ الدفعة المبلغ المستحق. سيتم تطبيق الفائض على الأقساط المستقبلية.",
+    "searchStudents": "البحث عن الطلاب",
+    "searchPlaceholder": "البحث بالاسم أو البريد الإلكتروني...",
+    "paid": "مدفوع",
+    "monthlyCost": "التكلفة الشهرية",
+    "statusPending": "معلق",
+    "statusPartial": "جزئي",
+    "statusOverdue": "متأخر"
   },
   "messages": {
     "logoutConfirm": "هل أنت متأكد من تسجيل الخروج؟"

@@ -212,16 +212,6 @@ export default function StudentDashboard() {
               </div>
             </button>
 
-            {/* Announcements Card */}
-            <div className={`bg-white overflow-hidden rounded-xl hover-lift p-6 sm:p-7 border-2 border-pink-100 hover:border-pink-300 group ${mounted ? 'animate-slide-up stagger-5' : 'opacity-0'}`}>
-              <div className="w-12 h-12 bg-gradient-to-br from-pink-500 to-rose-500 rounded-lg flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
-                <svg className="w-7 h-7 text-white" fill="currentColor" viewBox="0 0 20 20">
-                  <path fillRule="evenodd" d="M18 3a1 1 0 00-1.447-.894L8.763 6H5a3 3 0 000 6h.28l1.771 5.316A1 1 0 008 18h1a1 1 0 001-1v-4.382l6.553 3.276A1 1 0 0018 15V3z" clipRule="evenodd" />
-                </svg>
-              </div>
-              <h3 className="text-xl font-bold text-gray-900 mb-2">{t.student.announcements}</h3>
-              <p className="text-sm text-gray-600">{t.student.announcementsDesc}</p>
-            </div>
 
             {/* Evaluations Card */}
             <div className={`bg-white overflow-hidden rounded-xl hover-lift p-6 sm:p-7 border-2 border-green-100 hover:border-green-300 group ${mounted ? 'animate-slide-up stagger-6' : 'opacity-0'}`}>

@@ -446,16 +446,16 @@ export default function SupervisorStudentsPage() {
                       {t.users?.email || 'Email'}
                     </th>
                     <th className="px-6 py-4 text-left text-xs font-medium text-white uppercase tracking-wider">
-                      Class
+                      {t.students?.class || 'Class'}
                     </th>
                     <th className="px-6 py-4 text-left text-xs font-medium text-white uppercase tracking-wider">
-                      Subjects
+                      {t.students?.subjects || 'Subjects'}
                     </th>
                     <th className="px-6 py-4 text-left text-xs font-medium text-white uppercase tracking-wider">
                       {t.users?.status || 'Status'}
                     </th>
                     <th className="px-6 py-4 text-left text-xs font-medium text-white uppercase tracking-wider">
-                      Actions
+                      {t.users?.actions || 'Actions'}
                     </th>
                   </tr>
                 </thead>

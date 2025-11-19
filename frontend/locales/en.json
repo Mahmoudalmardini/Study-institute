@@ -36,6 +36,8 @@
     "teachersDesc": "Manage teachers",
     "homework": "Homework",
     "homeworkDesc": "View all homework",
+    "reviewHomework": "Review Homework",
+    "reviewHomeworkDesc": "Review and approve teacher evaluations",
     "grades": "Grades",
     "gradesDesc": "View all grades",
     "announcements": "Announcements",
@@ -43,9 +45,13 @@
     "classes": "Classes",
     "classesDesc": "Manage classes",
     "subjects": "Subjects",
-    "subjectsDesc": "Manage subjects",
+    "subjectsDesc": "Manage subjects & curriculum",
     "points": "Points Management",
-    "pointsDesc": "Manage student points and rewards"
+    "pointsDesc": "Manage student points and rewards",
+    "payroll": "Payroll",
+    "payrollDesc": "Manage teacher salaries and hour requests",
+    "installments": "Installments",
+    "installmentsDesc": "Manage student monthly installments and payments"
   },
   "classes": {
     "addClass": "Add Class",
@@ -69,6 +75,8 @@
     "confirmDelete": "Are you sure you want to delete this class?"
   },
   "subjects": {
+    "title": "Subjects Management",
+    "titleDesc": "Manage subjects and organize your curriculum",
     "addSubject": "Add Subject",
     "editSubject": "Edit Subject",
     "addNewSubject": "Add New Subject",
@@ -98,7 +106,20 @@
     "actions": "Actions",
     "loading": "Loading...",
     "confirmDelete": "Are you sure you want to delete this subject?",
-    "monthlyCost": "Monthly Cost"
+    "monthlyCost": "Monthly Cost",
+    "searchPlaceholder": "Search subjects...",
+    "noSubjects": "No subjects found",
+    "subjectCreated": "Subject created successfully!",
+    "subjectUpdated": "Subject updated successfully!",
+    "subjectDeleted": "Subject deleted successfully!",
+    "errorSaving": "Error saving subject",
+    "errorDeleting": "Error deleting subject",
+    "failedToLoad": "Failed to load subjects",
+    "tryAdjustingSearch": "Try adjusting your search terms",
+    "getStarted": "Get started by creating your first subject",
+    "createFirstSubject": "Create First Subject",
+    "updateSubject": "Update Subject",
+    "createSubject": "Create Subject"
   },
   "teacher": {
     "title": "Teacher Dashboard",
@@ -453,7 +474,14 @@
     "monthNames": ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"],
     "overpaidLabel": "Overpaid",
     "overpaidAmount": "Overpaid Amount",
-    "overpaymentInfo": "Payment exceeds outstanding amount. Excess will be applied to future installments."
+    "overpaymentInfo": "Payment exceeds outstanding amount. Excess will be applied to future installments.",
+    "searchStudents": "Search Students",
+    "searchPlaceholder": "Search by name or email...",
+    "paid": "Paid",
+    "monthlyCost": "Monthly Cost",
+    "statusPending": "Pending",
+    "statusPartial": "Partial",
+    "statusOverdue": "Overdue"
   },
   "messages": {
     "logoutConfirm": "Are you sure you want to logout?"
