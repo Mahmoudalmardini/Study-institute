@@ -49,8 +49,12 @@ export default function SupervisorPointsPage() {
       try {
         const list = await apiClient.get('/students');
         const studentsList = Array.isArray(list) ? list : (list?.data ?? []);
+        const filteredStudents = studentsList.filter((s: any) => {
+          const role = s?.user?.role || s?.role;
+          return role === 'STUDENT';
+        });
         // Map student data to match expected format
-        const mappedStudents = studentsList.map((s: any) => ({
+        const mappedStudents = filteredStudents.map((s: any) => ({
           id: s.id,
           firstName: s.user?.firstName || '',
           lastName: s.user?.lastName || '',
@@ -105,6 +109,16 @@ export default function SupervisorPointsPage() {
       }
     })();
   }, [selectedStudentId]);
+
+  const resetInputsForStudent = (studentId: string) => {
+    setSubjectForStudent(prev => {
+      if (prev[studentId] === undefined) return prev;
+      const updated = { ...prev };
+      delete updated[studentId];
+      return updated;
+    });
+    setAmount(0);
+  };
 
   const handleAddPoints = async (studentId: string, subjectId: string) => {
     if (!subjectId) {
@@ -236,6 +250,8 @@ export default function SupervisorPointsPage() {
         }, 2000);
       }
     })();
+
+    resetInputsForStudent(studentId);
   };
 
   const handleDeletePoints = async (studentId: string, subjectId: string) => {
@@ -357,6 +373,8 @@ export default function SupervisorPointsPage() {
         }, 2000);
       }
     })();
+
+    resetInputsForStudent(studentId);
   };
 
   const ensureStudentSubjects = async (studentId: string) => {
@@ -590,7 +608,7 @@ export default function SupervisorPointsPage() {
                             className="[&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
                           />
                         </div>
-                        <div className="flex gap-2 flex-wrap">
+                          <div className="flex gap-2 flex-wrap">
                           <Button
                             size="sm"
                             className="bg-green-600 hover:bg-green-700 text-white flex-1 sm:flex-none"
@@ -608,6 +626,11 @@ export default function SupervisorPointsPage() {
                             {t.points.deletePoints}
                           </Button>
                         </div>
+                          {(!subjectForStudent[s.id] || amount <= 0) && (
+                            <p className="text-xs text-gray-500">
+                              {t.points.selectSubject} / {t.points.amountPlaceholder}
+                            </p>
+                          )}
                       </div>
                     </div>
                   </div>
