@@ -34,7 +34,7 @@ export default function SupervisorPointsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null);
-  const [amount, setAmount] = useState<number>(1);
+  const [amountByStudent, setAmountByStudent] = useState<Record<string, number>>({});
   const [query, setQuery] = useState<string>('');
   const [subjectsByStudent, setSubjectsByStudent] = useState<Record<string, Subject[]>>({});
   const [subjectForStudent, setSubjectForStudent] = useState<Record<string, string | undefined>>({});
@@ -51,7 +51,8 @@ export default function SupervisorPointsPage() {
         const studentsList = Array.isArray(list) ? list : (list?.data ?? []);
         const filteredStudents = studentsList.filter((s: any) => {
           const role = s?.user?.role || s?.role;
-          return role === 'STUDENT';
+          const hasStudentProfile = Boolean(s?.studentProfile?.id || s?.studentProfile || s?.studentProfileId);
+          return role === 'STUDENT' || hasStudentProfile;
         });
         // Map student data to match expected format
         const mappedStudents = filteredStudents.map((s: any) => ({
@@ -117,7 +118,12 @@ export default function SupervisorPointsPage() {
       delete updated[studentId];
       return updated;
     });
-    setAmount(0);
+    setAmountByStudent(prev => {
+      if (prev[studentId] === undefined) return prev;
+      const updated = { ...prev };
+      delete updated[studentId];
+      return updated;
+    });
   };
 
   const handleAddPoints = async (studentId: string, subjectId: string) => {
@@ -125,12 +131,11 @@ export default function SupervisorPointsPage() {
       setError(t.points.selectSubject);
       return;
     }
-    if (amount <= 0) {
+    const pointAmount = Math.abs(Number(amountByStudent[studentId] || 0));
+    if (!pointAmount || pointAmount <= 0) {
       setError('Amount must be greater than 0 to add points');
       return;
     }
-    
-    const pointAmount = Math.abs(Number(amount));
 
     // Always apply optimistic update immediately and synchronously - allow multiple clicks
     setStudentSummaries(prev => {
@@ -259,12 +264,11 @@ export default function SupervisorPointsPage() {
       setError(t.points.selectSubject);
       return;
     }
-    if (amount <= 0) {
+    const pointAmount = Math.abs(Number(amountByStudent[studentId] || 0));
+    if (!pointAmount || pointAmount <= 0) {
       setError('Amount must be greater than 0 to remove points');
       return;
     }
-    
-    const pointAmount = Math.abs(Number(amount));
 
     // Always apply optimistic update immediately and synchronously - allow multiple clicks
     setStudentSummaries(prev => {
@@ -576,21 +580,29 @@ export default function SupervisorPointsPage() {
                         </div>
                         <div>
                           <Label className="text-sm text-gray-700">{t.points.amount} *</Label>
-                          <Input 
+                          {(() => {
+                            const value = amountByStudent[s.id] ?? 0;
+                            const hasAmount = value > 0;
+                            return (
+                              <Input 
                             type="number" 
                             min="1"
                             step="1"
                             inputMode="numeric"
-                            value={amount > 0 ? amount.toString() : ''} 
+                            value={hasAmount ? value.toString() : ''}
                             onChange={(e) => {
                               const inputValue = e.target.value;
                               if (inputValue === '') {
-                                setAmount(0);
+                                setAmountByStudent(prev => {
+                                  const updated = { ...prev };
+                                  delete updated[s.id];
+                                  return updated;
+                                });
                                 return;
                               }
                               const val = parseInt(inputValue, 10);
                               if (!isNaN(val) && val > 0) {
-                                setAmount(val);
+                                setAmountByStudent(prev => ({ ...prev, [s.id]: val }));
                               }
                             }}
                             onKeyDown={(e) => {
@@ -607,13 +619,22 @@ export default function SupervisorPointsPage() {
                             placeholder={t.points.amountPlaceholder}
                             className="[&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
                           />
+                            );
+                          })()}
                         </div>
                           <div className="flex gap-2 flex-wrap">
+                          {(() => {
+                            const hasSubject = Boolean(subjectForStudent[s.id]);
+                            const amountValue = amountByStudent[s.id] ?? 0;
+                            const hasAmount = amountValue > 0;
+                            const disabled = !hasSubject || !hasAmount;
+                            return (
+                              <>
                           <Button
                             size="sm"
                             className="bg-green-600 hover:bg-green-700 text-white flex-1 sm:flex-none"
                             onClick={() => handleAddPoints(s.id, subjectForStudent[s.id] || '')}
-                            disabled={!subjectForStudent[s.id] || amount <= 0}
+                            disabled={disabled}
                           >
                             {t.points.addPoints}
                           </Button>
@@ -621,16 +642,24 @@ export default function SupervisorPointsPage() {
                             size="sm"
                             className="bg-red-600 hover:bg-red-700 text-white flex-1 sm:flex-none"
                             onClick={() => handleDeletePoints(s.id, subjectForStudent[s.id] || '')}
-                            disabled={!subjectForStudent[s.id] || amount <= 0}
+                            disabled={disabled}
                           >
                             {t.points.deletePoints}
                           </Button>
+                              </>
+                            );
+                          })()}
                         </div>
-                          {(!subjectForStudent[s.id] || amount <= 0) && (
-                            <p className="text-xs text-gray-500">
-                              {t.points.selectSubject} / {t.points.amountPlaceholder}
-                            </p>
-                          )}
+                        {(() => {
+                          const hasSubject = Boolean(subjectForStudent[s.id]);
+                          const amountValue = amountByStudent[s.id] ?? 0;
+                          const hasAmount = amountValue > 0;
+                          return (!hasSubject || !hasAmount) ? (
+                          <p className="text-xs text-gray-500">
+                            {t.points.selectSubject} / {t.points.amountPlaceholder}
+                          </p>
+                          ) : null;
+                        })()}
                       </div>
                     </div>
                   </div>
@@ -673,26 +702,6 @@ export default function SupervisorPointsPage() {
                       <div className="font-semibold text-gray-800 mb-1">{b.subjectName}</div>
                       <div className="text-sm text-gray-600">Daily: {b.daily}</div>
                       <div className="text-sm text-gray-600">Total: {b.total}</div>
-                      {selectedStudentId && b.subjectId && (
-                        <div className="mt-2 flex gap-2">
-                          <Button 
-                            size="sm" 
-                            className="bg-green-600 hover:bg-green-700 text-white"
-                            onClick={() => handleAddPoints(selectedStudentId, b.subjectId!)}
-                            disabled={amount <= 0}
-                          >
-                            Add {amount} pts
-                          </Button>
-                          <Button 
-                            size="sm" 
-                            className="bg-red-600 hover:bg-red-700 text-white"
-                            onClick={() => handleDeletePoints(selectedStudentId, b.subjectId!)}
-                            disabled={amount <= 0}
-                          >
-                            Remove {amount} pts
-                          </Button>
-                        </div>
-                      )}
                     </div>
                   ))}
                 </div>
