@@ -314,6 +314,7 @@ export interface StudentDiscount {
   studentId: string;
   student?: Student;
   amount: number | string;
+  percent?: number | string | null;
   reason?: string;
   isActive: boolean;
   createdBy: string;
@@ -357,7 +358,8 @@ export interface PaymentRecord {
 
 export interface CreateDiscountDto {
   studentId: string;
-  amount: number;
+  amount?: number;
+  percent?: number;
   reason?: string;
 }
 

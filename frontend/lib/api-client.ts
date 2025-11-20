@@ -205,7 +205,8 @@ export async function calculateInstallment(
 
 export async function createDiscount(data: {
   studentId: string;
-  amount: number;
+  amount?: number;
+  percent?: number;
   reason?: string;
 }) {
   return apiClient.post('/installments/discounts', data);

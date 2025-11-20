@@ -39,6 +39,13 @@ interface StudentWithInstallments extends Student {
   }>;
 }
 
+type DiscountFormState = {
+  type: 'AMOUNT' | 'PERCENT';
+  amount: string;
+  percent: string;
+  reason: string;
+};
+
 const monthNames = [
   'January',
   'February',
@@ -75,9 +82,41 @@ export default function InstallmentsPage() {
     paymentMethod: '',
     notes: '',
   });
-  const [discountForm, setDiscountForm] = useState({ amount: '', reason: '' });
+  const [discountForm, setDiscountForm] = useState<DiscountFormState>({
+    type: 'AMOUNT',
+    amount: '',
+    percent: '',
+    reason: '',
+  });
   const [selectedInstallmentOutstanding, setSelectedInstallmentOutstanding] = useState<number>(0);
   const [selectedStudentTotalOutstanding, setSelectedStudentTotalOutstanding] = useState<number>(0);
+
+  const isAmountDiscount = discountForm.type === 'AMOUNT';
+  const parsedDiscountAmount = parseFloat(discountForm.amount || 'NaN');
+  const parsedDiscountPercent = parseFloat(discountForm.percent || 'NaN');
+  const amountProvided =
+    !!discountForm.amount && !isNaN(parsedDiscountAmount);
+  const amountExceedsOutstanding =
+    isAmountDiscount &&
+    amountProvided &&
+    parsedDiscountAmount > selectedStudentTotalOutstanding;
+  const amountNonPositive =
+    isAmountDiscount && amountProvided && parsedDiscountAmount <= 0;
+  const discountAmountInvalid =
+    isAmountDiscount &&
+    (!amountProvided || amountExceedsOutstanding || amountNonPositive);
+  const percentProvided =
+    !!discountForm.percent && !isNaN(parsedDiscountPercent);
+  const percentTooLarge =
+    !isAmountDiscount && percentProvided && parsedDiscountPercent > 100;
+  const percentNonPositive =
+    !isAmountDiscount && percentProvided && parsedDiscountPercent <= 0;
+  const discountPercentInvalid =
+    !isAmountDiscount &&
+    (!percentProvided || percentTooLarge || percentNonPositive);
+  const disableDiscountSubmit = isAmountDiscount
+    ? discountAmountInvalid
+    : discountPercentInvalid;
 
   useEffect(() => {
     const token = localStorage.getItem('accessToken');
@@ -395,9 +434,13 @@ export default function InstallmentsPage() {
 
   const handleAddDiscount = (student: StudentWithInstallments) => {
     setSelectedStudent(student);
-    const totalOutstanding = parseFloat(String(student.outstanding?.totalOutstanding || '0'));
-    setSelectedStudentTotalOutstanding(totalOutstanding);
-    setDiscountForm({ amount: '', reason: '' });
+    const totalOutstanding = parseFloat(
+      String(student.outstanding?.totalOutstanding || '0'),
+    );
+    setSelectedStudentTotalOutstanding(
+      Number.isFinite(totalOutstanding) ? totalOutstanding : 0,
+    );
+    setDiscountForm({ type: 'AMOUNT', amount: '', percent: '', reason: '' });
     setShowDiscountForm(true);
   };
 
@@ -948,27 +991,119 @@ export default function InstallmentsPage() {
               </div>
               <div>
                 <label className="block text-sm font-semibold mb-2">
-                  {t.installments?.discountAmount || 'Discount Amount'}
+                  {t.installments?.discountType || 'Discount Type'}
                 </label>
-                <input
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  max={selectedStudentTotalOutstanding}
-                  value={discountForm.amount}
-                  onChange={(e) => setDiscountForm({ ...discountForm, amount: e.target.value })}
-                  className={`w-full px-4 py-2 border rounded-lg ${
-                    discountForm.amount && parseFloat(discountForm.amount) > selectedStudentTotalOutstanding
-                      ? 'border-red-500 bg-red-50'
-                      : 'border-gray-300'
-                  }`}
-                />
-                {discountForm.amount && parseFloat(discountForm.amount) > selectedStudentTotalOutstanding && (
-                  <p className="mt-1 text-sm text-red-600">
-                    {(t.installments?.discountAmountExceedsError || 'Discount amount cannot exceed total outstanding balance ({amount})').replace('{amount}', formatCurrency(selectedStudentTotalOutstanding))}
-                  </p>
-                )}
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setDiscountForm((prev) => ({
+                        ...prev,
+                        type: 'AMOUNT',
+                        percent: '',
+                      }))
+                    }
+                    className={`px-3 py-2 rounded-lg border text-sm font-medium transition ${
+                      isAmountDiscount
+                        ? 'border-emerald-500 bg-emerald-50 text-emerald-700'
+                        : 'border-gray-300 text-gray-600 hover:border-emerald-300'
+                    }`}
+                  >
+                    {t.installments?.discountTypeAmount || 'Fixed Amount'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setDiscountForm((prev) => ({
+                        ...prev,
+                        type: 'PERCENT',
+                        amount: '',
+                      }))
+                    }
+                    className={`px-3 py-2 rounded-lg border text-sm font-medium transition ${
+                      !isAmountDiscount
+                        ? 'border-emerald-500 bg-emerald-50 text-emerald-700'
+                        : 'border-gray-300 text-gray-600 hover:border-emerald-300'
+                    }`}
+                  >
+                    {t.installments?.discountTypePercent || 'Percentage'}
+                  </button>
+                </div>
               </div>
+              {isAmountDiscount ? (
+                <div>
+                  <label className="block text-sm font-semibold mb-2">
+                    {t.installments?.discountAmount || 'Discount Amount'}
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    max={selectedStudentTotalOutstanding}
+                    value={discountForm.amount}
+                    onChange={(e) =>
+                      setDiscountForm({ ...discountForm, amount: e.target.value })
+                    }
+                    className={`w-full px-4 py-2 border rounded-lg ${
+                      discountAmountInvalid
+                        ? 'border-red-500 bg-red-50'
+                        : 'border-gray-300'
+                    }`}
+                  />
+                  {amountExceedsOutstanding && (
+                    <p className="mt-1 text-sm text-red-600">
+                      {(t.installments?.discountAmountExceedsError ||
+                        'Discount amount cannot exceed total outstanding balance ({amount})').replace(
+                        '{amount}',
+                        formatCurrency(selectedStudentTotalOutstanding),
+                      )}
+                    </p>
+                  )}
+                  {amountNonPositive && (
+                    <p className="mt-1 text-sm text-red-600">
+                      {t.installments?.invalidDiscountAmount ||
+                        'Please enter a valid discount amount'}
+                    </p>
+                  )}
+                </div>
+              ) : (
+                <div>
+                  <label className="block text-sm font-semibold mb-2">
+                    {t.installments?.discountPercent || 'Discount Percentage'}
+                  </label>
+                  <input
+                    type="number"
+                    step="0.1"
+                    min="0"
+                    max="100"
+                    value={discountForm.percent}
+                    onChange={(e) =>
+                      setDiscountForm({ ...discountForm, percent: e.target.value })
+                    }
+                    className={`w-full px-4 py-2 border rounded-lg ${
+                      discountPercentInvalid
+                        ? 'border-red-500 bg-red-50'
+                        : 'border-gray-300'
+                    }`}
+                  />
+                  <p className="mt-1 text-xs text-gray-500">
+                    {t.installments?.discountPercentHelper ||
+                      'Applies to the student’s monthly tuition from this month onward.'}
+                  </p>
+                  {percentTooLarge && (
+                    <p className="mt-1 text-sm text-red-600">
+                      {t.installments?.discountPercentExceedsError ||
+                        'Percentage discount cannot exceed 100%.'}
+                    </p>
+                  )}
+                  {percentNonPositive && (
+                    <p className="mt-1 text-sm text-red-600">
+                      {t.installments?.invalidDiscountPercent ||
+                        'Please enter a valid percentage between 0 and 100.'}
+                    </p>
+                  )}
+                </div>
+              )}
               <div>
                 <label className="block text-sm font-semibold mb-2">
                   {t.installments?.discountReason || 'Reason (Optional)'}
@@ -983,31 +1118,68 @@ export default function InstallmentsPage() {
               <div className="flex gap-3">
                 <button
                   onClick={async () => {
-                    const discountAmount = parseFloat(discountForm.amount);
-                    if (isNaN(discountAmount) || !discountForm.amount || discountAmount <= 0) {
-                      setError(t.installments?.invalidDiscountAmount || 'Please enter a valid discount amount');
-                      return;
+                    if (isAmountDiscount) {
+                      if (!amountProvided || amountNonPositive) {
+                        setError(
+                          t.installments?.invalidDiscountAmount ||
+                            'Please enter a valid discount amount',
+                        );
+                        return;
+                      }
+                      if (amountExceedsOutstanding) {
+                        setError(
+                          (t.installments?.discountAmountExceedsError ||
+                            'Discount amount cannot exceed total outstanding balance ({amount})').replace(
+                            '{amount}',
+                            formatCurrency(selectedStudentTotalOutstanding),
+                          ),
+                        );
+                        return;
+                      }
+                    } else if (discountPercentInvalid) {
+                      if (!percentProvided || percentNonPositive) {
+                        setError(
+                          t.installments?.invalidDiscountPercent ||
+                            'Please enter a valid discount percentage',
+                        );
+                        return;
+                      }
+                      if (percentTooLarge) {
+                        setError(
+                          t.installments?.discountPercentExceedsError ||
+                            'Percentage discount cannot exceed 100%.',
+                        );
+                        return;
+                      }
                     }
-                    if (discountAmount > selectedStudentTotalOutstanding) {
-                      setError((t.installments?.discountAmountExceedsError || 'Discount amount cannot exceed total outstanding balance ({amount})').replace('{amount}', formatCurrency(selectedStudentTotalOutstanding)));
-                      return;
-                    }
+
                     try {
                       await createDiscount({
                         studentId: selectedStudent.studentProfile!.id,
-                        amount: discountAmount,
+                        amount: isAmountDiscount ? parsedDiscountAmount : undefined,
+                        percent: !isAmountDiscount ? parsedDiscountPercent : undefined,
                         reason: discountForm.reason || undefined,
                       });
-                      setSuccess(t.installments?.discountCreated || 'Discount added successfully');
+                      setSuccess(
+                        t.installments?.discountCreated ||
+                          'Discount added successfully',
+                      );
                       setShowDiscountForm(false);
-                      setDiscountForm({ amount: '', reason: '' });
+                      setDiscountForm({
+                        type: 'AMOUNT',
+                        amount: '',
+                        percent: '',
+                        reason: '',
+                      });
                       setSelectedStudentTotalOutstanding(0);
                       await fetchData();
                     } catch (err: any) {
-                      setError(err.response?.data?.message || 'Failed to add discount');
+                      setError(
+                        err.response?.data?.message || 'Failed to add discount',
+                      );
                     }
                   }}
-                  disabled={!discountForm.amount || isNaN(parseFloat(discountForm.amount)) || parseFloat(discountForm.amount) <= 0 || parseFloat(discountForm.amount) > selectedStudentTotalOutstanding}
+                  disabled={disableDiscountSubmit}
                   className="flex-1 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
                 >
                   Add
@@ -1015,7 +1187,12 @@ export default function InstallmentsPage() {
                 <button
                   onClick={() => {
                     setShowDiscountForm(false);
-                    setDiscountForm({ amount: '', reason: '' });
+                    setDiscountForm({
+                      type: 'AMOUNT',
+                      amount: '',
+                      percent: '',
+                      reason: '',
+                    });
                     setSelectedStudentTotalOutstanding(0);
                   }}
                   className="flex-1 px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300"

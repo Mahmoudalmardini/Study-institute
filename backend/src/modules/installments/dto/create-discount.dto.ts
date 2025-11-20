@@ -1,4 +1,11 @@
-import { IsString, IsNotEmpty, IsNumber, Min, IsOptional } from 'class-validator';
+import {
+  IsString,
+  IsNotEmpty,
+  IsNumber,
+  Min,
+  Max,
+  IsOptional,
+} from 'class-validator';
 import { Type } from 'class-transformer';
 
 export class CreateDiscountDto {
@@ -6,11 +13,18 @@ export class CreateDiscountDto {
   @IsNotEmpty()
   studentId: string;
 
+  @IsOptional()
   @IsNumber()
-  @IsNotEmpty()
-  @Min(0)
+  @Min(0.01)
   @Type(() => Number)
-  amount: number;
+  amount?: number;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0.01)
+  @Max(100)
+  @Type(() => Number)
+  percent?: number;
 
   @IsString()
   @IsOptional()

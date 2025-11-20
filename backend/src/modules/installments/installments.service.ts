@@ -164,10 +164,26 @@ export class InstallmentsService {
       },
     });
 
-    let discountAmount = new Prisma.Decimal(0);
+    let fixedDiscountTotal = new Prisma.Decimal(0);
+    let percentageDiscountTotal = new Prisma.Decimal(0);
+
     for (const discount of activeDiscounts) {
-      discountAmount = discountAmount.add(discount.amount);
+      if (discount.percent && discount.percent.gt(0)) {
+        percentageDiscountTotal = percentageDiscountTotal.add(discount.percent);
+      } else if (discount.amount && discount.amount.gt(0)) {
+        fixedDiscountTotal = fixedDiscountTotal.add(discount.amount);
+      }
     }
+
+    if (percentageDiscountTotal.gt(100)) {
+      percentageDiscountTotal = new Prisma.Decimal(100);
+    }
+
+    const percentageDiscountAmount = percentageDiscountTotal.gt(0)
+      ? totalAmount.mul(percentageDiscountTotal).div(new Prisma.Decimal(100))
+      : new Prisma.Decimal(0);
+
+    const discountAmount = fixedDiscountTotal.add(percentageDiscountAmount);
 
     // Calculate final amounts
     const finalAmount = totalAmount.minus(discountAmount);
@@ -335,22 +351,77 @@ export class InstallmentsService {
       );
     }
 
-    // Get total outstanding balance
-    const outstandingBalance = await this.getOutstandingBalance(createDiscountDto.studentId);
-    const totalOutstanding = new Prisma.Decimal(outstandingBalance.totalOutstanding);
-    const discountAmount = new Prisma.Decimal(createDiscountDto.amount);
+    const hasAmount =
+      typeof createDiscountDto.amount === 'number' &&
+      !isNaN(createDiscountDto.amount) &&
+      createDiscountDto.amount > 0;
+    const hasPercent =
+      typeof createDiscountDto.percent === 'number' &&
+      !isNaN(createDiscountDto.percent) &&
+      createDiscountDto.percent > 0;
 
-    // Validate discount amount doesn't exceed total outstanding
-    if (discountAmount.gt(totalOutstanding)) {
+    if ((hasAmount && hasPercent) || (!hasAmount && !hasPercent)) {
       throw new BadRequestException(
-        `Discount amount (${discountAmount.toString()}) cannot exceed total outstanding balance (${totalOutstanding.toString()})`,
+        'Please provide either a discount amount or a discount percentage.',
       );
+    }
+
+    let percentValue = new Prisma.Decimal(0);
+    if (hasPercent) {
+      percentValue = new Prisma.Decimal(createDiscountDto.percent!);
+      if (percentValue.lte(0) || percentValue.gt(100)) {
+        throw new BadRequestException(
+          'Discount percentage must be greater than 0 and no more than 100.',
+        );
+      }
+
+      const activePercentAggregate = await this.prisma.studentDiscount.aggregate({
+        where: {
+          studentId: createDiscountDto.studentId,
+          isActive: true,
+          percent: {
+            not: null,
+          },
+        },
+        _sum: {
+          percent: true,
+        },
+      });
+
+      const existingPercent = new Prisma.Decimal(
+        activePercentAggregate._sum.percent || 0,
+      );
+      if (existingPercent.add(percentValue).gt(100)) {
+        throw new BadRequestException(
+          'Total percentage-based discounts for a student cannot exceed 100%.',
+        );
+      }
+    }
+
+    let discountAmount = new Prisma.Decimal(0);
+    if (hasAmount) {
+      // Get total outstanding balance
+      const outstandingBalance = await this.getOutstandingBalance(
+        createDiscountDto.studentId,
+      );
+      const totalOutstanding = new Prisma.Decimal(
+        outstandingBalance.totalOutstanding,
+      );
+      discountAmount = new Prisma.Decimal(createDiscountDto.amount);
+
+      // Validate discount amount doesn't exceed total outstanding
+      if (discountAmount.gt(totalOutstanding)) {
+        throw new BadRequestException(
+          `Discount amount (${discountAmount.toString()}) cannot exceed total outstanding balance (${totalOutstanding.toString()})`,
+        );
+      }
     }
 
     const discount = await this.prisma.studentDiscount.create({
       data: {
         studentId: createDiscountDto.studentId,
-        amount: createDiscountDto.amount,
+        amount: hasAmount ? discountAmount : new Prisma.Decimal(0),
+        percent: hasPercent ? percentValue : null,
         reason: createDiscountDto.reason,
         createdBy,
         isActive: true,

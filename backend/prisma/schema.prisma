@@ -525,6 +525,7 @@ model StudentDiscount {
   studentId   String
   student     Student   @relation(fields: [studentId], references: [id], onDelete: Cascade)
   amount      Decimal   @db.Decimal(10, 2)
+  percent     Decimal?  @db.Decimal(5, 2)
   reason      String?
   isActive    Boolean   @default(true)
   createdBy   String    // User ID of admin who created the discount
