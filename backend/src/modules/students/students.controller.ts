@@ -33,8 +33,21 @@ export class StudentsController {
 
   @Get()
   @Roles(Role.ADMIN, Role.SUPERVISOR, Role.TEACHER)
-  findAll(@Query('classId') classId?: string) {
-    return this.studentsService.findAll(classId);
+  findAll(
+    @Query('classId') classId?: string,
+    @Query('assignedSubjectsOnly') assignedSubjectsOnly?: string,
+    @Query('includeSubjects') includeSubjects?: string,
+  ) {
+    return this.studentsService.findAll(classId, {
+      assignedSubjectsOnly:
+        typeof assignedSubjectsOnly === 'string'
+          ? assignedSubjectsOnly === 'true'
+          : undefined,
+      includeSubjects:
+        typeof includeSubjects === 'string'
+          ? includeSubjects === 'true'
+          : undefined,
+    });
   }
 
   @Get('me')

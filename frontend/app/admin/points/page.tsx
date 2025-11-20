@@ -11,7 +11,31 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import apiClient from '@/lib/api-client';
 import { createPoint, getPointSummary, getBatchPointSummaries, getStudentSubjects } from '@/lib/api-client';
-import type { Subject } from '@/types';
+
+interface SubjectOption {
+  id: string;
+  name: string;
+  code?: string;
+  teacherName?: string;
+  teacherEmail?: string;
+}
+
+interface StudentSubjectRelation {
+  subject?: {
+    id: string;
+    name: string;
+    code?: string;
+  };
+  teacher?: {
+    id: string;
+    user?: {
+      id: string;
+      email: string;
+      firstName: string;
+      lastName: string;
+    };
+  } | null;
+}
 
 interface Student {
   id: string;
@@ -24,6 +48,7 @@ interface Student {
     firstName: string;
     lastName: string;
   };
+  subjects?: StudentSubjectRelation[];
 }
 
 export default function AdminPointsPage() {
@@ -36,18 +61,40 @@ export default function AdminPointsPage() {
   const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null);
   const [amount, setAmount] = useState<number>(1);
   const [query, setQuery] = useState<string>('');
-  const [subjectsByStudent, setSubjectsByStudent] = useState<Record<string, Subject[]>>({});
+  const [subjectsByStudent, setSubjectsByStudent] = useState<Record<string, SubjectOption[]>>({});
   const [subjectForStudent, setSubjectForStudent] = useState<Record<string, string | undefined>>({});
   const [summary, setSummary] = useState<{ total: number; daily: number; bySubject: { subjectId: string | null; subjectName: string; total: number; daily: number }[] } | null>(null);
   const [processing, setProcessing] = useState<Record<string, boolean>>({});
   const [studentSummaries, setStudentSummaries] = useState<Record<string, { total: number; daily: number; bySubject: { subjectId: string | null; subjectName: string; total: number; daily: number }[] }>>({});
-  const [pendingOperations, setPendingOperations] = useState<Record<string, number>>({}); // Track pending operations count
+
+  const mapSubjectsToOptions = (entries: any[]): SubjectOption[] => {
+    return (entries || [])
+      .map((row) => {
+        const subject = row?.subject;
+        if (!subject?.id || !subject?.name) return null;
+        const teacherUser = row?.teacher?.user;
+        const teacherName = `${teacherUser?.firstName || ''} ${teacherUser?.lastName || ''}`.trim();
+        return {
+          id: subject.id,
+          name: subject.name,
+          code: subject.code,
+          teacherName: teacherName || undefined,
+          teacherEmail: teacherUser?.email,
+        };
+      })
+      .filter((entry): entry is SubjectOption => Boolean(entry));
+  };
 
   useEffect(() => {
     let mounted = true;
     (async () => {
       try {
-        const list = await apiClient.get('/students');
+        const list = await apiClient.get('/students', {
+          params: {
+            assignedSubjectsOnly: true,
+            includeSubjects: true,
+          },
+        });
         const studentsList = Array.isArray(list) ? list : (list?.data ?? []);
         // Map student data to match expected format
         const mappedStudents = studentsList.map((s: any) => ({
@@ -55,9 +102,20 @@ export default function AdminPointsPage() {
           firstName: s.user?.firstName || '',
           lastName: s.user?.lastName || '',
           email: s.user?.email || '',
-          user: s.user
+          user: s.user,
+          subjects: s.subjects || []
         }));
-        if (mounted) setStudents(mappedStudents);
+        if (mounted) {
+          setStudents(mappedStudents);
+          const initialSubjects: Record<string, SubjectOption[]> = {};
+          mappedStudents.forEach((student) => {
+            const subjectOptions = mapSubjectsToOptions(student.subjects || []);
+            if (subjectOptions.length > 0) {
+              initialSubjects[student.id] = subjectOptions;
+            }
+          });
+          setSubjectsByStudent(initialSubjects);
+        }
         
         // Load summaries for all students using batch endpoint
         if (mounted && mappedStudents.length > 0) {
@@ -106,7 +164,112 @@ export default function AdminPointsPage() {
     })();
   }, [selectedStudentId]);
 
+  const setStudentProcessingState = (studentId: string, value: boolean) => {
+    setProcessing((prev) => ({ ...prev, [studentId]: value }));
+  };
+
+  const resetStudentForm = (studentId: string) => {
+    setSubjectForStudent((prev) => ({ ...prev, [studentId]: undefined }));
+    setAmount(0);
+    setSelectedStudentId(null);
+  };
+
+  const applyPointDelta = (studentId: string, subjectId: string, delta: number) => {
+    setStudentSummaries(prev => {
+      const current = prev[studentId] || { total: 0, daily: 0, bySubject: [] };
+      const subjectIndex = current.bySubject.findIndex(s => s.subjectId === subjectId);
+      const newBySubject = [...current.bySubject];
+
+      if (subjectIndex >= 0) {
+        newBySubject[subjectIndex] = {
+          ...newBySubject[subjectIndex],
+          daily: (newBySubject[subjectIndex].daily || 0) + delta,
+          total: (newBySubject[subjectIndex].total || 0) + delta,
+        };
+      } else if (delta > 0) {
+        newBySubject.push({
+          subjectId,
+          subjectName: (subjectsByStudent[studentId] || []).find(s => s.id === subjectId)?.name || 'Unknown',
+          daily: delta,
+          total: delta,
+        });
+      }
+
+      const normalizedBySubject = newBySubject.map((entry) => ({
+        ...entry,
+        daily: entry.daily < 0 ? 0 : entry.daily,
+        total: entry.total < 0 ? 0 : entry.total,
+      }));
+
+      return {
+        ...prev,
+        [studentId]: {
+          total: Math.max(0, (current.total || 0) + delta),
+          daily: Math.max(0, (current.daily || 0) + delta),
+          bySubject: normalizedBySubject,
+        },
+      };
+    });
+
+    if (selectedStudentId === studentId) {
+      setSummary(prev => {
+        if (!prev) return prev;
+        const subjectIndex = prev.bySubject.findIndex(s => s.subjectId === subjectId);
+        const newBySubject = [...prev.bySubject];
+
+        if (subjectIndex >= 0) {
+          newBySubject[subjectIndex] = {
+            ...newBySubject[subjectIndex],
+            daily: (newBySubject[subjectIndex].daily || 0) + delta,
+            total: (newBySubject[subjectIndex].total || 0) + delta,
+          };
+        } else if (delta > 0) {
+          newBySubject.push({
+            subjectId,
+            subjectName: (subjectsByStudent[studentId] || []).find(s => s.id === subjectId)?.name || 'Unknown',
+            daily: delta,
+            total: delta,
+          });
+        }
+
+        return {
+          ...prev,
+          total: Math.max(0, (prev.total || 0) + delta),
+          daily: Math.max(0, (prev.daily || 0) + delta),
+          bySubject: newBySubject.map((entry) => ({
+            ...entry,
+            daily: entry.daily < 0 ? 0 : entry.daily,
+            total: entry.total < 0 ? 0 : entry.total,
+          })),
+        };
+      });
+    }
+  };
+
+  const refreshStudentSummary = async (studentId: string) => {
+    try {
+      const updatedSummary = await getPointSummary(studentId) as any;
+      if (updatedSummary) {
+        setStudentSummaries(prev => ({
+          ...prev,
+          [studentId]: {
+            total: updatedSummary.total || 0,
+            daily: updatedSummary.daily || 0,
+            bySubject: updatedSummary.bySubject || [],
+          },
+        }));
+
+        if (selectedStudentId === studentId) {
+          setSummary(updatedSummary);
+        }
+      }
+    } catch {
+      // ignore refresh errors
+    }
+  };
+
   const handleAddPoints = async (studentId: string, subjectId: string) => {
+    if (processing[studentId]) return;
     if (!subjectId) {
       setError(t.points.selectSubject);
       return;
@@ -117,128 +280,26 @@ export default function AdminPointsPage() {
     }
     
     const pointAmount = Math.abs(Number(amount));
+    setStudentProcessingState(studentId, true);
+    setError(null);
+    applyPointDelta(studentId, subjectId, pointAmount);
 
-    // Always apply optimistic update immediately and synchronously - allow multiple clicks
-    setStudentSummaries(prev => {
-      const current = prev[studentId] || { total: 0, daily: 0, bySubject: [] };
-      const subjectIndex = current.bySubject.findIndex(s => s.subjectId === subjectId);
-      const newBySubject = [...current.bySubject];
-      
-      if (subjectIndex >= 0) {
-        newBySubject[subjectIndex] = {
-          ...newBySubject[subjectIndex],
-          daily: (newBySubject[subjectIndex].daily || 0) + pointAmount,
-          total: (newBySubject[subjectIndex].total || 0) + pointAmount
-        };
-      } else {
-        newBySubject.push({
-          subjectId,
-          subjectName: (subjectsByStudent[studentId] || []).find(s => s.id === subjectId)?.name || 'Unknown',
-          daily: pointAmount,
-          total: pointAmount
-        });
+    try {
+      await createPoint({ studentId, subjectId, amount: pointAmount });
+      await refreshStudentSummary(studentId);
+    } catch (err: any) {
+      if (err?.response?.status !== 429) {
+        setError(err?.response?.data?.message || 'Failed to add points');
       }
-      
-      return {
-        ...prev,
-        [studentId]: {
-          total: (current.total || 0) + pointAmount,
-          daily: (current.daily || 0) + pointAmount,
-          bySubject: newBySubject
-        }
-      };
-    });
-    
-    // Update summary if this is the selected student
-    if (selectedStudentId === studentId) {
-      setSummary(prev => {
-        if (!prev) return prev;
-        const subjectIndex = prev.bySubject.findIndex(s => s.subjectId === subjectId);
-        const newBySubject = [...prev.bySubject];
-        
-        if (subjectIndex >= 0) {
-          newBySubject[subjectIndex] = {
-            ...newBySubject[subjectIndex],
-            daily: (newBySubject[subjectIndex].daily || 0) + pointAmount,
-            total: (newBySubject[subjectIndex].total || 0) + pointAmount
-          };
-        } else {
-          newBySubject.push({
-            subjectId,
-            subjectName: (subjectsByStudent[studentId] || []).find(s => s.id === subjectId)?.name || 'Unknown',
-            daily: pointAmount,
-            total: pointAmount
-          });
-        }
-        
-        return {
-          ...prev,
-          total: (prev.total || 0) + pointAmount,
-          daily: (prev.daily || 0) + pointAmount,
-          bySubject: newBySubject
-        };
-      });
+      await refreshStudentSummary(studentId);
+    } finally {
+      resetStudentForm(studentId);
+      setStudentProcessingState(studentId, false);
     }
-
-    // Process API call asynchronously - each click fires independently
-    (async () => {
-      try {
-        setError(null);
-        // Make API call - fire immediately, no blocking
-        await createPoint({ studentId, subjectId, amount: pointAmount });
-        
-        // Debounced refresh - wait a bit then refresh to sync with server
-        setTimeout(async () => {
-          try {
-            const updatedSummary = await getPointSummary(studentId) as any;
-            if (updatedSummary) {
-              setStudentSummaries(prev => ({
-                ...prev,
-                [studentId]: { 
-                  total: updatedSummary.total || 0, 
-                  daily: updatedSummary.daily || 0,
-                  bySubject: updatedSummary.bySubject || []
-                }
-              }));
-              
-              if (selectedStudentId === studentId) {
-                setSummary(updatedSummary);
-              }
-            }
-          } catch (refreshErr) {
-            // Ignore refresh errors
-          }
-        }, 500); // Debounce refresh by 500ms
-      } catch (err: any) {
-        if (err?.response?.status !== 429) {
-          setError(err?.response?.data?.message || 'Failed to add points');
-        }
-        // On 429, silently retry refresh after delay
-        setTimeout(async () => {
-          try {
-            const updatedSummary = await getPointSummary(studentId) as any;
-            if (updatedSummary) {
-              setStudentSummaries(prev => ({
-                ...prev,
-                [studentId]: { 
-                  total: updatedSummary.total || 0, 
-                  daily: updatedSummary.daily || 0,
-                  bySubject: updatedSummary.bySubject || []
-                }
-              }));
-              if (selectedStudentId === studentId) {
-                setSummary(updatedSummary);
-              }
-            }
-          } catch (retryErr) {
-            // Ignore retry errors
-          }
-        }, 2000);
-      }
-    })();
   };
 
   const handleDeletePoints = async (studentId: string, subjectId: string) => {
+    if (processing[studentId]) return;
     if (!subjectId) {
       setError(t.points.selectSubject);
       return;
@@ -249,114 +310,22 @@ export default function AdminPointsPage() {
     }
     
     const pointAmount = Math.abs(Number(amount));
+    setStudentProcessingState(studentId, true);
+    setError(null);
+    applyPointDelta(studentId, subjectId, -pointAmount);
 
-    // Always apply optimistic update immediately and synchronously - allow multiple clicks
-    setStudentSummaries(prev => {
-      const current = prev[studentId] || { total: 0, daily: 0, bySubject: [] };
-      const subjectIndex = current.bySubject.findIndex(s => s.subjectId === subjectId);
-      const newBySubject = [...current.bySubject];
-      
-      if (subjectIndex >= 0) {
-        newBySubject[subjectIndex] = {
-          ...newBySubject[subjectIndex],
-          daily: Math.max(0, (newBySubject[subjectIndex].daily || 0) - pointAmount),
-          total: Math.max(0, (newBySubject[subjectIndex].total || 0) - pointAmount)
-        };
+    try {
+      await createPoint({ studentId, subjectId, amount: -pointAmount });
+      await refreshStudentSummary(studentId);
+    } catch (err: any) {
+      if (err?.response?.status !== 429) {
+        setError(err?.response?.data?.message || 'Failed to remove points');
       }
-      
-      const newTotal = Math.max(0, (current.total || 0) - pointAmount);
-      const newDaily = Math.max(0, (current.daily || 0) - pointAmount);
-      
-      return {
-        ...prev,
-        [studentId]: {
-          total: newTotal,
-          daily: newDaily,
-          bySubject: newBySubject
-        }
-      };
-    });
-    
-    // Update summary if this is the selected student
-    if (selectedStudentId === studentId) {
-      setSummary(prev => {
-        if (!prev) return prev;
-        const subjectIndex = prev.bySubject.findIndex(s => s.subjectId === subjectId);
-        const newBySubject = [...prev.bySubject];
-        
-        if (subjectIndex >= 0) {
-          newBySubject[subjectIndex] = {
-            ...newBySubject[subjectIndex],
-            daily: Math.max(0, (newBySubject[subjectIndex].daily || 0) - pointAmount),
-            total: Math.max(0, (newBySubject[subjectIndex].total || 0) - pointAmount)
-          };
-        }
-        
-        return {
-          ...prev,
-          total: Math.max(0, (prev.total || 0) - pointAmount),
-          daily: Math.max(0, (prev.daily || 0) - pointAmount),
-          bySubject: newBySubject
-        };
-      });
+      await refreshStudentSummary(studentId);
+    } finally {
+      resetStudentForm(studentId);
+      setStudentProcessingState(studentId, false);
     }
-
-    // Process API call asynchronously - each click fires independently
-    (async () => {
-      try {
-        setError(null);
-        // Make API call - fire immediately, no blocking
-        await createPoint({ studentId, subjectId, amount: -pointAmount });
-        
-        // Debounced refresh - wait a bit then refresh to sync with server
-        setTimeout(async () => {
-          try {
-            const updatedSummary = await getPointSummary(studentId) as any;
-            if (updatedSummary) {
-              setStudentSummaries(prev => ({
-                ...prev,
-                [studentId]: { 
-                  total: updatedSummary.total || 0, 
-                  daily: updatedSummary.daily || 0,
-                  bySubject: updatedSummary.bySubject || []
-                }
-              }));
-              
-              if (selectedStudentId === studentId) {
-                setSummary(updatedSummary);
-              }
-            }
-          } catch (refreshErr) {
-            // Ignore refresh errors
-          }
-        }, 500); // Debounce refresh by 500ms
-      } catch (err: any) {
-        if (err?.response?.status !== 429) {
-          setError(err?.response?.data?.message || 'Failed to remove points');
-        }
-        // On 429, silently retry refresh after delay
-        setTimeout(async () => {
-          try {
-            const updatedSummary = await getPointSummary(studentId) as any;
-            if (updatedSummary) {
-              setStudentSummaries(prev => ({
-                ...prev,
-                [studentId]: { 
-                  total: updatedSummary.total || 0, 
-                  daily: updatedSummary.daily || 0,
-                  bySubject: updatedSummary.bySubject || []
-                }
-              }));
-              if (selectedStudentId === studentId) {
-                setSummary(updatedSummary);
-              }
-            }
-          } catch (retryErr) {
-            // Ignore retry errors
-          }
-        }, 2000);
-      }
-    })();
   };
 
   const ensureStudentSubjects = async (studentId: string) => {
@@ -364,9 +333,7 @@ export default function AdminPointsPage() {
     try {
       const res = await getStudentSubjects(studentId);
       const list = Array.isArray(res) ? res : (res?.data ?? []);
-      const subjects: Subject[] = (list || [])
-        .map((row: any) => row?.subject)
-        .filter((s: any) => s && s.id && s.name);
+      const subjects = mapSubjectsToOptions(list || []);
       setSubjectsByStudent((m) => ({ ...m, [studentId]: subjects }));
     } catch {
       setSubjectsByStudent((m) => ({ ...m, [studentId]: [] }));
@@ -487,7 +454,12 @@ export default function AdminPointsPage() {
           if (filteredStudents.length > 0) {
             return (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 mb-6">
-                {filteredStudents.map((s, idx) => (
+                {filteredStudents.map((s, idx) => {
+                  const subjectOptions = subjectsByStudent[s.id] || [];
+                  const selectedSubjectOption = subjectOptions.find(sub => sub.id === subjectForStudent[s.id]);
+                  const isProcessing = !!processing[s.id];
+                  const disableActions = isProcessing || !subjectForStudent[s.id] || amount <= 0;
+                  return (
                 <Card key={s.id} className={`p-5 bg-white rounded-2xl shadow-lg hover-lift border-2 border-gray-100 hover:border-teal-200 transition-colors ${idx < 6 ? `animate-slide-up stagger-${idx + 1}` : ''}`}>
                   <div className="flex items-start gap-4">
                     <div className="w-12 h-12 rounded-full bg-teal-500 text-white flex items-center justify-center text-lg font-bold flex-shrink-0">
@@ -507,10 +479,21 @@ export default function AdminPointsPage() {
                         {studentSummaries[s.id]?.bySubject && studentSummaries[s.id].bySubject.length > 0 ? (
                           <div className="space-y-2">
                             {studentSummaries[s.id].bySubject.slice(0, 3).map((subj, idx) => (
-                              <div key={idx} className="flex justify-between items-center text-xs bg-gray-50 px-2 py-1 rounded">
-                                <span className="text-gray-700 font-medium truncate flex-1">{subj.subjectName}</span>
-                                <span className="text-teal-600 font-semibold ml-2">{subj.daily}d</span>
-                                <span className="text-blue-600 font-semibold ml-2">{subj.total}t</span>
+                              <div key={idx} className="text-xs bg-gray-50 px-2 py-1 rounded">
+                                <div className="flex justify-between items-center">
+                                  <span className="text-gray-700 font-medium truncate flex-1">{subj.subjectName}</span>
+                                  <span className="text-teal-600 font-semibold ml-2">{subj.daily}d</span>
+                                  <span className="text-blue-600 font-semibold ml-2">{subj.total}t</span>
+                                </div>
+                                {subj.subjectId && (() => {
+                                  const teacherDetails = subjectOptions.find(opt => opt.id === subj.subjectId);
+                                  if (!teacherDetails?.teacherName) return null;
+                                  return (
+                                    <div className="text-[10px] text-gray-500 mt-0.5">
+                                      Teacher: {teacherDetails.teacherName}
+                                    </div>
+                                  );
+                                })()}
                               </div>
                             ))}
                             {studentSummaries[s.id].bySubject.length > 3 && (
@@ -542,18 +525,35 @@ export default function AdminPointsPage() {
                           <Label className="text-sm text-gray-700">Subject *</Label>
                           <select
                             className="mt-1 w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent"
-                            onFocus={() => ensureStudentSubjects(s.id)}
+                            onFocus={() => {
+                              ensureStudentSubjects(s.id);
+                              setSelectedStudentId(s.id);
+                            }}
                             value={subjectForStudent[s.id] || ''}
-                            onChange={(e) => setSubjectForStudent((m) => ({ ...m, [s.id]: e.target.value || undefined }))}
+                            onChange={(e) => {
+                              const value = e.target.value || undefined;
+                              setSubjectForStudent((m) => ({ ...m, [s.id]: value }));
+                              if (value) {
+                                setSelectedStudentId(s.id);
+                              }
+                            }}
                             required
                           >
                             <option value="">{t.points.selectSubject}</option>
                             {(subjectsByStudent[s.id] || []).map((sub) => (
-                              <option key={sub.id} value={sub.id}>{sub.name}</option>
+                              <option key={sub.id} value={sub.id}>
+                                {sub.name}{sub.teacherName ? ` — ${sub.teacherName}` : ''}
+                              </option>
                             ))}
                           </select>
                           {!subjectForStudent[s.id] && (subjectsByStudent[s.id] || []).length === 0 && (
                             <p className="text-xs text-gray-500 mt-1">{t.points.loadSubjects}</p>
+                          )}
+                          {subjectForStudent[s.id] && selectedSubjectOption?.teacherName && (
+                            <p className="text-xs text-gray-500 mt-2">
+                              Teacher: {selectedSubjectOption.teacherName}
+                              {selectedSubjectOption.teacherEmail ? ` (${selectedSubjectOption.teacherEmail})` : ''}
+                            </p>
                           )}
                         </div>
                         <div>
@@ -595,7 +595,7 @@ export default function AdminPointsPage() {
                             size="sm"
                             className="bg-green-600 hover:bg-green-700 text-white flex-1 sm:flex-none"
                             onClick={() => handleAddPoints(s.id, subjectForStudent[s.id] || '')}
-                            disabled={!subjectForStudent[s.id] || amount <= 0}
+                            disabled={disableActions}
                           >
                             {t.points.addPoints}
                           </Button>
@@ -603,7 +603,7 @@ export default function AdminPointsPage() {
                             size="sm"
                             className="bg-red-600 hover:bg-red-700 text-white flex-1 sm:flex-none"
                             onClick={() => handleDeletePoints(s.id, subjectForStudent[s.id] || '')}
-                            disabled={!subjectForStudent[s.id] || amount <= 0}
+                            disabled={disableActions}
                           >
                             {t.points.deletePoints}
                           </Button>
@@ -612,7 +612,8 @@ export default function AdminPointsPage() {
                     </div>
                   </div>
                 </Card>
-              ))}
+                  );
+                })}
               </div>
             );
           }
@@ -650,13 +651,22 @@ export default function AdminPointsPage() {
                       <div className="font-semibold text-gray-800 mb-1">{b.subjectName}</div>
                       <div className="text-sm text-gray-600">Daily: {b.daily}</div>
                       <div className="text-sm text-gray-600">Total: {b.total}</div>
+                      {selectedStudentId && b.subjectId && (() => {
+                        const teacherDetails = (subjectsByStudent[selectedStudentId] || []).find(opt => opt.id === b.subjectId);
+                        if (!teacherDetails?.teacherName) return null;
+                        return (
+                          <div className="text-xs text-gray-500 mt-1">
+                            Teacher: {teacherDetails.teacherName}
+                          </div>
+                        );
+                      })()}
                       {selectedStudentId && b.subjectId && (
                         <div className="mt-2 flex gap-2">
                           <Button 
                             size="sm" 
                             className="bg-green-600 hover:bg-green-700 text-white"
                             onClick={() => handleAddPoints(selectedStudentId, b.subjectId!)}
-                            disabled={amount <= 0}
+                            disabled={!selectedStudentId || processing[selectedStudentId] || amount <= 0}
                           >
                             Add {amount} pts
                           </Button>
@@ -664,7 +674,7 @@ export default function AdminPointsPage() {
                             size="sm" 
                             className="bg-red-600 hover:bg-red-700 text-white"
                             onClick={() => handleDeletePoints(selectedStudentId, b.subjectId!)}
-                            disabled={amount <= 0}
+                            disabled={!selectedStudentId || processing[selectedStudentId] || amount <= 0}
                           >
                             Remove {amount} pts
                           </Button>

@@ -92,26 +92,71 @@ export class StudentsService {
     return this.findOne(student.id);
   }
 
-  async findAll(classId?: string) {
-    const students = await this.prisma.student.findMany({
-      where: classId ? { classId } : {},
-      include: {
-        user: {
-          select: {
-            id: true,
-            email: true,
-            firstName: true,
-            lastName: true,
-            phone: true,
-          },
-        },
-        class: true,
-        _count: {
-          select: {
-            subjects: true,
-          },
+  async findAll(
+    classId?: string,
+    options?: { assignedSubjectsOnly?: boolean; includeSubjects?: boolean },
+  ) {
+    const { assignedSubjectsOnly, includeSubjects } = options || {};
+
+    const where: Prisma.StudentWhereInput = {};
+
+    if (classId) {
+      where.classId = classId;
+    }
+
+    if (assignedSubjectsOnly) {
+      where.subjects = {
+        some: {},
+      };
+    }
+
+    const include: Prisma.StudentInclude = {
+      user: {
+        select: {
+          id: true,
+          email: true,
+          firstName: true,
+          lastName: true,
+          phone: true,
         },
       },
+      class: true,
+      _count: {
+        select: {
+          subjects: true,
+        },
+      },
+    };
+
+    if (includeSubjects) {
+      include.subjects = {
+        include: {
+          subject: {
+            select: {
+              id: true,
+              name: true,
+              code: true,
+            },
+          },
+          teacher: {
+            include: {
+              user: {
+                select: {
+                  id: true,
+                  firstName: true,
+                  lastName: true,
+                  email: true,
+                },
+              },
+            },
+          },
+        },
+      };
+    }
+
+    const students = await this.prisma.student.findMany({
+      where,
+      include,
       orderBy: { enrollmentDate: 'desc' },
     });
 
