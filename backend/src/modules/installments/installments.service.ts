@@ -407,7 +407,7 @@ export class InstallmentsService {
       const totalOutstanding = new Prisma.Decimal(
         outstandingBalance.totalOutstanding,
       );
-      discountAmount = new Prisma.Decimal(createDiscountDto.amount);
+      discountAmount = new Prisma.Decimal(createDiscountDto.amount!);
 
       // Validate discount amount doesn't exceed total outstanding
       if (discountAmount.gt(totalOutstanding)) {
