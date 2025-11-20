@@ -444,8 +444,29 @@ export default function InstallmentsPage() {
     setShowDiscountForm(true);
   };
 
-  const formatCurrency = (amount: number | string) => {
-    const num = typeof amount === 'string' ? parseFloat(amount) : amount;
+  const normalizeAmount = (value: number | string | null | undefined) => {
+    if (typeof value === 'number') {
+      return Number.isFinite(value) ? value : 0;
+    }
+    if (typeof value === 'string') {
+      const parsed = parseFloat(value);
+      return Number.isNaN(parsed) ? 0 : parsed;
+    }
+    return 0;
+  };
+
+  const calculateNetTotal = (
+    total?: number | string | null,
+    discount?: number | string | null,
+  ) => {
+    const base = normalizeAmount(total);
+    const discountValue = normalizeAmount(discount);
+    const net = base - discountValue;
+    return net < 0 ? 0 : net;
+  };
+
+  const formatCurrency = (amount: number | string | null | undefined) => {
+    const num = normalizeAmount(amount);
     return num.toFixed(2);
   };
 
@@ -780,40 +801,62 @@ export default function InstallmentsPage() {
                             )}
                           </div>
                           <div className="grid grid-cols-4 gap-4 text-sm mt-3">
-                            <div>
-                              <p className="text-gray-600">Total</p>
-                              <p className="font-semibold">{formatCurrency(installment.totalAmount)}</p>
-                            </div>
-                            <div>
-                              <p className="text-gray-600">{t.installments?.paid || 'Paid'}</p>
-                              <p className="font-semibold text-green-600">
-                                {formatCurrency(installment.paidAmount)}
-                              </p>
-                            </div>
-                            <div>
-                              <p className="text-gray-600">
-                                {parseFloat(String(installment.outstandingAmount || 0)) < 0
-                                  ? t.installments?.overpaidLabel || 'Overpaid'
-                                  : t.installments?.outstandingLabel || 'Outstanding'}
-                              </p>
-                              <p className={`font-semibold ${
-                                parseFloat(String(installment.outstandingAmount || 0)) < 0
-                                  ? 'text-green-600'
-                                  : 'text-red-600'
-                              }`}>
-                                {parseFloat(String(installment.outstandingAmount || 0)) < 0
-                                  ? formatCurrency(Math.abs(parseFloat(String(installment.outstandingAmount || 0))))
-                                  : formatCurrency(installment.outstandingAmount)}
-                              </p>
-                            </div>
-                            {parseFloat(String(installment.discountAmount || 0)) > 0 && (
-                              <div>
-                                <p className="text-gray-600">Discount</p>
-                                <p className="font-semibold text-blue-600">
-                                  -{formatCurrency(installment.discountAmount)}
-                                </p>
-                              </div>
-                            )}
+                            {(() => {
+                              const totalBeforeDiscount = normalizeAmount(installment.totalAmount);
+                              const discountValue = normalizeAmount(installment.discountAmount);
+                              const totalAfterDiscount = calculateNetTotal(
+                                totalBeforeDiscount,
+                                discountValue,
+                              );
+                              return (
+                                <>
+                                  <div>
+                                    <p className="text-gray-600">Total</p>
+                                    <p className="font-semibold">
+                                      {formatCurrency(totalAfterDiscount)}
+                                    </p>
+                                  </div>
+                                  <div>
+                                    <p className="text-gray-600">{t.installments?.paid || 'Paid'}</p>
+                                    <p className="font-semibold text-green-600">
+                                      {formatCurrency(installment.paidAmount)}
+                                    </p>
+                                  </div>
+                                  <div>
+                                    <p className="text-gray-600">
+                                      {parseFloat(String(installment.outstandingAmount || 0)) < 0
+                                        ? t.installments?.overpaidLabel || 'Overpaid'
+                                        : t.installments?.outstandingLabel || 'Outstanding'}
+                                    </p>
+                                    <p
+                                      className={`font-semibold ${
+                                        parseFloat(String(installment.outstandingAmount || 0)) < 0
+                                          ? 'text-green-600'
+                                          : 'text-red-600'
+                                      }`}
+                                    >
+                                      {parseFloat(String(installment.outstandingAmount || 0)) < 0
+                                        ? formatCurrency(
+                                            Math.abs(
+                                              parseFloat(
+                                                String(installment.outstandingAmount || 0),
+                                              ),
+                                            ),
+                                          )
+                                        : formatCurrency(installment.outstandingAmount)}
+                                    </p>
+                                  </div>
+                                  {discountValue > 0 && (
+                                    <div>
+                                      <p className="text-gray-600">Discount</p>
+                                      <p className="font-semibold text-blue-600">
+                                        -{formatCurrency(discountValue)}
+                                      </p>
+                                    </div>
+                                  )}
+                                </>
+                              );
+                            })()}
                           </div>
                         </div>
                       ))}

@@ -280,9 +280,29 @@ export default function StudentInstallmentsPage() {
     }
   };
 
-  const formatCurrency = (amount: number | string) => {
-    const num = typeof amount === 'string' ? parseFloat(amount) : amount;
-    return isNaN(num) ? '0.00' : num.toFixed(2);
+  const normalizeAmount = (value: number | string | null | undefined) => {
+    if (typeof value === 'number') {
+      return Number.isFinite(value) ? value : 0;
+    }
+    if (typeof value === 'string') {
+      const parsed = parseFloat(value);
+      return Number.isNaN(parsed) ? 0 : parsed;
+    }
+    return 0;
+  };
+
+  const calculateNetTotal = (
+    total?: number | string | null,
+    discount?: number | string | null,
+  ) => {
+    const base = normalizeAmount(total);
+    const discountValue = normalizeAmount(discount);
+    const net = base - discountValue;
+    return net < 0 ? 0 : net;
+  };
+
+  const formatCurrency = (amount: number | string | null | undefined) => {
+    return normalizeAmount(amount).toFixed(2);
   };
 
   const handleLogout = () => {
@@ -302,6 +322,14 @@ export default function StudentInstallmentsPage() {
       </div>
     );
   }
+
+  const currentInstallmentRecord = currentMonth?.installment;
+  const currentInstallmentNetTotal = currentInstallmentRecord
+    ? calculateNetTotal(
+        currentInstallmentRecord.totalAmount,
+        currentInstallmentRecord.discountAmount,
+      )
+    : 0;
 
   return (
     <div className="min-h-screen gradient-bg">
@@ -468,7 +496,7 @@ export default function StudentInstallmentsPage() {
                 {t.installments?.currentMonth || 'Current Month Installment'}
               </p>
               <p className="text-3xl font-bold text-gray-900">
-                {formatCurrency(currentMonth.installment?.totalAmount || '0')}
+                {formatCurrency(currentInstallmentNetTotal)}
               </p>
             </div>
           )}
@@ -583,11 +611,18 @@ export default function StudentInstallmentsPage() {
             </div>
           ) : (
             <div className="divide-y divide-gray-200">
-              {installments.map((installment) => (
-                <div
-                  key={installment.id}
-                  className="p-6 hover:bg-gray-50 transition-colors"
-                >
+              {installments.map((installment) => {
+                const discountValue = normalizeAmount(installment.discountAmount);
+                const totalAfterDiscount = calculateNetTotal(
+                  installment.totalAmount,
+                  discountValue,
+                );
+
+                return (
+                  <div
+                    key={installment.id}
+                    className="p-6 hover:bg-gray-50 transition-colors"
+                  >
                   <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                     <div className="flex-1">
                       <div className="flex items-center gap-3 mb-2">
@@ -610,7 +645,7 @@ export default function StudentInstallmentsPage() {
                             {t.installments?.totalAmount || 'Total'}
                           </p>
                           <p className="text-lg font-semibold text-gray-900">
-                            {formatCurrency(installment.totalAmount)}
+                            {formatCurrency(totalAfterDiscount)}
                           </p>
                         </div>
                         <div>
@@ -637,13 +672,13 @@ export default function StudentInstallmentsPage() {
                               : formatCurrency(installment.outstandingAmount)}
                           </p>
                         </div>
-                        {parseFloat(String(installment.discountAmount || 0)) > 0 && (
+                        {discountValue > 0 && (
                           <div>
                             <p className="text-sm text-gray-600">
                               {t.installments?.discountAmountLabel || 'Discount'}
                             </p>
                             <p className="text-lg font-semibold text-blue-600">
-                              -{formatCurrency(installment.discountAmount)}
+                              -{formatCurrency(discountValue)}
                             </p>
                           </div>
                         )}
@@ -694,8 +729,9 @@ export default function StudentInstallmentsPage() {
                       </div>
                     </div>
                   )}
-                </div>
-              ))}
+                  </div>
+                );
+              })}
             </div>
           )}
         </div>
