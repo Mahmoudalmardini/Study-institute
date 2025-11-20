@@ -66,6 +66,7 @@ export default function ClassesPage() {
   const [subjectModalLoading, setSubjectModalLoading] = useState(false);
   const [editingInstallmentSubjectId, setEditingInstallmentSubjectId] = useState<string | null>(null);
   const [editingInstallmentValue, setEditingInstallmentValue] = useState<string>('');
+  const canManageInstallments = false;
 
   useEffect(() => {
     const token = localStorage.getItem('accessToken');
@@ -542,15 +543,17 @@ export default function ClassesPage() {
                   </svg>
                 </div>
                 <div className="flex gap-2">
-                  <button
-                    onClick={() => handleOpenSubjectModal(cls)}
-                    className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                    title="Assign Subjects"
-                  >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-                    </svg>
-                  </button>
+                  {canManageInstallments && (
+                    <button
+                      onClick={() => handleOpenSubjectModal(cls)}
+                      className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                      title="Assign Subjects"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                      </svg>
+                    </button>
+                  )}
                   <button
                     onClick={() => handleEdit(cls)}
                     className="p-2 text-cyan-600 hover:bg-cyan-50 rounded-lg transition-colors"
@@ -647,7 +650,7 @@ export default function ClassesPage() {
       </main>
 
       {/* Subject Assignment Modal */}
-      {showSubjectModal && selectedClassForSubjects && (
+      {canManageInstallments && showSubjectModal && selectedClassForSubjects && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-2xl shadow-xl max-w-4xl w-full max-h-[90vh] flex flex-col">
             <div className="sticky top-0 bg-gradient-to-r from-cyan-500 to-blue-600 px-6 py-4 rounded-t-2xl">

@@ -8,7 +8,8 @@
     "arabic": "Arabic",
     "cancel": "Cancel",
     "confirm": "Confirm",
-    "loading": "Loading..."
+    "loading": "Loading...",
+    "back": "Back"
   },
   "login": {
     "title": "Study follow-up center",
@@ -410,8 +411,48 @@
     "manageStudentPoints": "Manage student points and rewards"
   },
   "supervisor": {
-    "points": "Points Management",
-    "pointsDesc": "Manage student points and rewards"
+    "dashboardTitle": "Supervisor Dashboard",
+    "roleLabel": "Supervisor",
+    "greeting": "Welcome, {name}",
+    "bannerTitle": "Welcome back, {name}! 👋",
+    "bannerSubtitle": "Oversee student performance and manage educational activities",
+    "cards": {
+      "students": {
+        "title": "Students",
+        "description": "View and monitor all students"
+      },
+      "teachers": {
+        "title": "Teachers",
+        "description": "View all teachers"
+      },
+      "subjects": {
+        "title": "Subjects",
+        "description": "Manage subjects"
+      },
+      "classes": {
+        "title": "Classes",
+        "description": "Manage classes"
+      },
+      "evaluations": {
+        "title": "Evaluations",
+        "description": "Review student evaluations"
+      },
+      "points": {
+        "title": "Points Management",
+        "description": "Manage student points and rewards"
+      },
+      "payroll": {
+        "title": "Payroll",
+        "description": "View teacher salary scales"
+      },
+      "reports": {
+        "title": "Reports",
+        "description": "View analytics and reports"
+      }
+    },
+    "messages": {
+      "restrictedFeature": "This feature is not available for your role."
+    }
   },
   "installments": {
     "title": "Installments Management",
