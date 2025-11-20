@@ -180,7 +180,9 @@
     "evaluations": "التقييمات",
     "evaluationsDesc": "عرض تقييماتك",
     "instituteTerms": "شروط وأحكام المعهد",
-    "instituteTermsDesc": "عرض شروط وأحكام المعهد"
+    "instituteTermsDesc": "عرض شروط وأحكام المعهد",
+    "payroll": "الرواتب",
+    "payrollDesc": "عرض معلومات الرواتب"
   },
   "homework": {
     "title": "واجباتي",

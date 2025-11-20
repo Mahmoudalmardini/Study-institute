@@ -180,7 +180,9 @@
     "evaluations": "Evaluations",
     "evaluationsDesc": "View your evaluations",
     "instituteTerms": "Institute Terms and Conditions",
-    "instituteTermsDesc": "View institute terms and conditions"
+    "instituteTermsDesc": "View institute terms and conditions",
+    "payroll": "Payroll",
+    "payrollDesc": "View payroll information"
   },
   "homework": {
     "title": "My Homework",

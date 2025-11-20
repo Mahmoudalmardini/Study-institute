@@ -950,6 +950,7 @@ export class HomeworkService {
       ...(student.classes?.map(sc => sc.classId) || []),
     ];
 
+    // Get explicit StudentSubject enrollments
     const studentSubjects = await this.prisma.studentSubject.findMany({
       where: { studentId: student.id },
       include: {
@@ -994,8 +995,111 @@ export class HomeworkService {
       },
     });
 
+    // Get subjects from student's classes via ClassSubject (if student has classes)
+    let classBasedSubjects: any[] = [];
+    if (studentClassIds.length > 0) {
+      const classSubjects = await this.prisma.classSubject.findMany({
+        where: { classId: { in: studentClassIds } },
+        include: {
+          class: {
+            select: {
+              id: true,
+              name: true,
+              grade: true,
+            },
+          },
+          subject: {
+            include: {
+              class: true,
+              classSubjects: {
+                include: {
+                  class: true,
+                },
+              },
+              teachers: {
+                include: {
+                  teacher: {
+                    include: {
+                      user: {
+                        select: {
+                          id: true,
+                          firstName: true,
+                          lastName: true,
+                          email: true,
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      });
+
+      // Get all explicitly enrolled subject IDs to avoid duplicates
+      const enrolledSubjectIds = new Set(studentSubjects.map(ss => ss.subjectId));
+
+      // Create virtual enrollment objects for subjects from classes that aren't explicitly enrolled
+      classBasedSubjects = classSubjects
+        .filter(cs => !enrolledSubjectIds.has(cs.subjectId))
+        .map(cs => {
+          const subject = cs.subject;
+          
+          // Find a teacher for this subject from TeacherSubject relationships
+          // Prefer teachers that are assigned to this subject
+          let assignedTeacher = null;
+          if (subject.teachers && subject.teachers.length > 0) {
+            // Use the first available teacher
+            assignedTeacher = subject.teachers[0].teacher;
+          }
+
+          // Determine class info - prefer the class from the ClassSubject relationship
+          let classInfo = null;
+          if (cs.class) {
+            classInfo = {
+              id: cs.class.id,
+              name: cs.class.name,
+              grade: cs.class.grade,
+            };
+          } else if (subject.class) {
+            classInfo = subject.class;
+          } else if (subject.classSubjects && subject.classSubjects.length > 0) {
+            // Try to find a class that matches the student's classes
+            const matchingClassSubject = subject.classSubjects.find(
+              css => studentClassIds.includes(css.classId)
+            );
+            if (matchingClassSubject) {
+              classInfo = matchingClassSubject.class;
+            } else {
+              classInfo = subject.classSubjects[0].class;
+            }
+          }
+
+          // Create a virtual StudentSubject-like object
+          return {
+            id: `virtual-${cs.subjectId}-${student.id}`, // Virtual ID
+            studentId: student.id,
+            subjectId: cs.subjectId,
+            teacherId: assignedTeacher?.id || null,
+            enrolledBy: 'system', // Mark as system-generated
+            enrolledAt: new Date(),
+            createdAt: new Date(),
+            updatedAt: new Date(),
+            subject: {
+              ...subject,
+              class: classInfo,
+            },
+            teacher: assignedTeacher,
+          };
+        });
+    }
+
+    // Merge explicit enrollments with class-based subjects
+    const allEnrollments = [...studentSubjects, ...classBasedSubjects];
+
     // Enrich subject with class information (from direct classId or classSubjects matching student's classes)
-    return studentSubjects.map((ss) => {
+    return allEnrollments.map((ss) => {
       const subject = ss.subject;
       let classInfo = subject.class;
       
@@ -1003,6 +1107,7 @@ export class HomeworkService {
         hasDirectClass: !!subject.class,
         classSubjectsCount: subject.classSubjects?.length || 0,
         studentClassIds,
+        isExplicitEnrollment: !ss.id?.startsWith('virtual-'),
       });
       
       // If no direct class, try to get from classSubjects that match student's classes
