@@ -1066,14 +1066,14 @@ export class HomeworkService {
           
           // Find a teacher for this subject from TeacherSubject relationships
           // Prefer teachers that are assigned to this subject
-          let assignedTeacher = null;
+          let assignedTeacher: any = null;
           if (subject.teachers && subject.teachers.length > 0) {
             // Use the first available teacher
             assignedTeacher = subject.teachers[0].teacher;
           }
 
           // Determine class info - prefer the class from the ClassSubject relationship
-          let classInfo = null;
+          let classInfo: any = null;
           if (cs.class) {
             classInfo = {
               id: cs.class.id,
@@ -1087,9 +1087,9 @@ export class HomeworkService {
             const matchingClassSubject = subject.classSubjects.find(
               css => studentClassIds.includes(css.classId)
             );
-            if (matchingClassSubject) {
+            if (matchingClassSubject && matchingClassSubject.class) {
               classInfo = matchingClassSubject.class;
-            } else {
+            } else if (subject.classSubjects[0]?.class) {
               classInfo = subject.classSubjects[0].class;
             }
           }
