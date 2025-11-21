@@ -452,17 +452,17 @@ export default function StudentInstallmentsPage() {
 
         {/* Total Monthly Cost Card - Always show if student has subjects */}
         {subjectBreakdown.length > 0 && (
-          <div className="mb-6 p-6 bg-gradient-to-br from-blue-50 to-blue-100 border border-blue-200 rounded-xl">
+          <div className="mb-6 p-4 sm:p-6 bg-gradient-to-br from-blue-50 to-blue-100 border border-blue-200 rounded-xl">
             <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600 mb-1">
+              <div className="flex-1 min-w-0">
+                <p className="text-xs sm:text-sm text-gray-600 mb-1">
                   {t.installments?.monthlyPayment || 'Monthly Payment'}
                 </p>
-                <p className="text-3xl font-bold text-gray-900">
+                <p className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-900 break-words">
                   {formatCurrency(monthlyPaymentAfterDiscount || 0)}
                 </p>
                 {monthlyPaymentAfterDiscount < totalMonthlyCost && totalMonthlyCost > 0 && (
-                  <p className="text-xs text-gray-500 mt-1">
+                  <p className="text-xs text-gray-500 mt-1 break-words">
                     <span className="line-through">{formatCurrency(totalMonthlyCost)}</span>
                     {' '}
                     <span className="text-emerald-600 font-semibold">
@@ -494,14 +494,14 @@ export default function StudentInstallmentsPage() {
                     item.amount === 0 ? 'opacity-60' : ''
                   }`}
                 >
-                  <div className="flex flex-col">
-                    <span className="text-gray-700 font-medium">{item.subjectName}</span>
+                  <div className="flex flex-col min-w-0 flex-1">
+                    <span className="text-gray-700 font-medium text-sm sm:text-base truncate">{item.subjectName}</span>
                     <span className="text-xs text-gray-500">Monthly Cost</span>
                   </div>
-                  <span className={`font-semibold text-lg ${item.amount === 0 ? 'text-amber-600' : 'text-gray-900'}`}>
+                  <span className={`font-semibold text-sm sm:text-base lg:text-lg flex-shrink-0 ml-2 ${item.amount === 0 ? 'text-amber-600' : 'text-gray-900'}`}>
                     {formatCurrency(item.amount)}
                     {item.amount === 0 && (
-                      <span className="ml-2 text-xs text-amber-600 font-normal">(No cost set)</span>
+                      <span className="ml-1 sm:ml-2 text-xs text-amber-600 font-normal">(No cost set)</span>
                     )}
                   </span>
                 </div>
@@ -512,20 +512,20 @@ export default function StudentInstallmentsPage() {
 
         {/* Summary Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-          <div className="bg-gradient-to-br from-red-50 to-red-100 rounded-xl p-6 border border-red-200">
-            <p className="text-sm text-gray-600 mb-1">
+          <div className="bg-gradient-to-br from-red-50 to-red-100 rounded-xl p-4 sm:p-6 border border-red-200">
+            <p className="text-xs sm:text-sm text-gray-600 mb-1">
               {t.installments?.outstandingBalance || 'Outstanding Balance'}
             </p>
-            <p className="text-3xl font-bold text-gray-900">
+            <p className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-900 break-words">
               {formatCurrency(outstanding?.totalOutstanding || '0')}
             </p>
           </div>
           {currentMonth && (
-            <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl p-6 border border-blue-200">
-              <p className="text-sm text-gray-600 mb-1">
+            <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl p-4 sm:p-6 border border-blue-200">
+              <p className="text-xs sm:text-sm text-gray-600 mb-1">
                 {t.installments?.currentMonth || 'Current Month Installment'}
               </p>
-              <p className="text-3xl font-bold text-gray-900">
+              <p className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-900 break-words">
                 {formatCurrency(currentInstallmentNetTotal)}
               </p>
             </div>
@@ -669,30 +669,30 @@ export default function StudentInstallmentsPage() {
                           ] || installment.status}
                         </span>
                       </div>
-                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-4">
-                        <div>
-                          <p className="text-sm text-gray-600">
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 mt-4">
+                        <div className="min-w-0">
+                          <p className="text-xs sm:text-sm text-gray-600 mb-1">
                             {t.installments?.totalAmount || 'Total'}
                           </p>
-                          <p className="text-lg font-semibold text-gray-900">
+                          <p className="text-sm sm:text-base lg:text-lg font-semibold text-gray-900 break-words">
                             {formatCurrency(totalAfterDiscount)}
                           </p>
                         </div>
-                        <div>
-                          <p className="text-sm text-gray-600">
+                        <div className="min-w-0">
+                          <p className="text-xs sm:text-sm text-gray-600 mb-1">
                             {t.installments?.paidAmount || 'Paid'}
                           </p>
-                          <p className="text-lg font-semibold text-green-600">
+                          <p className="text-sm sm:text-base lg:text-lg font-semibold text-green-600 break-words">
                             {formatCurrency(installment.paidAmount)}
                           </p>
                         </div>
-                        <div>
-                          <p className="text-sm text-gray-600">
+                        <div className="min-w-0">
+                          <p className="text-xs sm:text-sm text-gray-600 mb-1">
                             {parseFloat(String(installment.outstandingAmount || 0)) < 0
                               ? t.installments?.overpaidLabel || 'Overpaid'
                               : t.installments?.outstandingAmount || 'Outstanding'}
                           </p>
-                          <p className={`text-lg font-semibold ${
+                          <p className={`text-sm sm:text-base lg:text-lg font-semibold break-words ${
                             parseFloat(String(installment.outstandingAmount || 0)) < 0
                               ? 'text-green-600'
                               : 'text-red-600'
@@ -703,11 +703,11 @@ export default function StudentInstallmentsPage() {
                           </p>
                         </div>
                         {discountValue > 0 && (
-                          <div>
-                            <p className="text-sm text-gray-600">
+                          <div className="min-w-0">
+                            <p className="text-xs sm:text-sm text-gray-600 mb-1">
                               {t.installments?.discountAmountLabel || 'Discount'}
                             </p>
-                            <p className="text-lg font-semibold text-blue-600">
+                            <p className="text-sm sm:text-base lg:text-lg font-semibold text-blue-600 break-words">
                               -{formatCurrency(discountValue)}
                             </p>
                           </div>

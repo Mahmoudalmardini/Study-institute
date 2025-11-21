@@ -665,27 +665,27 @@ export default function InstallmentsPage() {
             filteredStudents.map((student) => (
               <div
                 key={student.id}
-                className="bg-white rounded-xl shadow-lg p-6 border border-gray-200"
+                className="bg-white rounded-xl shadow-lg p-4 sm:p-6 border border-gray-200"
               >
-                <div className="flex items-start justify-between mb-4">
-                  <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 bg-gradient-to-br from-emerald-500 to-green-600 rounded-full flex items-center justify-center">
-                      <span className="text-white font-semibold text-lg">
+                <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 mb-4">
+                  <div className="flex items-center gap-3 sm:gap-4 min-w-0 flex-1">
+                    <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gradient-to-br from-emerald-500 to-green-600 rounded-full flex items-center justify-center flex-shrink-0">
+                      <span className="text-white font-semibold text-base sm:text-lg">
                         {student.firstName[0]}
                         {student.lastName[0]}
                       </span>
                     </div>
-                    <div>
-                      <h3 className="text-lg font-bold text-gray-900">
+                    <div className="min-w-0 flex-1">
+                      <h3 className="text-base sm:text-lg font-bold text-gray-900 truncate">
                         {student.firstName} {student.lastName}
                       </h3>
-                      <p className="text-sm text-gray-600">{student.email}</p>
+                      <p className="text-xs sm:text-sm text-gray-600 truncate">{student.email}</p>
                     </div>
                   </div>
-                  <div className="flex gap-2">
+                  <div className="flex gap-2 flex-shrink-0">
                     <button
                       onClick={() => handleAddDiscount(student)}
-                      className="px-3 py-1.5 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 text-sm font-medium"
+                      className="px-3 py-1.5 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 text-xs sm:text-sm font-medium whitespace-nowrap"
                     >
                       {t.installments?.addDiscount || 'Add Discount'}
                     </button>
@@ -694,13 +694,13 @@ export default function InstallmentsPage() {
 
                 {/* Total Monthly Cost Card - Always show if student has subjects */}
                 {student.subjectBreakdown && student.subjectBreakdown.length > 0 && (
-                  <div className="mb-4 p-4 bg-gradient-to-br from-blue-50 to-blue-100 border border-blue-200 rounded-lg">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-sm text-gray-600 mb-1">
+                  <div className="mb-4 p-3 sm:p-4 bg-gradient-to-br from-blue-50 to-blue-100 border border-blue-200 rounded-lg">
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs sm:text-sm text-gray-600 mb-1">
                           {t.installments?.monthlyPayment || 'Monthly Payment'}
                         </p>
-                        <p className="text-2xl font-bold text-gray-900">
+                        <p className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-900 break-words">
                           {formatCurrency(student.totalMonthlyCost || 0)}
                         </p>
                         {student.totalMonthlyCost === 0 && (
@@ -710,13 +710,13 @@ export default function InstallmentsPage() {
                         )}
                       </div>
                       {student.totalMonthlyCost > 0 && (
-                        <button
-                          onClick={() => handleRecordPayment(student, student.currentMonth)}
-                          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-medium"
-                        >
-                          {t.installments?.recordPayment || 'Record Payment'}
-                        </button>
-                      )}
+                          <button
+                            onClick={() => handleRecordPayment(student, student.currentMonth)}
+                            className="px-3 sm:px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-xs sm:text-sm font-medium whitespace-nowrap flex-shrink-0"
+                          >
+                            {t.installments?.recordPayment || 'Record Payment'}
+                          </button>
+                        )}
                     </div>
                   </div>
                 )}
@@ -735,14 +735,14 @@ export default function InstallmentsPage() {
                             item.amount === 0 ? 'opacity-60' : ''
                           }`}
                         >
-                          <div className="flex flex-col">
-                            <span className="text-gray-700 font-medium">{item.subjectName}</span>
+                          <div className="flex flex-col min-w-0 flex-1">
+                            <span className="text-gray-700 font-medium text-sm sm:text-base truncate">{item.subjectName}</span>
                             <span className="text-xs text-gray-500">{t.installments?.monthlyCost || 'Monthly Cost'}</span>
                           </div>
-                          <span className={`font-semibold ${item.amount === 0 ? 'text-amber-600' : 'text-gray-900'}`}>
+                          <span className={`font-semibold text-sm sm:text-base flex-shrink-0 ml-2 ${item.amount === 0 ? 'text-amber-600' : 'text-gray-900'}`}>
                             {formatCurrency(item.amount)}
                             {item.amount === 0 && (
-                              <span className="ml-2 text-xs text-amber-600">(No cost set)</span>
+                              <span className="ml-1 sm:ml-2 text-xs text-amber-600">(No cost set)</span>
                             )}
                           </span>
                         </div>
@@ -753,9 +753,9 @@ export default function InstallmentsPage() {
 
                 {student.outstanding && (
                   <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
-                    <p className="text-sm text-gray-600">
+                    <p className="text-xs sm:text-sm text-gray-600 break-words">
                       {t.installments?.outstandingBalance || 'Outstanding Balance'}:{' '}
-                      <span className="font-bold text-red-600">
+                      <span className="font-bold text-red-600 text-sm sm:text-base">
                         {formatCurrency(student.outstanding.totalOutstanding || '0')}
                       </span>
                     </p>
@@ -772,9 +772,9 @@ export default function InstallmentsPage() {
                           key={installment.id}
                           className="border border-gray-200 rounded-lg p-4 hover:bg-gray-50"
                         >
-                          <div className="flex items-center justify-between mb-2">
-                            <div>
-                              <p className="font-semibold text-gray-900">
+                          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-2">
+                            <div className="min-w-0 flex-1">
+                              <p className="font-semibold text-sm sm:text-base text-gray-900">
                                 {monthNames[installment.month - 1]} {installment.year}
                               </p>
                               <span
@@ -794,13 +794,13 @@ export default function InstallmentsPage() {
                             {parseFloat(String(installment.outstandingAmount || 0)) > 0 && (
                               <button
                                 onClick={() => handleRecordPayment(student, installment)}
-                                className="px-3 py-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-medium"
+                                className="px-3 py-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-xs sm:text-sm font-medium whitespace-nowrap flex-shrink-0"
                               >
                                 {t.installments?.recordPayment || 'Record Payment'}
                               </button>
                             )}
                           </div>
-                          <div className="grid grid-cols-4 gap-4 text-sm mt-3">
+                          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 text-xs sm:text-sm mt-3">
                             {(() => {
                               const totalBeforeDiscount = normalizeAmount(installment.totalAmount);
                               const discountValue = normalizeAmount(installment.discountAmount);
@@ -810,26 +810,26 @@ export default function InstallmentsPage() {
                               );
                               return (
                                 <>
-                                  <div>
-                                    <p className="text-gray-600">Total</p>
-                                    <p className="font-semibold">
+                                  <div className="min-w-0">
+                                    <p className="text-gray-600 text-xs mb-1">Total</p>
+                                    <p className="font-semibold text-sm sm:text-base break-words">
                                       {formatCurrency(totalAfterDiscount)}
                                     </p>
                                   </div>
-                                  <div>
-                                    <p className="text-gray-600">{t.installments?.paid || 'Paid'}</p>
-                                    <p className="font-semibold text-green-600">
+                                  <div className="min-w-0">
+                                    <p className="text-gray-600 text-xs mb-1">{t.installments?.paid || 'Paid'}</p>
+                                    <p className="font-semibold text-green-600 text-sm sm:text-base break-words">
                                       {formatCurrency(installment.paidAmount)}
                                     </p>
                                   </div>
-                                  <div>
-                                    <p className="text-gray-600">
+                                  <div className="min-w-0">
+                                    <p className="text-gray-600 text-xs mb-1">
                                       {parseFloat(String(installment.outstandingAmount || 0)) < 0
                                         ? t.installments?.overpaidLabel || 'Overpaid'
                                         : t.installments?.outstandingLabel || 'Outstanding'}
                                     </p>
                                     <p
-                                      className={`font-semibold ${
+                                      className={`font-semibold text-sm sm:text-base break-words ${
                                         parseFloat(String(installment.outstandingAmount || 0)) < 0
                                           ? 'text-green-600'
                                           : 'text-red-600'
@@ -847,9 +847,9 @@ export default function InstallmentsPage() {
                                     </p>
                                   </div>
                                   {discountValue > 0 && (
-                                    <div>
-                                      <p className="text-gray-600">Discount</p>
-                                      <p className="font-semibold text-blue-600">
+                                    <div className="min-w-0">
+                                      <p className="text-gray-600 text-xs mb-1">Discount</p>
+                                      <p className="font-semibold text-blue-600 text-sm sm:text-base break-words">
                                         -{formatCurrency(discountValue)}
                                       </p>
                                     </div>
