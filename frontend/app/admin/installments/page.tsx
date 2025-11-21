@@ -141,15 +141,6 @@ export default function InstallmentsPage() {
     return net < 0 ? 0 : net;
   };
 
-  useEffect(() => {
-    const token = localStorage.getItem('accessToken');
-    if (!token) {
-      router.push('/login');
-      return;
-    }
-    fetchData();
-  }, [router]);
-
   const fetchData = async () => {
     try {
       setLoading(true);
@@ -402,6 +393,15 @@ export default function InstallmentsPage() {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    const token = localStorage.getItem('accessToken');
+    if (!token) {
+      router.push('/login');
+      return;
+    }
+    fetchData();
+  }, [router]);
 
   const filteredStudents = students.filter((student) => {
     const matchesSearch =
@@ -728,9 +728,16 @@ export default function InstallmentsPage() {
                           {t.installments?.monthlyPayment || 'Monthly Payment'}
                         </p>
                         <p className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-900 break-words">
-                          {formatCurrency(student.monthlyPaymentAfterDiscount ?? student.totalMonthlyCost || 0)}
+                          {formatCurrency(
+                            student.monthlyPaymentAfterDiscount !== undefined && student.monthlyPaymentAfterDiscount !== null
+                              ? student.monthlyPaymentAfterDiscount
+                              : (student.totalMonthlyCost || 0)
+                          )}
                         </p>
-                        {student.monthlyPaymentAfterDiscount && student.monthlyPaymentAfterDiscount < (student.totalMonthlyCost || 0) && student.totalMonthlyCost > 0 && (
+                        {student.monthlyPaymentAfterDiscount !== undefined && 
+                         student.monthlyPaymentAfterDiscount !== null &&
+                         student.monthlyPaymentAfterDiscount < (student.totalMonthlyCost || 0) && 
+                         student.totalMonthlyCost > 0 && (
                           <p className="text-xs text-gray-500 mt-1 break-words">
                             <span className="line-through">{formatCurrency(student.totalMonthlyCost)}</span>
                             {' '}
@@ -745,7 +752,9 @@ export default function InstallmentsPage() {
                           </p>
                         )}
                       </div>
-                      {(student.monthlyPaymentAfterDiscount ?? student.totalMonthlyCost || 0) > 0 && (
+                      {((student.monthlyPaymentAfterDiscount !== undefined && student.monthlyPaymentAfterDiscount !== null
+                          ? student.monthlyPaymentAfterDiscount
+                          : (student.totalMonthlyCost || 0)) > 0) && (
                           <button
                             onClick={() => handleRecordPayment(student, student.currentMonth)}
                             className="px-3 sm:px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-xs sm:text-sm font-medium whitespace-nowrap flex-shrink-0"
