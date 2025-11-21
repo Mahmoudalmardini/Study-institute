@@ -230,7 +230,19 @@
     "fileTooLarge": "ملف (ملفات) تتجاوز حد 50 ميجابايت. يرجى اختيار ملفات أصغر.",
     "fileValidationError": "بعض الملفات كبيرة جداً",
     "totalSize": "الإجمالي",
-    "largeUploadWarning": "رفع كبير: قد يستغرق هذا بعض الوقت للرفع"
+    "largeUploadWarning": "رفع كبير: قد يستغرق هذا بعض الوقت للرفع",
+    "homeworkGradesTitle": "درجات واجباتي",
+    "homeworkGradesDesc": "عرض نتائج وملاحظات واجباتك",
+    "totalReviewed": "إجمالي المراجعات",
+    "accepted": "مقبول",
+    "rejected": "مرفوض",
+    "noHomeworkResults": "لا توجد نتائج واجبات بعد",
+    "homeworkResultsDesc": "ستظهر واجباتك المُقيّمة هنا بعد المراجعة",
+    "submitted": "تم التقديم",
+    "reviewed": "تمت المراجعة",
+    "feedback": "الملاحظات",
+    "acceptedStatus": "مقبول",
+    "rejectedStatus": "مرفوض"
   },
   "users": {
     "title": "إدارة المستخدمين",

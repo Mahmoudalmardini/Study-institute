@@ -78,7 +78,7 @@ export default function StudentGradesPage() {
         router.push('/login');
         return;
       }
-      setError(error.message || 'Failed to load homework results');
+      setError(error.message || t.homework.error || 'Failed to load homework results');
       setResults([]);
     } finally {
       setLoading(false);
@@ -117,10 +117,10 @@ export default function StudentGradesPage() {
           <div className="flex justify-between items-start gap-3">
             <div className="flex-1 min-w-0">
               <h1 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold mb-1 sm:mb-2 tracking-tight truncate">
-                My Homework Grades
+                {t.homework.homeworkGradesTitle}
               </h1>
               <p className="text-teal-100 text-xs sm:text-sm lg:text-base leading-tight">
-                View your homework results and feedback
+                {t.homework.homeworkGradesDesc}
               </p>
             </div>
             <div className="flex-shrink-0">
@@ -150,7 +150,7 @@ export default function StudentGradesPage() {
               </div>
               <div className="min-w-0">
                 <p className="text-xl sm:text-2xl font-bold text-gray-900">{results.length}</p>
-                <p className="text-xs sm:text-sm text-gray-600">Total Reviewed</p>
+                <p className="text-xs sm:text-sm text-gray-600">{t.homework.totalReviewed}</p>
               </div>
             </div>
           </div>
@@ -164,7 +164,7 @@ export default function StudentGradesPage() {
               </div>
               <div className="min-w-0">
                 <p className="text-xl sm:text-2xl font-bold text-gray-900">{getAcceptedCount()}</p>
-                <p className="text-xs sm:text-sm text-gray-600">Accepted</p>
+                <p className="text-xs sm:text-sm text-gray-600">{t.homework.accepted}</p>
               </div>
             </div>
           </div>
@@ -178,7 +178,7 @@ export default function StudentGradesPage() {
               </div>
               <div className="min-w-0">
                 <p className="text-xl sm:text-2xl font-bold text-gray-900">{getRejectedCount()}</p>
-                <p className="text-xs sm:text-sm text-gray-600">Rejected</p>
+                <p className="text-xs sm:text-sm text-gray-600">{t.homework.rejected}</p>
               </div>
             </div>
           </div>
@@ -193,8 +193,8 @@ export default function StudentGradesPage() {
             <svg className="mx-auto h-16 w-16 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
             </svg>
-            <h3 className="mt-4 text-lg font-medium text-gray-900">No homework results yet</h3>
-            <p className="mt-2 text-sm text-gray-500">Your graded homework will appear here once reviewed</p>
+            <h3 className="mt-4 text-lg font-medium text-gray-900">{t.homework.noHomeworkResults}</h3>
+            <p className="mt-2 text-sm text-gray-500">{t.homework.homeworkResultsDesc}</p>
           </div>
         ) : (
           <div className="space-y-4">
@@ -220,7 +220,7 @@ export default function StudentGradesPage() {
                             <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="currentColor" viewBox="0 0 20 20">
                               <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
                             </svg>
-                            <span className="hidden sm:inline">ACCEPTED</span>
+                            <span className="hidden sm:inline">{t.homework.acceptedStatus}</span>
                             <span className="sm:hidden">✓</span>
                           </span>
                         ) : (
@@ -228,7 +228,7 @@ export default function StudentGradesPage() {
                             <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="currentColor" viewBox="0 0 20 20">
                               <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
                             </svg>
-                            <span className="hidden sm:inline">REJECTED</span>
+                            <span className="hidden sm:inline">{t.homework.rejectedStatus}</span>
                             <span className="sm:hidden">✗</span>
                           </span>
                         )}
@@ -241,13 +241,13 @@ export default function StudentGradesPage() {
                         <svg className="w-4 h-4 sm:w-5 sm:h-5 text-gray-400 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
                           <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clipRule="evenodd" />
                         </svg>
-                        <span className="break-words">Submitted: {formatDate(result.submittedAt)}</span>
+                        <span className="break-words">{t.homework.submitted}: {formatDate(result.submittedAt)}</span>
                       </div>
                       <div className="flex items-center gap-2">
                         <svg className="w-4 h-4 sm:w-5 sm:h-5 text-gray-400 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
                           <path fillRule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" clipRule="evenodd" />
                         </svg>
-                        <span className="break-words">Reviewed: {formatDate(result.reviewedAt)}</span>
+                        <span className="break-words">{t.homework.reviewed}: {formatDate(result.reviewedAt)}</span>
                       </div>
                     </div>
 
@@ -263,7 +263,7 @@ export default function StudentGradesPage() {
                             <path fillRule="evenodd" d="M18 10c0 3.866-3.582 7-8 7a8.841 8.841 0 01-4.083-.98L2 17l1.338-3.123C2.493 12.767 2 11.434 2 10c0-3.866 3.582-7 8-7s8 3.134 8 7zM7 9H5v2h2V9zm8 0h-2v2h2V9zM9 9h2v2H9V9z" clipRule="evenodd" />
                           </svg>
                           <div className="flex-1 min-w-0">
-                            <p className="text-xs font-semibold text-gray-700 mb-1">Feedback:</p>
+                            <p className="text-xs font-semibold text-gray-700 mb-1">{t.homework.feedback}:</p>
                             <p className="text-sm text-gray-800 break-words">{result.feedback}</p>
                           </div>
                         </div>

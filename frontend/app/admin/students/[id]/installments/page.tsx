@@ -331,6 +331,27 @@ export default function StudentInstallmentsPage() {
       )
     : 0;
 
+  // Calculate monthly payment after discount
+  // If there's a current month installment, calculate the discount ratio and apply it
+  // Otherwise, use the base totalMonthlyCost
+  let monthlyPaymentAfterDiscount = totalMonthlyCost;
+  
+  if (currentInstallmentRecord) {
+    const installmentTotal = normalizeAmount(currentInstallmentRecord.totalAmount);
+    const installmentDiscount = normalizeAmount(currentInstallmentRecord.discountAmount);
+    
+    // If the installment total matches the monthly cost (no outstanding from previous months),
+    // use the net total directly
+    if (Math.abs(installmentTotal - totalMonthlyCost) < 0.01) {
+      monthlyPaymentAfterDiscount = currentInstallmentNetTotal;
+    } else if (installmentDiscount > 0 && installmentTotal > 0) {
+      // Calculate discount percentage and apply to monthly cost
+      const discountPercentage = (installmentDiscount / installmentTotal) * 100;
+      monthlyPaymentAfterDiscount = totalMonthlyCost * (1 - discountPercentage / 100);
+      if (monthlyPaymentAfterDiscount < 0) monthlyPaymentAfterDiscount = 0;
+    }
+  }
+
   return (
     <div className="min-h-screen gradient-bg">
       {/* Header */}
@@ -438,8 +459,17 @@ export default function StudentInstallmentsPage() {
                   {t.installments?.monthlyPayment || 'Monthly Payment'}
                 </p>
                 <p className="text-3xl font-bold text-gray-900">
-                  {formatCurrency(totalMonthlyCost || 0)}
+                  {formatCurrency(monthlyPaymentAfterDiscount || 0)}
                 </p>
+                {monthlyPaymentAfterDiscount < totalMonthlyCost && totalMonthlyCost > 0 && (
+                  <p className="text-xs text-gray-500 mt-1">
+                    <span className="line-through">{formatCurrency(totalMonthlyCost)}</span>
+                    {' '}
+                    <span className="text-emerald-600 font-semibold">
+                      (Discount: {formatCurrency(totalMonthlyCost - monthlyPaymentAfterDiscount)})
+                    </span>
+                  </p>
+                )}
                 {totalMonthlyCost === 0 && (
                   <p className="text-xs text-amber-600 mt-2">
                     Some subjects may not have monthly costs set. Please update subject costs in the Subjects page.

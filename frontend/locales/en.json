@@ -230,7 +230,19 @@
     "fileTooLarge": "file(s) exceed the 50MB limit. Please select smaller files.",
     "fileValidationError": "Some files are too large",
     "totalSize": "Total",
-    "largeUploadWarning": "Large upload: This may take some time to upload"
+    "largeUploadWarning": "Large upload: This may take some time to upload",
+    "homeworkGradesTitle": "My Homework Grades",
+    "homeworkGradesDesc": "View your homework results and feedback",
+    "totalReviewed": "Total Reviewed",
+    "accepted": "Accepted",
+    "rejected": "Rejected",
+    "noHomeworkResults": "No homework results yet",
+    "homeworkResultsDesc": "Your graded homework will appear here once reviewed",
+    "submitted": "Submitted",
+    "reviewed": "Reviewed",
+    "feedback": "Feedback",
+    "acceptedStatus": "ACCEPTED",
+    "rejectedStatus": "REJECTED"
   },
   "users": {
     "title": "User Management",
