@@ -184,31 +184,48 @@ export default function StudentHomeworkPage() {
   const fetchSubjects = async () => {
     try {
       const token = localStorage.getItem('accessToken');
+      console.log('[fetchSubjects] Fetching subjects from API...');
       const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api'}/homework/my-subjects`, {
         headers: { Authorization: `Bearer ${token}` },
       });
 
+      console.log('[fetchSubjects] Response status:', response.status);
+
       if (response.ok) {
         const data = await response.json();
-        console.log('Student subjects raw response:', data);
+        console.log('[fetchSubjects] Student subjects raw response:', data);
         // Handle both direct array response and wrapped response
         const subjects = Array.isArray(data) ? data : (data.data || []);
-        console.log('Processed subjects:', subjects);
+        console.log('[fetchSubjects] Processed subjects count:', subjects.length);
+        console.log('[fetchSubjects] Processed subjects:', subjects);
+        
         // Log class information for each subject
         subjects.forEach((subj: any) => {
-          console.log(`Subject: ${subj.subject?.name || 'Unknown'}`, {
+          console.log(`[fetchSubjects] Subject: ${subj.subject?.name || 'Unknown'}`, {
+            subjectId: subj.subject?.id,
             directClass: subj.subject?.class,
             classSubjects: subj.subject?.classSubjects,
             finalClass: subj.subject?.class,
+            teacher: subj.teacher,
           });
         });
+        
         setMySubjects(subjects);
+        
+        if (subjects.length === 0) {
+          console.warn('[fetchSubjects] WARNING: No subjects returned from API even though student may be enrolled');
+        }
       } else {
-        console.error('Failed to fetch subjects:', response.status);
+        const errorData = await response.json().catch(() => ({}));
+        console.error('[fetchSubjects] Failed to fetch subjects:', {
+          status: response.status,
+          statusText: response.statusText,
+          error: errorData,
+        });
         setMySubjects([]);
       }
     } catch (err) {
-      console.error('Error fetching subjects:', err);
+      console.error('[fetchSubjects] Error fetching subjects:', err);
       setMySubjects([]);
     }
   };
@@ -321,11 +338,18 @@ export default function StudentHomeworkPage() {
   const multipleTeachersForSubject = subjectTeacherCount > 1;
 
   const openAddForm = () => {
-    console.log('Opening add form, mySubjects:', mySubjects);
-    console.log('Number of subjects:', (mySubjects || []).length);
+    console.log('[openAddForm] Opening add form');
+    console.log('[openAddForm] mySubjects:', mySubjects);
+    console.log('[openAddForm] Number of subjects:', (mySubjects || []).length);
+    console.log('[openAddForm] studentProfileId:', studentProfileId);
     
     if ((mySubjects || []).length === 0) {
-      console.error('No subjects available!');
+      console.error('[openAddForm] No subjects available!');
+      console.error('[openAddForm] This might indicate:');
+      console.error('  1. Student is not enrolled in any subjects');
+      console.error('  2. Student has no classes assigned');
+      console.error('  3. Classes have no subjects assigned');
+      console.error('  4. API call failed or returned empty array');
       setError('You are not enrolled in any subjects. Please contact your administrator.');
       return;
     }

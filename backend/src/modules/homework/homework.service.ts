@@ -905,6 +905,8 @@ export class HomeworkService {
 
   // Get student's subjects for homework submission
   async getStudentSubjects(studentUserId: string) {
+    console.log('[getStudentSubjects] Starting for user ID:', studentUserId);
+    
     let student = await this.prisma.student.findUnique({
       where: { userId: studentUserId },
       include: {
@@ -923,8 +925,15 @@ export class HomeworkService {
       },
     });
 
+    console.log('[getStudentSubjects] Student found:', {
+      studentId: student?.id,
+      classId: student?.classId,
+      classesCount: student?.classes?.length || 0,
+    });
+
     if (!student) {
       // Auto-create student profile if it doesn't exist
+      console.log('[getStudentSubjects] Student profile not found, creating new one');
       student = await this.prisma.student.create({
         data: { userId: studentUserId },
         include: {
@@ -942,6 +951,7 @@ export class HomeworkService {
           },
         },
       });
+      console.log('[getStudentSubjects] Created student profile:', student.id);
     }
 
     // Get all class IDs the student is enrolled in
@@ -949,6 +959,8 @@ export class HomeworkService {
       ...(student.classId ? [student.classId] : []),
       ...(student.classes?.map(sc => sc.classId) || []),
     ];
+
+    console.log('[getStudentSubjects] Student class IDs:', studentClassIds);
 
     // Get explicit StudentSubject enrollments
     const studentSubjects = await this.prisma.studentSubject.findMany({
@@ -995,9 +1007,12 @@ export class HomeworkService {
       },
     });
 
+    console.log('[getStudentSubjects] Explicit enrollments found:', studentSubjects.length);
+
     // Get subjects from student's classes via ClassSubject (if student has classes)
     let classBasedSubjects: any[] = [];
     if (studentClassIds.length > 0) {
+      console.log('[getStudentSubjects] Fetching class-based subjects for class IDs:', studentClassIds);
       const classSubjects = await this.prisma.classSubject.findMany({
         where: { classId: { in: studentClassIds } },
         include: {
@@ -1037,8 +1052,11 @@ export class HomeworkService {
         },
       });
 
+      console.log('[getStudentSubjects] Class subjects found:', classSubjects.length);
+
       // Get all explicitly enrolled subject IDs to avoid duplicates
       const enrolledSubjectIds = new Set(studentSubjects.map(ss => ss.subjectId));
+      console.log('[getStudentSubjects] Already enrolled subject IDs:', Array.from(enrolledSubjectIds));
 
       // Create virtual enrollment objects for subjects from classes that aren't explicitly enrolled
       classBasedSubjects = classSubjects
@@ -1097,9 +1115,24 @@ export class HomeworkService {
 
     // Merge explicit enrollments with class-based subjects
     const allEnrollments = [...studentSubjects, ...classBasedSubjects];
+    
+    console.log('[getStudentSubjects] Total enrollments (explicit + class-based):', allEnrollments.length);
+    console.log('[getStudentSubjects] Breakdown:', {
+      explicit: studentSubjects.length,
+      classBased: classBasedSubjects.length,
+    });
+
+    if (allEnrollments.length === 0) {
+      console.warn('[getStudentSubjects] WARNING: No subjects found for student:', {
+        studentId: student.id,
+        userId: studentUserId,
+        classIds: studentClassIds,
+        explicitEnrollments: studentSubjects.length,
+      });
+    }
 
     // Enrich subject with class information (from direct classId or classSubjects matching student's classes)
-    return allEnrollments.map((ss) => {
+    const result = allEnrollments.map((ss) => {
       const subject = ss.subject;
       let classInfo = subject.class;
       
@@ -1140,6 +1173,9 @@ export class HomeworkService {
         },
       };
     });
+    
+    console.log('[getStudentSubjects] Returning', result.length, 'subjects');
+    return result;
   }
 
   // Get teachers for a subject based on student's class
