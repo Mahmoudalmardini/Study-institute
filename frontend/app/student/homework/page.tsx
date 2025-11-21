@@ -111,6 +111,17 @@ export default function StudentHomeworkPage() {
     return classInfo?.grade || null;
   };
 
+  // Get API URL from environment or use current origin as fallback (same logic as api-client.ts)
+  const getApiUrl = () => {
+    if (process.env.NEXT_PUBLIC_API_URL) {
+      return process.env.NEXT_PUBLIC_API_URL;
+    }
+    if (typeof window !== 'undefined') {
+      return `${window.location.origin}/api`;
+    }
+    return 'http://localhost:3001/api';
+  };
+
   useEffect(() => {
     const token = localStorage.getItem('accessToken');
     if (!token) {
@@ -128,11 +139,13 @@ export default function StudentHomeworkPage() {
   const fetchStudentData = async () => {
     try {
       const token = localStorage.getItem('accessToken');
+      const apiUrl = getApiUrl();
       
       console.log('Fetching student profile...');
+      console.log('[fetchStudentData] API URL:', apiUrl);
       
       // Get student profile (backend auto-creates if doesn't exist)
-      const profileRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api'}/students/me`, {
+      const profileRes = await fetch(`${apiUrl}/students/me`, {
         headers: { Authorization: `Bearer ${token}` },
       });
 
@@ -152,7 +165,7 @@ export default function StudentHomeworkPage() {
       // Fetch assigned teachers
       console.log('Fetching assigned teachers for profile:', profile.id);
       const teachersRes = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api'}/student-teachers/student/${profile.id}`,
+        `${apiUrl}/student-teachers/student/${profile.id}`,
         { headers: { Authorization: `Bearer ${token}` } }
       );
 
@@ -184,8 +197,10 @@ export default function StudentHomeworkPage() {
   const fetchSubjects = async () => {
     try {
       const token = localStorage.getItem('accessToken');
+      const apiUrl = getApiUrl();
       console.log('[fetchSubjects] Fetching subjects from API...');
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api'}/homework/my-subjects`, {
+      console.log('[fetchSubjects] API URL:', apiUrl);
+      const response = await fetch(`${apiUrl}/homework/my-subjects`, {
         headers: { Authorization: `Bearer ${token}` },
       });
 
@@ -417,8 +432,10 @@ export default function StudentHomeworkPage() {
 
     try {
       const token = localStorage.getItem('accessToken');
+      const apiUrl = getApiUrl();
       
       console.log('Submitting homework to subject:', formData.subjectId);
+      console.log('[handleSubmit] API URL:', apiUrl);
       
       const fd = new FormData();
       fd.append('subjectId', formData.subjectId);
@@ -427,7 +444,7 @@ export default function StudentHomeworkPage() {
       fd.append('teacherId', assignedTeacherId);
       selectedFiles.forEach((file) => fd.append('files', file));
 
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api'}/homework/submit-to-subject-teacher`, {
+      const response = await fetch(`${apiUrl}/homework/submit-to-subject-teacher`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
