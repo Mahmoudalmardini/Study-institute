@@ -31,6 +31,7 @@ interface StudentWithInstallments extends Student {
   currentMonth?: any;
   subjects?: any[];
   totalMonthlyCost?: number;
+  monthlyPaymentAfterDiscount?: number;
   subjectBreakdown?: Array<{
     subjectId: string;
     subjectName: string;
@@ -117,6 +118,28 @@ export default function InstallmentsPage() {
   const disableDiscountSubmit = isAmountDiscount
     ? discountAmountInvalid
     : discountPercentInvalid;
+
+  // Helper functions for amount calculations
+  const normalizeAmount = (value: number | string | null | undefined) => {
+    if (typeof value === 'number') {
+      return Number.isFinite(value) ? value : 0;
+    }
+    if (typeof value === 'string') {
+      const parsed = parseFloat(value);
+      return Number.isNaN(parsed) ? 0 : parsed;
+    }
+    return 0;
+  };
+
+  const calculateNetTotal = (
+    total?: number | string | null,
+    discount?: number | string | null,
+  ) => {
+    const base = normalizeAmount(total);
+    const discountValue = normalizeAmount(discount);
+    const net = base - discountValue;
+    return net < 0 ? 0 : net;
+  };
 
   useEffect(() => {
     const token = localStorage.getItem('accessToken');
@@ -325,6 +348,30 @@ export default function InstallmentsPage() {
               }),
             ]);
 
+            // Calculate monthly payment after discount
+            // If there's a current month installment, calculate the discount ratio and apply it
+            // Otherwise, use the base totalMonthlyCost
+            let monthlyPaymentAfterDiscount = totalMonthlyCost;
+            
+            if (currentMonth) {
+              const installmentTotal = normalizeAmount(currentMonth.totalAmount);
+              const installmentDiscount = normalizeAmount(currentMonth.discountAmount);
+              
+              // If the installment total matches the monthly cost (no outstanding from previous months),
+              // use the net total directly
+              if (Math.abs(installmentTotal - totalMonthlyCost) < 0.01) {
+                monthlyPaymentAfterDiscount = calculateNetTotal(
+                  installmentTotal,
+                  installmentDiscount,
+                );
+              } else if (installmentDiscount > 0 && installmentTotal > 0) {
+                // Calculate discount percentage and apply to monthly cost
+                const discountPercentage = (installmentDiscount / installmentTotal) * 100;
+                monthlyPaymentAfterDiscount = totalMonthlyCost * (1 - discountPercentage / 100);
+                if (monthlyPaymentAfterDiscount < 0) monthlyPaymentAfterDiscount = 0;
+              }
+            }
+
             return {
               ...student,
               installments,
@@ -332,6 +379,7 @@ export default function InstallmentsPage() {
               currentMonth,
               subjects,
               totalMonthlyCost,
+              monthlyPaymentAfterDiscount,
               subjectBreakdown,
             };
           } catch (err) {
@@ -442,27 +490,6 @@ export default function InstallmentsPage() {
     );
     setDiscountForm({ type: 'AMOUNT', amount: '', percent: '', reason: '' });
     setShowDiscountForm(true);
-  };
-
-  const normalizeAmount = (value: number | string | null | undefined) => {
-    if (typeof value === 'number') {
-      return Number.isFinite(value) ? value : 0;
-    }
-    if (typeof value === 'string') {
-      const parsed = parseFloat(value);
-      return Number.isNaN(parsed) ? 0 : parsed;
-    }
-    return 0;
-  };
-
-  const calculateNetTotal = (
-    total?: number | string | null,
-    discount?: number | string | null,
-  ) => {
-    const base = normalizeAmount(total);
-    const discountValue = normalizeAmount(discount);
-    const net = base - discountValue;
-    return net < 0 ? 0 : net;
   };
 
   const formatCurrency = (amount: number | string | null | undefined) => {
@@ -701,15 +728,24 @@ export default function InstallmentsPage() {
                           {t.installments?.monthlyPayment || 'Monthly Payment'}
                         </p>
                         <p className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-900 break-words">
-                          {formatCurrency(student.totalMonthlyCost || 0)}
+                          {formatCurrency(student.monthlyPaymentAfterDiscount ?? student.totalMonthlyCost || 0)}
                         </p>
+                        {student.monthlyPaymentAfterDiscount && student.monthlyPaymentAfterDiscount < (student.totalMonthlyCost || 0) && student.totalMonthlyCost > 0 && (
+                          <p className="text-xs text-gray-500 mt-1 break-words">
+                            <span className="line-through">{formatCurrency(student.totalMonthlyCost)}</span>
+                            {' '}
+                            <span className="text-emerald-600 font-semibold">
+                              (Discount: {formatCurrency((student.totalMonthlyCost || 0) - (student.monthlyPaymentAfterDiscount || 0))})
+                            </span>
+                          </p>
+                        )}
                         {student.totalMonthlyCost === 0 && (
                           <p className="text-xs text-amber-600 mt-1">
                             Some subjects may not have monthly costs set
                           </p>
                         )}
                       </div>
-                      {student.totalMonthlyCost > 0 && (
+                      {(student.monthlyPaymentAfterDiscount ?? student.totalMonthlyCost || 0) > 0 && (
                           <button
                             onClick={() => handleRecordPayment(student, student.currentMonth)}
                             className="px-3 sm:px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-xs sm:text-sm font-medium whitespace-nowrap flex-shrink-0"
