@@ -212,22 +212,10 @@ export default function StudentDashboard() {
               </div>
             </button>
 
-
-            {/* Evaluations Card */}
-            <div className={`bg-white overflow-hidden rounded-xl hover-lift p-6 sm:p-7 border-2 border-green-100 hover:border-green-300 group ${mounted ? 'animate-slide-up stagger-6' : 'opacity-0'}`}>
-              <div className="w-12 h-12 gradient-success rounded-lg flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
-                <svg className="w-7 h-7 text-white" fill="currentColor" viewBox="0 0 20 20">
-                  <path fillRule="evenodd" d="M6.267 3.455a3.066 3.066 0 001.745-.723 3.066 3.066 0 013.976 0 3.066 3.066 0 001.745.723 3.066 3.066 0 012.812 2.812c.051.643.304 1.254.723 1.745a3.066 3.066 0 010 3.976 3.066 3.066 0 00-.723 1.745 3.066 3.066 0 01-2.812 2.812 3.066 3.066 0 00-1.745.723 3.066 3.066 0 01-3.976 0 3.066 3.066 0 00-1.745-.723 3.066 3.066 0 01-2.812-2.812 3.066 3.066 0 00-.723-1.745 3.066 3.066 0 010-3.976 3.066 3.066 0 00.723-1.745 3.066 3.066 0 012.812-2.812zm7.44 5.252a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                </svg>
-              </div>
-              <h3 className="text-xl font-bold text-gray-900 mb-2">{t.student.evaluations}</h3>
-              <p className="text-sm text-gray-600">{t.student.evaluationsDesc}</p>
-            </div>
-
             {/* Institute Terms and Conditions Card - Clickable */}
             <button
               onClick={() => setShowTermsModal(true)}
-              className={`bg-white overflow-hidden rounded-xl hover-lift p-6 sm:p-7 border-2 border-violet-100 hover:border-violet-300 group text-start ${mounted ? 'animate-slide-up stagger-7' : 'opacity-0'}`}
+              className={`bg-white overflow-hidden rounded-xl hover-lift p-6 sm:p-7 border-2 border-violet-100 hover:border-violet-300 group text-start ${mounted ? 'animate-slide-up stagger-5' : 'opacity-0'}`}
             >
               <div className="flex items-start justify-between">
                 <div className="flex-1">
