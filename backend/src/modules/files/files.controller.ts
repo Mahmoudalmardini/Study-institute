@@ -4,9 +4,9 @@ import {
   Param,
   Res,
   NotFoundException,
-  Public,
 } from '@nestjs/common';
-import { Response } from 'express';
+import type { Response } from 'express';
+import { Public } from '../../common/decorators/public.decorator';
 import { join } from 'path';
 import { existsSync, createReadStream } from 'fs';
 import * as path from 'path';
