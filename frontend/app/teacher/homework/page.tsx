@@ -66,11 +66,22 @@ export default function TeacherHomeworkPage() {
     setLoading(true);
     try {
       const token = localStorage.getItem('accessToken');
-      // Use the conflict-safe endpoint path
-      const url = `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api'}/homework/submissions/received`;
+      // Build API URL - handle both relative and absolute paths
+      let apiUrl = process.env.NEXT_PUBLIC_API_URL || '/api';
+      // If it's a relative path (starts with /), prepend window.location.origin
+      if (apiUrl.startsWith('/')) {
+        apiUrl = `${typeof window !== 'undefined' ? window.location.origin : ''}${apiUrl}`;
+      }
+      // Ensure it ends with /api if not already
+      if (!apiUrl.endsWith('/api')) {
+        apiUrl = apiUrl.endsWith('/') ? `${apiUrl}api` : `${apiUrl}/api`;
+      }
+      const url = `${apiUrl}/homework/submissions/received`;
       
       console.log('=== FETCHING TEACHER SUBMISSIONS ===');
-      console.log('URL:', url);
+      console.log('NEXT_PUBLIC_API_URL:', process.env.NEXT_PUBLIC_API_URL);
+      console.log('Built API URL:', apiUrl);
+      console.log('Full URL:', url);
       console.log('Token:', token ? 'Present' : 'Missing');
       
       const response = await fetch(url, {
@@ -139,9 +150,13 @@ export default function TeacherHomeworkPage() {
 
       const buildFileUrl = (u: string): string => {
         if (/^https?:\/\//i.test(u)) return u;
-        const baseUrl =
-          process.env.NEXT_PUBLIC_API_URL?.replace(/\/api$/, '') ||
-          'http://localhost:3001';
+        // Build base URL from NEXT_PUBLIC_API_URL or use current origin
+        let baseUrl = process.env.NEXT_PUBLIC_API_URL || '/api';
+        if (baseUrl.startsWith('/')) {
+          baseUrl = `${typeof window !== 'undefined' ? window.location.origin : ''}${baseUrl}`;
+        }
+        // Remove /api suffix if present
+        baseUrl = baseUrl.replace(/\/api$/, '') || (typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3001');
 
         const cleaned = u
           .replace(/^\.\/?/, '')
@@ -236,8 +251,16 @@ export default function TeacherHomeworkPage() {
 
     try {
       const token = localStorage.getItem('accessToken');
+      // Build API URL - handle both relative and absolute paths
+      let apiUrl = process.env.NEXT_PUBLIC_API_URL || '/api';
+      if (apiUrl.startsWith('/')) {
+        apiUrl = `${typeof window !== 'undefined' ? window.location.origin : ''}${apiUrl}`;
+      }
+      if (!apiUrl.endsWith('/api')) {
+        apiUrl = apiUrl.endsWith('/') ? `${apiUrl}api` : `${apiUrl}/api`;
+      }
       const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api'}/homework/submissions/${selectedSubmission?.id}/evaluate`,
+        `${apiUrl}/homework/submissions/${selectedSubmission?.id}/evaluate`,
         {
           method: 'POST',
           headers: {

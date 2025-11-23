@@ -26,7 +26,8 @@ export default () => {
   const redisConfig = parseRedisConfig();
   
   // Handle multiple CORS origins (for Railway deployment)
-  const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+  // Check CORS_ORIGIN first, then FRONTEND_URL, then default
+  const frontendUrl = process.env.CORS_ORIGIN || process.env.FRONTEND_URL || 'http://localhost:3000';
   const corsOrigins = frontendUrl.includes(',')
     ? frontendUrl.split(',').map((url) => url.trim())
     : frontendUrl;
