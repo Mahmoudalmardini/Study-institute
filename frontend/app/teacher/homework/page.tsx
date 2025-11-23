@@ -149,24 +149,23 @@ export default function TeacherHomeworkPage() {
       };
 
       const buildFileUrl = (u: string): string => {
+        // If already an absolute URL, return as-is
         if (/^https?:\/\//i.test(u)) return u;
-        // Build base URL from NEXT_PUBLIC_API_URL or use current origin
-        let baseUrl = process.env.NEXT_PUBLIC_API_URL || '/api';
-        if (baseUrl.startsWith('/')) {
-          baseUrl = `${typeof window !== 'undefined' ? window.location.origin : ''}${baseUrl}`;
+        
+        // Files are served directly from /uploads/* on the same origin
+        // Use window.location.origin directly (works in both dev and production)
+        const origin = typeof window !== 'undefined' ? window.location.origin : '';
+        
+        // Clean the path - remove leading dots, slashes
+        let cleaned = u.replace(/^\.\/?/, '').replace(/^\/+/, '');
+        
+        // Ensure it starts with 'uploads/'
+        if (!cleaned.startsWith('uploads/')) {
+          cleaned = `uploads/${cleaned}`;
         }
-        // Remove /api suffix if present
-        baseUrl = baseUrl.replace(/\/api$/, '') || (typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3001');
-
-        const cleaned = u
-          .replace(/^\.\/?/, '')
-          .replace(/^\/+/, '');
-
-        const withUploads = cleaned.startsWith('uploads/')
-          ? cleaned
-          : `uploads/${cleaned}`;
-
-        return `${baseUrl}/${withUploads}`;
+        
+        // Build the full URL
+        return `${origin}/${cleaned}`;
       };
 
       const fileNameFrom = (u: string): string => {
