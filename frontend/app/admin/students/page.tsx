@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useI18n } from '@/lib/i18n-context';
 import SettingsMenu from '@/components/SettingsMenu';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
+import Pagination from '@/components/ui/Pagination';
 import apiClient, {
   calculateInstallment,
 } from '@/lib/api-client';
@@ -35,6 +36,10 @@ export default function StudentsPage() {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [error, setError] = useState('');
+  const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(20);
+  const [total, setTotal] = useState(0);
+  const [totalPages, setTotalPages] = useState(0);
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
   const [showModal, setShowModal] = useState(false);
   const [modalLoading, setModalLoading] = useState(false);
@@ -53,7 +58,7 @@ export default function StudentsPage() {
       return;
     }
     fetchData();
-  }, [router]);
+  }, [router, page, limit]);
 
   const fetchData = async () => {
     try {
@@ -65,18 +70,31 @@ export default function StudentsPage() {
         return;
       }
 
-      // Fetch all users with STUDENT role and all student profiles in parallel
+      // Fetch paginated users with STUDENT role and student profiles
       const [usersRes, studentsRes, classesRes, subjectsRes] = await Promise.all([
-        apiClient.get('/users?role=STUDENT'),
-        apiClient.get('/students'),
+        apiClient.get(`/users?role=STUDENT&page=${page}&limit=${limit}`),
+        apiClient.get(`/students?page=${page}&limit=${limit}`),
         apiClient.get('/classes'),
         apiClient.get('/subjects'),
       ]);
 
-      const users = Array.isArray(usersRes) ? usersRes : (usersRes as any)?.data || [];
-      const studentProfiles = Array.isArray(studentsRes) ? studentsRes : (studentsRes as any)?.data || [];
+      // Handle paginated responses
+      const usersData = usersRes?.data || (Array.isArray(usersRes) ? usersRes : []);
+      const usersMeta = usersRes?.meta || { total: usersData.length, totalPages: 1 };
+      const users = Array.isArray(usersData) ? usersData : usersData?.data || [];
+
+      const studentsData = studentsRes?.data || (Array.isArray(studentsRes) ? studentsRes : []);
+      const studentsMeta = studentsRes?.meta || { total: studentsData.length, totalPages: 1 };
+      const studentProfiles = Array.isArray(studentsData) ? studentsData : studentsData?.data || [];
+
       const classes = Array.isArray(classesRes) ? classesRes : (classesRes as any)?.data || [];
       const subjects = Array.isArray(subjectsRes) ? subjectsRes : (subjectsRes as any)?.data || [];
+
+      // Use the meta from users response for pagination (since we're displaying users)
+      if (usersMeta) {
+        setTotal(usersMeta.total || 0);
+        setTotalPages(usersMeta.totalPages || 1);
+      }
 
       // Create a map of userId -> studentProfile for fast lookup
       const profileMap = new Map(
@@ -163,8 +181,8 @@ export default function StudentsPage() {
     if (!studentProfile) {
       try {
         // First try to fetch all students and find this one
-        const allStudents = await apiClient.get('/students');
-        const studentsList = Array.isArray(allStudents) ? allStudents : (allStudents as any)?.data || [];
+        const allStudents = await apiClient.get(`/students?page=1&limit=1000`);
+        const studentsList = allStudents?.data || (Array.isArray(allStudents) ? allStudents : (allStudents as any)?.data || []);
         studentProfile = studentsList.find((s: any) => s.userId === student.id);
         
         if (studentProfile) {
@@ -181,8 +199,8 @@ export default function StudentsPage() {
             // If 409 conflict, profile exists - fetch it one more time
             if (createErr.response?.status === 409) {
               console.log('Profile already exists (409), fetching again...');
-              const retryStudents = await apiClient.get('/students');
-              const retryList = Array.isArray(retryStudents) ? retryStudents : (retryStudents as any)?.data || [];
+              const retryStudents = await apiClient.get(`/students?page=1&limit=1000`);
+              const retryList = retryStudents?.data || (Array.isArray(retryStudents) ? retryStudents : (retryStudents as any)?.data || []);
               studentProfile = retryList.find((s: any) => s.userId === student.id);
               
               if (!studentProfile) {
@@ -515,6 +533,11 @@ export default function StudentsPage() {
                 {t.users?.totalUsers || 'Total students'}: {filteredStudents.length}
               </span>
               <span className="text-xs text-gray-500">Click on a student to manage classes & subjects</span>
+              {total > 0 && (
+                <span className="text-xs text-gray-500 ml-2">
+                  (Showing {((page - 1) * limit) + 1}-{Math.min(page * limit, total)} of {total})
+                </span>
+              )}
             </div>
 
             {/* Desktop Table View */}
@@ -716,7 +739,26 @@ export default function StudentsPage() {
               ))}
             </div>
 
-            {filteredStudents.length === 0 && (
+            {/* Pagination */}
+            {filteredStudents.length > 0 && (
+              <Pagination
+                currentPage={page}
+                totalPages={totalPages}
+                total={total}
+                limit={limit}
+                onPageChange={(newPage) => {
+                  setPage(newPage);
+                  window.scrollTo({ top: 0, behavior: 'smooth' });
+                }}
+                onLimitChange={(newLimit) => {
+                  setLimit(newLimit);
+                  setPage(1);
+                }}
+                showLimitSelector={true}
+              />
+            )}
+
+            {filteredStudents.length === 0 && !loading && (
               <div className="text-center py-12 bg-white rounded-xl shadow-md">
                 <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />

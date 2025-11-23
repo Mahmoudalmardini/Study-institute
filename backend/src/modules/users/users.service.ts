@@ -6,6 +6,7 @@ import {
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateUserDto, UpdateUserDto } from './dto';
 import * as bcrypt from 'bcrypt';
+import { PaginationResponse } from '../../common/interfaces/pagination-response.interface';
 
 @Injectable()
 export class UsersService {
@@ -51,31 +52,42 @@ export class UsersService {
     return userWithoutPassword;
   }
 
-  async findAll(role?: string) {
-    const users = await this.prisma.user.findMany({
-      where: role ? { role: role as any } : {},
-      select: {
-        id: true,
-        email: true,
-        firstName: true,
-        lastName: true,
-        role: true,
-        phone: true,
-        isActive: true,
-        createdAt: true,
-        updatedAt: true,
-        teacher: {
-          select: {
-            id: true,
-            subjects: {
-              include: {
-                subject: {
-                  include: {
-                    class: {
-                      select: {
-                        id: true,
-                        name: true,
-                        grade: true,
+  async findAll(
+    role?: string,
+    page: number = 1,
+    limit: number = 20,
+  ): Promise<PaginationResponse<any>> {
+    const where = role ? { role: role as any } : {};
+    const skip = (page - 1) * limit;
+
+    const [data, total] = await Promise.all([
+      this.prisma.user.findMany({
+        where,
+        skip,
+        take: limit,
+        select: {
+          id: true,
+          email: true,
+          firstName: true,
+          lastName: true,
+          role: true,
+          phone: true,
+          isActive: true,
+          createdAt: true,
+          updatedAt: true,
+          teacher: {
+            select: {
+              id: true,
+              subjects: {
+                include: {
+                  subject: {
+                    include: {
+                      class: {
+                        select: {
+                          id: true,
+                          name: true,
+                          grade: true,
+                        },
                       },
                     },
                   },
@@ -83,25 +95,34 @@ export class UsersService {
               },
             },
           },
-        },
-        student: {
-          select: {
-            id: true,
-            classId: true,
-            class: {
-              select: {
-                id: true,
-                name: true,
-                grade: true,
+          student: {
+            select: {
+              id: true,
+              classId: true,
+              class: {
+                select: {
+                  id: true,
+                  name: true,
+                  grade: true,
+                },
               },
             },
           },
         },
-      },
-      orderBy: { createdAt: 'desc' },
-    });
+        orderBy: { createdAt: 'desc' },
+      }),
+      this.prisma.user.count({ where }),
+    ]);
 
-    return users;
+    return {
+      data,
+      meta: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+      },
+    };
   }
 
   async findOne(id: string) {

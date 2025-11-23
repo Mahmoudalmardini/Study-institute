@@ -7,6 +7,7 @@ import SettingsMenu from '@/components/SettingsMenu';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import Pagination from '@/components/ui/Pagination';
 import { apiClient } from '@/lib/api-client';
 
 interface User {
@@ -45,6 +46,10 @@ export default function UsersPage() {
   });
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(20);
+  const [total, setTotal] = useState(0);
+  const [totalPages, setTotalPages] = useState(0);
 
   useEffect(() => {
     const token = localStorage.getItem('accessToken');
@@ -53,7 +58,7 @@ export default function UsersPage() {
       return;
     }
     fetchUsers();
-  }, [router, roleFilter]);
+  }, [router, roleFilter, page, limit]);
 
   const fetchUsers = async () => {
     try {
@@ -61,12 +66,20 @@ export default function UsersPage() {
       setError(''); // Clear previous errors
 
       // Use apiClient which handles the API URL and authentication automatically
-      const url = roleFilter ? `/users?role=${roleFilter}` : '/users';
+      const url = roleFilter 
+        ? `/users?role=${roleFilter}&page=${page}&limit=${limit}` 
+        : `/users?page=${page}&limit=${limit}`;
       const usersData = await apiClient.get(url);
       
-      // Handle both response formats: direct array or wrapped in data property
-      const users = Array.isArray(usersData) ? usersData : (usersData?.data || []);
-      setUsers(users);
+      // Handle paginated response format
+      const users = usersData?.data || (Array.isArray(usersData) ? usersData : []);
+      const meta = usersData?.meta || { total: users.length, totalPages: 1 };
+      
+      setUsers(Array.isArray(users) ? users : []);
+      if (meta) {
+        setTotal(meta.total || 0);
+        setTotalPages(meta.totalPages || 1);
+      }
       setError(''); // Clear any previous errors on success
     } catch (err: any) {
       console.error('Error fetching users:', err);
@@ -342,7 +355,7 @@ export default function UsersPage() {
               <div className="p-8 text-center text-gray-500">
                 {t.users.loading}
               </div>
-            ) : filteredUsers.length === 0 ? (
+            ) : filteredUsers.length === 0 && !loading ? (
               <div className="p-8 text-center text-gray-500">
                 {t.users.noUsers}
               </div>
@@ -467,6 +480,27 @@ export default function UsersPage() {
                     </div>
                   ))}
                 </div>
+
+                {/* Pagination */}
+                {filteredUsers.length > 0 && (
+                  <div className="px-4 py-4 border-t">
+                    <Pagination
+                      currentPage={page}
+                      totalPages={totalPages}
+                      total={total}
+                      limit={limit}
+                      onPageChange={(newPage) => {
+                        setPage(newPage);
+                        window.scrollTo({ top: 0, behavior: 'smooth' });
+                      }}
+                      onLimitChange={(newLimit) => {
+                        setLimit(newLimit);
+                        setPage(1);
+                      }}
+                      showLimitSelector={true}
+                    />
+                  </div>
+                )}
               </>
             )}
           </div>

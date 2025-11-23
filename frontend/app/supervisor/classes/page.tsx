@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useI18n } from '@/lib/i18n-context';
 import SettingsMenu from '@/components/SettingsMenu';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
+import Pagination from '@/components/ui/Pagination';
 import apiClient from '@/lib/api-client';
 
 interface Class {
@@ -58,6 +59,10 @@ export default function ClassesPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(20);
+  const [total, setTotal] = useState(0);
+  const [totalPages, setTotalPages] = useState(0);
   const [showSubjectModal, setShowSubjectModal] = useState(false);
   const [selectedClassForSubjects, setSelectedClassForSubjects] = useState<Class | null>(null);
   const [allSubjects, setAllSubjects] = useState<Subject[]>([]);
@@ -79,12 +84,19 @@ export default function ClassesPage() {
     setMounted(true);
     fetchClasses();
     fetchTeachers();
-  }, [router]);
+  }, [router, page, limit]);
 
   const fetchClasses = async () => {
     try {
-      const data = await apiClient.get('/classes');
-      setClasses(data || []);
+      const data = await apiClient.get(`/classes?page=${page}&limit=${limit}`);
+      const classesData = data?.data || (Array.isArray(data) ? data : []);
+      const meta = data?.meta || { total: classesData.length, totalPages: 1 };
+      
+      setClasses(Array.isArray(classesData) ? classesData : []);
+      if (meta) {
+        setTotal(meta.total || 0);
+        setTotalPages(meta.totalPages || 1);
+      }
     } catch (error) {
       console.error('Error fetching classes:', error);
       setClasses([]);
@@ -624,6 +636,25 @@ export default function ClassesPage() {
         </div>
 
         {/* Empty State */}
+        {/* Pagination */}
+        {filteredClasses.length > 0 && (
+          <Pagination
+            currentPage={page}
+            totalPages={totalPages}
+            total={total}
+            limit={limit}
+            onPageChange={(newPage) => {
+              setPage(newPage);
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }}
+            onLimitChange={(newLimit) => {
+              setLimit(newLimit);
+              setPage(1);
+            }}
+            showLimitSelector={true}
+          />
+        )}
+
         {filteredClasses.length === 0 && !loading && (
           <div className={`text-center py-12 ${mounted ? 'animate-slide-up' : 'opacity-0'}`}>
             <div className="w-24 h-24 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">

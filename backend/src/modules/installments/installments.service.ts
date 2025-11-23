@@ -389,7 +389,7 @@ export class InstallmentsService {
       });
 
       const existingPercent = new Prisma.Decimal(
-        activePercentAggregate._sum.percent || 0,
+        activePercentAggregate._sum?.percent || 0,
       );
       if (existingPercent.add(percentValue).gt(100)) {
         throw new BadRequestException(

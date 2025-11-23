@@ -8,7 +8,11 @@ import {
   Delete,
   Query,
   UseGuards,
+  UseInterceptors,
+  ParseIntPipe,
+  DefaultValuePipe,
 } from '@nestjs/common';
+import { CacheInterceptor } from '@nestjs/cache-manager';
 import { StudentsService } from './students.service';
 import { CreateStudentDto } from './dto/create-student.dto';
 import { UpdateStudentDto } from './dto/update-student.dto';
@@ -33,21 +37,29 @@ export class StudentsController {
 
   @Get()
   @Roles(Role.ADMIN, Role.SUPERVISOR, Role.TEACHER)
+  @UseInterceptors(CacheInterceptor)
   findAll(
     @Query('classId') classId?: string,
     @Query('assignedSubjectsOnly') assignedSubjectsOnly?: string,
     @Query('includeSubjects') includeSubjects?: string,
+    @Query('page', new DefaultValuePipe(1), ParseIntPipe) page: number = 1,
+    @Query('limit', new DefaultValuePipe(20), ParseIntPipe) limit: number = 20,
   ) {
-    return this.studentsService.findAll(classId, {
-      assignedSubjectsOnly:
-        typeof assignedSubjectsOnly === 'string'
-          ? assignedSubjectsOnly === 'true'
-          : undefined,
-      includeSubjects:
-        typeof includeSubjects === 'string'
-          ? includeSubjects === 'true'
-          : undefined,
-    });
+    return this.studentsService.findAll(
+      classId,
+      {
+        assignedSubjectsOnly:
+          typeof assignedSubjectsOnly === 'string'
+            ? assignedSubjectsOnly === 'true'
+            : undefined,
+        includeSubjects:
+          typeof includeSubjects === 'string'
+            ? includeSubjects === 'true'
+            : undefined,
+      },
+      page,
+      limit,
+    );
   }
 
   @Get('me')

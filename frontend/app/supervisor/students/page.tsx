@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useI18n } from '@/lib/i18n-context';
 import SettingsMenu from '@/components/SettingsMenu';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
+import Pagination from '@/components/ui/Pagination';
 import apiClient from '@/lib/api-client';
 import type { Class, Subject, StudentClass, StudentSubject } from '@/types';
 
@@ -33,6 +34,10 @@ export default function SupervisorStudentsPage() {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [error, setError] = useState('');
+  const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(20);
+  const [total, setTotal] = useState(0);
+  const [totalPages, setTotalPages] = useState(0);
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
   const [showModal, setShowModal] = useState(false);
   const [modalLoading, setModalLoading] = useState(false);
@@ -51,7 +56,7 @@ export default function SupervisorStudentsPage() {
       return;
     }
     fetchData();
-  }, [router]);
+  }, [router, page, limit]);
 
   const fetchData = async () => {
     try {
@@ -63,14 +68,25 @@ export default function SupervisorStudentsPage() {
         return;
       }
 
-      // Fetch all users with STUDENT role and student profiles in parallel
+      // Fetch paginated users with STUDENT role and student profiles
       const [usersRes, studentsRes] = await Promise.all([
-        apiClient.get('/users?role=STUDENT'),
-        apiClient.get('/students'),
+        apiClient.get(`/users?role=STUDENT&page=${page}&limit=${limit}`),
+        apiClient.get(`/students?page=${page}&limit=${limit}`),
       ]);
       
-      const users = Array.isArray(usersRes) ? usersRes : (usersRes as any)?.data || [];
-      const studentProfiles = Array.isArray(studentsRes) ? studentsRes : (studentsRes as any)?.data || [];
+      // Handle paginated responses
+      const usersData = usersRes?.data || (Array.isArray(usersRes) ? usersRes : []);
+      const usersMeta = usersRes?.meta || { total: usersData.length, totalPages: 1 };
+      const users = Array.isArray(usersData) ? usersData : usersData?.data || [];
+
+      const studentsData = studentsRes?.data || (Array.isArray(studentsRes) ? studentsRes : []);
+      const studentProfiles = Array.isArray(studentsData) ? studentsData : studentsData?.data || [];
+
+      // Use the meta from users response for pagination (since we're displaying users)
+      if (usersMeta) {
+        setTotal(usersMeta.total || 0);
+        setTotalPages(usersMeta.totalPages || 1);
+      }
       
       // Create a map of userId -> studentProfile for fast lookup
       const profileMap = new Map(
@@ -643,7 +659,26 @@ export default function SupervisorStudentsPage() {
               ))}
             </div>
 
-            {filteredStudents.length === 0 && (
+            {/* Pagination */}
+            {filteredStudents.length > 0 && (
+              <Pagination
+                currentPage={page}
+                totalPages={totalPages}
+                total={total}
+                limit={limit}
+                onPageChange={(newPage) => {
+                  setPage(newPage);
+                  window.scrollTo({ top: 0, behavior: 'smooth' });
+                }}
+                onLimitChange={(newLimit) => {
+                  setLimit(newLimit);
+                  setPage(1);
+                }}
+                showLimitSelector={true}
+              />
+            )}
+
+            {filteredStudents.length === 0 && !loading && (
               <div className="text-center py-12 bg-white rounded-xl shadow-md">
                 <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />

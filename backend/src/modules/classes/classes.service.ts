@@ -6,6 +6,7 @@ import {
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateClassDto } from './dto/create-class.dto';
 import { UpdateClassDto } from './dto/update-class.dto';
+import { PaginationResponse } from '../../common/interfaces/pagination-response.interface';
 
 @Injectable()
 export class ClassesService {
@@ -75,41 +76,61 @@ export class ClassesService {
     };
   }
 
-  async findAll() {
-    const classes = await this.prisma.class.findMany({
-      include: {
-        teacher: {
-          include: {
-            user: {
-              select: {
-                id: true,
-                firstName: true,
-                lastName: true,
-                email: true,
+  async findAll(
+    page: number = 1,
+    limit: number = 20,
+  ) {
+    const skip = (page - 1) * limit;
+
+    const [classes, total] = await Promise.all([
+      this.prisma.class.findMany({
+        skip,
+        take: limit,
+        include: {
+          teacher: {
+            include: {
+              user: {
+                select: {
+                  id: true,
+                  firstName: true,
+                  lastName: true,
+                  email: true,
+                },
               },
             },
           },
-        },
-        _count: {
-          select: {
-            students: true,
-            classSubjects: true,
+          _count: {
+            select: {
+              students: true,
+              classSubjects: true,
+            },
           },
         },
-      },
-      orderBy: {
-        createdAt: 'desc',
-      },
-    });
+        orderBy: {
+          createdAt: 'desc',
+        },
+      }),
+      this.prisma.class.count(),
+    ]);
 
     // Map to use classSubjects count as subjects count for backward compatibility
-    return classes.map((cls) => ({
+    const data = classes.map((cls) => ({
       ...cls,
       _count: {
         ...cls._count,
         subjects: cls._count.classSubjects,
       },
     }));
+
+    return {
+      data,
+      meta: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+      },
+    };
   }
 
   async findOne(id: string) {

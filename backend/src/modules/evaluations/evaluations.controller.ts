@@ -8,7 +8,11 @@ import {
   Delete,
   Query,
   UseGuards,
+  UseInterceptors,
+  ParseIntPipe,
+  DefaultValuePipe,
 } from '@nestjs/common';
+import { CacheInterceptor } from '@nestjs/cache-manager';
 import { EvaluationsService } from './evaluations.service';
 import { CreateEvaluationDto } from './dto/create-evaluation.dto';
 import { UpdateEvaluationDto } from './dto/update-evaluation.dto';
@@ -34,12 +38,15 @@ export class EvaluationsController {
 
   @Get()
   @Roles(Role.ADMIN, Role.SUPERVISOR, Role.TEACHER)
+  @UseInterceptors(CacheInterceptor)
   findAll(
     @Query('studentId') studentId?: string,
     @Query('academicYear') academicYear?: string,
     @Query('term') term?: string,
+    @Query('page', new DefaultValuePipe(1), ParseIntPipe) page: number = 1,
+    @Query('limit', new DefaultValuePipe(20), ParseIntPipe) limit: number = 20,
   ) {
-    return this.evaluationsService.findAll(studentId, academicYear, term);
+    return this.evaluationsService.findAll(studentId, academicYear, term, page, limit);
   }
 
   @Get('me')

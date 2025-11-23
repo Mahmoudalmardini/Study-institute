@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useI18n } from '@/lib/i18n-context';
 import SettingsMenu from '@/components/SettingsMenu';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
+import Pagination from '@/components/ui/Pagination';
 import apiClient from '@/lib/api-client';
 
 interface Subject {
@@ -48,6 +49,10 @@ export default function SubjectsPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(20);
+  const [total, setTotal] = useState(0);
+  const [totalPages, setTotalPages] = useState(0);
 
   useEffect(() => {
     const token = localStorage.getItem('accessToken');
@@ -59,7 +64,7 @@ export default function SubjectsPage() {
     setUser({ name: 'Administrator', role: 'ADMIN' });
     setMounted(true);
     fetchData();
-  }, [router]);
+  }, [router, page, limit]);
 
   const fetchData = async () => {
     await fetchSubjects();
@@ -67,8 +72,15 @@ export default function SubjectsPage() {
 
   const fetchSubjects = async () => {
     try {
-      const data = await apiClient.get('/subjects');
-      setSubjects(data || []);
+      const data = await apiClient.get(`/subjects?page=${page}&limit=${limit}`);
+      const subjectsData = data?.data || (Array.isArray(data) ? data : []);
+      const meta = data?.meta || { total: subjectsData.length, totalPages: 1 };
+      
+      setSubjects(Array.isArray(subjectsData) ? subjectsData : []);
+      if (meta) {
+        setTotal(meta.total || 0);
+        setTotalPages(meta.totalPages || 1);
+      }
     } catch (error) {
       console.error('Error fetching subjects:', error);
       setSubjects([]);
@@ -404,6 +416,25 @@ export default function SubjectsPage() {
             </div>
           ))}
         </div>
+
+        {/* Pagination */}
+        {filteredSubjects.length > 0 && (
+          <Pagination
+            currentPage={page}
+            totalPages={totalPages}
+            total={total}
+            limit={limit}
+            onPageChange={(newPage) => {
+              setPage(newPage);
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }}
+            onLimitChange={(newLimit) => {
+              setLimit(newLimit);
+              setPage(1);
+            }}
+            showLimitSelector={true}
+          />
+        )}
 
         {/* Empty State */}
         {filteredSubjects.length === 0 && !loading && (

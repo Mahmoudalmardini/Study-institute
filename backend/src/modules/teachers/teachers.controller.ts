@@ -1,4 +1,5 @@
-import { Controller, Get, Param, UseGuards } from '@nestjs/common';
+import { Controller, Get, Param, Query, UseGuards, UseInterceptors, ParseIntPipe, DefaultValuePipe } from '@nestjs/common';
+import { CacheInterceptor } from '@nestjs/cache-manager';
 import { TeachersService } from './teachers.service';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { RolesGuard } from '../../common/guards/roles.guard';
@@ -14,8 +15,12 @@ export class TeachersController {
 
   @Get()
   @Roles(Role.ADMIN, Role.SUPERVISOR)
-  findAll() {
-    return this.teachersService.findAll();
+  @UseInterceptors(CacheInterceptor)
+  findAll(
+    @Query('page', new DefaultValuePipe(1), ParseIntPipe) page: number = 1,
+    @Query('limit', new DefaultValuePipe(20), ParseIntPipe) limit: number = 20,
+  ) {
+    return this.teachersService.findAll(page, limit);
   }
 
   @Get('me')

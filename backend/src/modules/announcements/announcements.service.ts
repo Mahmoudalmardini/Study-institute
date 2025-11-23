@@ -7,6 +7,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { CreateAnnouncementDto } from './dto/create-announcement.dto';
 import { UpdateAnnouncementDto } from './dto/update-announcement.dto';
 import { Role } from '@prisma/client';
+import { PaginationResponse } from '../../common/interfaces/pagination-response.interface';
 
 @Injectable()
 export class AnnouncementsService {
@@ -34,7 +35,11 @@ export class AnnouncementsService {
     return announcement;
   }
 
-  async findAll(userRole?: Role) {
+  async findAll(
+    userRole?: Role,
+    page: number = 1,
+    limit: number = 20,
+  ): Promise<PaginationResponse<any>> {
     const where: any = {
       OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }],
     };
@@ -46,27 +51,42 @@ export class AnnouncementsService {
       };
     }
 
-    const announcements = await this.prisma.announcement.findMany({
-      where,
-      include: {
-        author: {
-          select: {
-            id: true,
-            firstName: true,
-            lastName: true,
-            role: true,
-          },
-        },
-        _count: {
-          select: {
-            files: true,
-          },
-        },
-      },
-      orderBy: [{ priority: 'desc' }, { createdAt: 'desc' }],
-    });
+    const skip = (page - 1) * limit;
 
-    return announcements;
+    const [data, total] = await Promise.all([
+      this.prisma.announcement.findMany({
+        where,
+        skip,
+        take: limit,
+        include: {
+          author: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+              role: true,
+            },
+          },
+          _count: {
+            select: {
+              files: true,
+            },
+          },
+        },
+        orderBy: [{ priority: 'desc' }, { createdAt: 'desc' }],
+      }),
+      this.prisma.announcement.count({ where }),
+    ]);
+
+    return {
+      data,
+      meta: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+      },
+    };
   }
 
   async findOne(id: string) {

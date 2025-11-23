@@ -10,8 +10,11 @@ import {
   UseGuards,
   UploadedFiles,
   UseInterceptors,
+  ParseIntPipe,
+  DefaultValuePipe,
 } from '@nestjs/common';
 import { FilesInterceptor } from '@nestjs/platform-express';
+import { CacheInterceptor } from '@nestjs/cache-manager';
 import { HomeworkService } from './homework.service';
 import { CreateHomeworkDto } from './dto/create-homework.dto';
 import { UpdateHomeworkDto } from './dto/update-homework.dto';
@@ -43,12 +46,15 @@ export class HomeworkController {
 
   @Get()
   @Roles(Role.ADMIN, Role.SUPERVISOR, Role.TEACHER, Role.STUDENT)
+  @UseInterceptors(CacheInterceptor)
   findAll(
     @CurrentUser() user: CurrentUserData,
     @Query('classId') classId?: string,
+    @Query('page', new DefaultValuePipe(1), ParseIntPipe) page: number = 1,
+    @Query('limit', new DefaultValuePipe(20), ParseIntPipe) limit: number = 20,
   ) {
     const teacherId = user.role === Role.TEACHER ? user.id : undefined;
-    return this.homeworkService.findAll(classId, teacherId);
+    return this.homeworkService.findAll(classId, teacherId, page, limit);
   }
 
   // Specific routes must come before parameterized routes

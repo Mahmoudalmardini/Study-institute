@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useI18n } from '@/lib/i18n-context';
 import SettingsMenu from '@/components/SettingsMenu';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
+import Pagination from '@/components/ui/Pagination';
 import apiClient from '@/lib/api-client';
 
 interface Subject {
@@ -58,6 +59,10 @@ export default function TeachersPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(20);
+  const [total, setTotal] = useState(0);
+  const [totalPages, setTotalPages] = useState(0);
   const [selectedTeacher, setSelectedTeacher] = useState<Teacher | null>(null);
   const [showSubjectModal, setShowSubjectModal] = useState(false);
   const [assigningSubject, setAssigningSubject] = useState(false);
@@ -104,7 +109,7 @@ export default function TeachersPage() {
     fetchTeachers();
     fetchSubjects();
     fetchClasses();
-  }, [router]);
+  }, [router, page, limit]);
 
   const fetchTeachers = async () => {
     try {
@@ -116,10 +121,16 @@ export default function TeachersPage() {
         return [];
       }
 
-      const response = await apiClient.get('/teachers');
-      const teachersData = (response as any) || [];
-      setTeachers(teachersData);
-      return teachersData;
+      const response = await apiClient.get(`/teachers?page=${page}&limit=${limit}`);
+      const teachersData = response?.data || (Array.isArray(response) ? response : []);
+      const meta = response?.meta || { total: teachersData.length, totalPages: 1 };
+      
+      setTeachers(Array.isArray(teachersData) ? teachersData : []);
+      if (meta) {
+        setTotal(meta.total || 0);
+        setTotalPages(meta.totalPages || 1);
+      }
+      return Array.isArray(teachersData) ? teachersData : [];
     } catch (err) {
       console.error('Error fetching teachers:', err);
       setError('Error loading teachers');
@@ -1103,7 +1114,26 @@ export default function TeachersPage() {
               ))}
             </div>
 
-            {filteredTeachers.length === 0 && (
+            {/* Pagination */}
+            {filteredTeachers.length > 0 && (
+              <Pagination
+                currentPage={page}
+                totalPages={totalPages}
+                total={total}
+                limit={limit}
+                onPageChange={(newPage) => {
+                  setPage(newPage);
+                  window.scrollTo({ top: 0, behavior: 'smooth' });
+                }}
+                onLimitChange={(newLimit) => {
+                  setLimit(newLimit);
+                  setPage(1);
+                }}
+                showLimitSelector={true}
+              />
+            )}
+
+            {filteredTeachers.length === 0 && !loading && (
               <div className="text-center py-12 bg-white rounded-xl shadow-md">
                 <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />

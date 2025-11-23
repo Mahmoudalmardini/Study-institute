@@ -13,6 +13,7 @@ import { GradeSubmissionDto } from './dto/grade-submission.dto';
 import { TeacherEvaluateSubmissionDto } from './dto/teacher-evaluate-submission.dto';
 import { AdminReviewSubmissionDto } from './dto/admin-review-submission.dto';
 import { SubmissionStatus, ReviewStatus } from '@prisma/client';
+import { PaginationResponse } from '../../common/interfaces/pagination-response.interface';
 
 @Injectable()
 export class HomeworkService {
@@ -58,7 +59,12 @@ export class HomeworkService {
     return homework;
   }
 
-  async findAll(classId?: string, teacherId?: string) {
+  async findAll(
+    classId?: string,
+    teacherId?: string,
+    page: number = 1,
+    limit: number = 20,
+  ) {
     const where: any = {};
 
     if (classId) {
@@ -74,30 +80,45 @@ export class HomeworkService {
       }
     }
 
-    const homework = await this.prisma.homework.findMany({
-      where,
-      include: {
-        class: true,
-        teacher: {
-          include: {
-            user: {
-              select: {
-                firstName: true,
-                lastName: true,
+    const skip = (page - 1) * limit;
+
+    const [data, total] = await Promise.all([
+      this.prisma.homework.findMany({
+        where,
+        skip,
+        take: limit,
+        include: {
+          class: true,
+          teacher: {
+            include: {
+              user: {
+                select: {
+                  firstName: true,
+                  lastName: true,
+                },
               },
             },
           },
-        },
-        _count: {
-          select: {
-            submissions: true,
+          _count: {
+            select: {
+              submissions: true,
+            },
           },
         },
-      },
-      orderBy: { dueDate: 'desc' },
-    });
+        orderBy: { dueDate: 'desc' },
+      }),
+      this.prisma.homework.count({ where }),
+    ]);
 
-    return homework;
+    return {
+      data,
+      meta: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+      },
+    };
   }
 
   async findOne(id: string) {

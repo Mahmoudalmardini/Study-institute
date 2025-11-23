@@ -8,7 +8,11 @@ import {
   Delete,
   Query,
   UseGuards,
+  UseInterceptors,
+  ParseIntPipe,
+  DefaultValuePipe,
 } from '@nestjs/common';
+import { CacheInterceptor } from '@nestjs/cache-manager';
 import { UsersService } from './users.service';
 import { CreateUserDto, UpdateUserDto } from './dto';
 import { Roles } from '../../common/decorators/roles.decorator';
@@ -31,8 +35,13 @@ export class UsersController {
 
   @Get()
   @Roles(Role.ADMIN, Role.SUPERVISOR)
-  findAll(@Query('role') role?: string) {
-    return this.usersService.findAll(role);
+  @UseInterceptors(CacheInterceptor)
+  findAll(
+    @Query('role') role?: string,
+    @Query('page', new DefaultValuePipe(1), ParseIntPipe) page: number = 1,
+    @Query('limit', new DefaultValuePipe(20), ParseIntPipe) limit: number = 20,
+  ) {
+    return this.usersService.findAll(role, page, limit);
   }
 
   @Get('profile')

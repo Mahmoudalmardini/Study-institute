@@ -1,40 +1,50 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { PaginationResponse } from '../../common/interfaces/pagination-response.interface';
 
 @Injectable()
 export class TeachersService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async findAll() {
-    return this.prisma.teacher.findMany({
-      include: {
-        user: {
-          select: {
-            id: true,
-            firstName: true,
-            lastName: true,
-            email: true,
-            phone: true,
+  async findAll(
+    page: number = 1,
+    limit: number = 20,
+  ): Promise<PaginationResponse<any>> {
+    const skip = (page - 1) * limit;
+
+    const [data, total] = await Promise.all([
+      this.prisma.teacher.findMany({
+        skip,
+        take: limit,
+        include: {
+          user: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+              email: true,
+              phone: true,
+            },
           },
-        },
-        subjects: {
-          include: {
-            subject: {
-              include: {
-                class: {
-                  select: {
-                    id: true,
-                    name: true,
-                    grade: true,
+          subjects: {
+            include: {
+              subject: {
+                include: {
+                  class: {
+                    select: {
+                      id: true,
+                      name: true,
+                      grade: true,
+                    },
                   },
-                },
-                classSubjects: {
-                  include: {
-                    class: {
-                      select: {
-                        id: true,
-                        name: true,
-                        grade: true,
+                  classSubjects: {
+                    include: {
+                      class: {
+                        select: {
+                          id: true,
+                          name: true,
+                          grade: true,
+                        },
                       },
                     },
                   },
@@ -42,18 +52,29 @@ export class TeachersService {
               },
             },
           },
-        },
-        _count: {
-          select: {
-            subjects: true,
-            students: true,
+          _count: {
+            select: {
+              subjects: true,
+              students: true,
+            },
           },
         },
+        orderBy: {
+          hireDate: 'desc',
+        },
+      }),
+      this.prisma.teacher.count(),
+    ]);
+
+    return {
+      data,
+      meta: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
       },
-      orderBy: {
-        hireDate: 'desc',
-      },
-    });
+    };
   }
 
   async findOne(id: string) {

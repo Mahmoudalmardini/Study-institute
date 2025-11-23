@@ -6,6 +6,7 @@ import {
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateEvaluationDto } from './dto/create-evaluation.dto';
 import { UpdateEvaluationDto } from './dto/update-evaluation.dto';
+import { PaginationResponse } from '../../common/interfaces/pagination-response.interface';
 
 @Injectable()
 export class EvaluationsService {
@@ -60,7 +61,13 @@ export class EvaluationsService {
     return evaluation;
   }
 
-  async findAll(studentId?: string, academicYear?: string, term?: string) {
+  async findAll(
+    studentId?: string,
+    academicYear?: string,
+    term?: string,
+    page: number = 1,
+    limit: number = 20,
+  ): Promise<PaginationResponse<any>> {
     const where: any = {};
 
     if (studentId) {
@@ -75,34 +82,49 @@ export class EvaluationsService {
       where.term = term;
     }
 
-    const evaluations = await this.prisma.evaluation.findMany({
-      where,
-      include: {
-        student: {
-          include: {
-            user: {
-              select: {
-                firstName: true,
-                lastName: true,
-              },
-            },
-          },
-        },
-        teacher: {
-          include: {
-            user: {
-              select: {
-                firstName: true,
-                lastName: true,
-              },
-            },
-          },
-        },
-      },
-      orderBy: [{ academicYear: 'desc' }, { term: 'desc' }],
-    });
+    const skip = (page - 1) * limit;
 
-    return evaluations;
+    const [data, total] = await Promise.all([
+      this.prisma.evaluation.findMany({
+        where,
+        skip,
+        take: limit,
+        include: {
+          student: {
+            include: {
+              user: {
+                select: {
+                  firstName: true,
+                  lastName: true,
+                },
+              },
+            },
+          },
+          teacher: {
+            include: {
+              user: {
+                select: {
+                  firstName: true,
+                  lastName: true,
+                },
+              },
+            },
+          },
+        },
+        orderBy: [{ academicYear: 'desc' }, { term: 'desc' }],
+      }),
+      this.prisma.evaluation.count({ where }),
+    ]);
+
+    return {
+      data,
+      meta: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+      },
+    };
   }
 
   async findOne(id: string) {

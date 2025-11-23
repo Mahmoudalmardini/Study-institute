@@ -6,8 +6,13 @@ import {
   Patch,
   Param,
   Delete,
+  Query,
   UseGuards,
+  UseInterceptors,
+  ParseIntPipe,
+  DefaultValuePipe,
 } from '@nestjs/common';
+import { CacheInterceptor } from '@nestjs/cache-manager';
 import { ClassesService } from './classes.service';
 import { CreateClassDto } from './dto/create-class.dto';
 import { UpdateClassDto } from './dto/update-class.dto';
@@ -33,8 +38,12 @@ export class ClassesController {
 
   @Get()
   @Roles(Role.ADMIN, Role.SUPERVISOR, Role.TEACHER)
-  findAll() {
-    return this.classesService.findAll();
+  @UseInterceptors(CacheInterceptor)
+  findAll(
+    @Query('page', new DefaultValuePipe(1), ParseIntPipe) page: number = 1,
+    @Query('limit', new DefaultValuePipe(20), ParseIntPipe) limit: number = 20,
+  ) {
+    return this.classesService.findAll(page, limit);
   }
 
   @Get(':id')

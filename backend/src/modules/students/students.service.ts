@@ -10,6 +10,7 @@ import { CreateStudentDto } from './dto/create-student.dto';
 import { UpdateStudentDto } from './dto/update-student.dto';
 import { InstallmentsService } from '../installments/installments.service';
 import { Prisma } from '@prisma/client';
+import { PaginationResponse } from '../../common/interfaces/pagination-response.interface';
 
 @Injectable()
 export class StudentsService {
@@ -95,7 +96,9 @@ export class StudentsService {
   async findAll(
     classId?: string,
     options?: { assignedSubjectsOnly?: boolean; includeSubjects?: boolean },
-  ) {
+    page: number = 1,
+    limit: number = 20,
+  ): Promise<PaginationResponse<any>> {
     const { assignedSubjectsOnly, includeSubjects } = options || {};
 
     const where: Prisma.StudentWhereInput = {};
@@ -154,13 +157,28 @@ export class StudentsService {
       };
     }
 
-    const students = await this.prisma.student.findMany({
-      where,
-      include,
-      orderBy: { enrollmentDate: 'desc' },
-    });
+    const skip = (page - 1) * limit;
 
-    return students;
+    const [data, total] = await Promise.all([
+      this.prisma.student.findMany({
+        where,
+        include,
+        skip,
+        take: limit,
+        orderBy: { enrollmentDate: 'desc' },
+      }),
+      this.prisma.student.count({ where }),
+    ]);
+
+    return {
+      data,
+      meta: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+      },
+    };
   }
 
   async findOne(id: string) {

@@ -7,6 +7,7 @@ import {
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateSubjectDto } from './dto/create-subject.dto';
 import { UpdateSubjectDto } from './dto/update-subject.dto';
+import { PaginationResponse } from '../../common/interfaces/pagination-response.interface';
 
 @Injectable()
 export class SubjectsService {
@@ -67,38 +68,60 @@ export class SubjectsService {
     });
   }
 
-  async findAll(classId?: string) {
-    return this.prisma.subject.findMany({
-      where: classId ? { classId } : undefined,
-      include: {
-        class: true,
-        teachers: {
-          include: {
-            teacher: {
-              include: {
-                user: {
-                  select: {
-                    id: true,
-                    firstName: true,
-                    lastName: true,
-                    email: true,
+  async findAll(
+    classId?: string,
+    page: number = 1,
+    limit: number = 20,
+  ) {
+    const where = classId ? { classId } : undefined;
+    const skip = (page - 1) * limit;
+
+    const [data, total] = await Promise.all([
+      this.prisma.subject.findMany({
+        where,
+        skip,
+        take: limit,
+        include: {
+          class: true,
+          teachers: {
+            include: {
+              teacher: {
+                include: {
+                  user: {
+                    select: {
+                      id: true,
+                      firstName: true,
+                      lastName: true,
+                      email: true,
+                    },
                   },
                 },
               },
             },
           },
-        },
-        _count: {
-          select: {
-            students: true,
-            teachers: true,
+          _count: {
+            select: {
+              students: true,
+              teachers: true,
+            },
           },
         },
+        orderBy: {
+          name: 'asc',
+        },
+      }),
+      this.prisma.subject.count({ where }),
+    ]);
+
+    return {
+      data,
+      meta: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
       },
-      orderBy: {
-        name: 'asc',
-      },
-    });
+    };
   }
 
   async findOne(id: string) {

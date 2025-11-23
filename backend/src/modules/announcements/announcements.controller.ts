@@ -6,8 +6,13 @@ import {
   Patch,
   Param,
   Delete,
+  Query,
   UseGuards,
+  UseInterceptors,
+  ParseIntPipe,
+  DefaultValuePipe,
 } from '@nestjs/common';
+import { CacheInterceptor } from '@nestjs/cache-manager';
 import { AnnouncementsService } from './announcements.service';
 import { CreateAnnouncementDto } from './dto/create-announcement.dto';
 import { UpdateAnnouncementDto } from './dto/update-announcement.dto';
@@ -33,8 +38,13 @@ export class AnnouncementsController {
 
   @Get()
   @Roles(Role.ADMIN, Role.SUPERVISOR, Role.TEACHER, Role.STUDENT)
-  findAll(@CurrentUser() user: CurrentUserData) {
-    return this.announcementsService.findAll(user.role as Role);
+  @UseInterceptors(CacheInterceptor)
+  findAll(
+    @CurrentUser() user: CurrentUserData,
+    @Query('page', new DefaultValuePipe(1), ParseIntPipe) page: number = 1,
+    @Query('limit', new DefaultValuePipe(20), ParseIntPipe) limit: number = 20,
+  ) {
+    return this.announcementsService.findAll(user.role as Role, page, limit);
   }
 
   @Get(':id')
