@@ -152,20 +152,28 @@ export default function TeacherHomeworkPage() {
         // If already an absolute URL, return as-is
         if (/^https?:\/\//i.test(u)) return u;
         
-        // Files are served directly from /uploads/* on the same origin
-        // Use window.location.origin directly (works in both dev and production)
-        const origin = typeof window !== 'undefined' ? window.location.origin : '';
-        
-        // Clean the path - remove leading dots, slashes
-        let cleaned = u.replace(/^\.\/?/, '').replace(/^\/+/, '');
-        
-        // Ensure it starts with 'uploads/'
-        if (!cleaned.startsWith('uploads/')) {
-          cleaned = `uploads/${cleaned}`;
+        // Files are served through the API at /api/uploads/*
+        // Build API URL base
+        let apiUrl = process.env.NEXT_PUBLIC_API_URL || '/api';
+        if (apiUrl.startsWith('/')) {
+          apiUrl = `${typeof window !== 'undefined' ? window.location.origin : ''}${apiUrl}`;
+        }
+        if (!apiUrl.endsWith('/api')) {
+          apiUrl = apiUrl.endsWith('/') ? `${apiUrl}api` : `${apiUrl}/api`;
         }
         
-        // Build the full URL
-        return `${origin}/${cleaned}`;
+        // Normalize path separators (handle both Windows \ and Unix /)
+        let cleaned = u.replace(/\\/g, '/');
+        
+        // Remove leading dots, slashes, and 'uploads/' prefix if present
+        cleaned = cleaned.replace(/^\.\/?/, '').replace(/^\/+/, '').replace(/^uploads\//, '');
+        
+        // Build the full URL: /api/uploads/filename
+        const fullUrl = `${apiUrl}/uploads/${cleaned}`;
+        
+        console.log('[buildFileUrl] Original:', u, 'Cleaned:', cleaned, 'Full URL:', fullUrl);
+        
+        return fullUrl;
       };
 
       const fileNameFrom = (u: string): string => {

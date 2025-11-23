@@ -26,6 +26,7 @@ import { TransformInterceptor } from './common/interceptors/transform.intercepto
 import { PointsModule } from './modules/points/points.module';
 import { PayrollModule } from './modules/payroll/payroll.module';
 import { InstallmentsModule } from './modules/installments/installments.module';
+import { FilesModule } from './modules/files/files.module';
 
 @Module({
   imports: [
@@ -33,6 +34,10 @@ import { InstallmentsModule } from './modules/installments/installments.module';
     ServeStaticModule.forRoot({
       rootPath: join(process.cwd(), 'uploads'),
       serveRoot: '/uploads',
+      serveStaticOptions: {
+        index: false, // Disable directory index (don't serve index.html)
+        fallthrough: false, // Don't fall through to other handlers
+      },
     }),
     ConfigModule.forRoot({
       isGlobal: true,
@@ -74,6 +79,7 @@ import { InstallmentsModule } from './modules/installments/installments.module';
     PointsModule,
     PayrollModule,
     InstallmentsModule,
+    FilesModule,
   ],
   controllers: [AppController],
   providers: [
