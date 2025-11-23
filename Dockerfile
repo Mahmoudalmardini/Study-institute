@@ -11,7 +11,8 @@ COPY backend/package*.json ./
 COPY backend/prisma ./prisma/
 
 # Install backend dependencies
-RUN npm ci
+# Using --legacy-peer-deps to resolve @nestjs/cache-manager compatibility with NestJS 11
+RUN npm ci --legacy-peer-deps
 
 # Copy backend source
 COPY backend/ ./
