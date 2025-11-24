@@ -4,6 +4,7 @@ import { diskStorage } from 'multer';
 import { extname } from 'path';
 import { HomeworkService } from './homework.service';
 import { HomeworkController } from './homework.controller';
+import { SubmissionCleanupService } from './submission-cleanup.service';
 import { PrismaModule } from '../prisma/prisma.module';
 
 @Module({
@@ -25,7 +26,7 @@ import { PrismaModule } from '../prisma/prisma.module';
     }),
   ],
   controllers: [HomeworkController],
-  providers: [HomeworkService],
+  providers: [HomeworkService, SubmissionCleanupService],
   exports: [HomeworkService],
 })
 export class HomeworkModule {}
