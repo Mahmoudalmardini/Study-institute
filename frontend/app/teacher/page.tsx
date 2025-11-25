@@ -182,8 +182,8 @@ export default function TeacherDashboard() {
                       <path fillRule="evenodd" d="M18 9H2v5a2 2 0 002 2h12a2 2 0 002-2V9zM4 13a1 1 0 011-1h1a1 1 0 110 2H5a1 1 0 01-1-1zm5-1a1 1 0 100 2h1a1 1 0 100-2H9z" clipRule="evenodd" />
                     </svg>
                   </div>
-                  <h3 className="text-xl font-bold text-gray-900 mb-2">Payroll</h3>
-                  <p className="text-sm text-gray-600">Submit hours and view payroll</p>
+                  <h3 className="text-xl font-bold text-gray-900 mb-2">{t.teacher.payrollTitle}</h3>
+                  <p className="text-sm text-gray-600">{t.teacher.payrollDesc}</p>
                 </div>
                 <svg className="w-6 h-6 text-yellow-500 flex-shrink-0 ms-2 rtl:rotate-180 group-hover:translate-x-1 rtl:group-hover:-translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />

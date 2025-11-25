@@ -6,16 +6,12 @@ import { useI18n } from '@/lib/i18n-context';
 import SettingsMenu from '@/components/SettingsMenu';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import { getMyOutstanding, getMyCurrentMonthInstallment } from '@/lib/api-client';
-
-interface User {
-  name: string;
-  role: string;
-}
+import { useAuthStore } from '@/store/auth-store';
 
 export default function StudentDashboard() {
   const router = useRouter();
   const { t } = useI18n();
-  const [user, setUser] = useState<User | null>(null);
+  const { user } = useAuthStore();
   const [mounted, setMounted] = useState(false);
   const [outstanding, setOutstanding] = useState<any>(null);
   const [currentMonth, setCurrentMonth] = useState<any>(null);
@@ -28,7 +24,6 @@ export default function StudentDashboard() {
       return;
     }
 
-    setUser({ name: 'Student', role: 'STUDENT' });
     fetchInstallmentSummary();
     setMounted(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -49,10 +44,10 @@ export default function StudentDashboard() {
   };
 
   const handleLogout = () => {
+    const { clearAuth } = useAuthStore.getState();
     const confirmLogout = window.confirm(t.messages.logoutConfirm);
     if (confirmLogout) {
-      localStorage.removeItem('accessToken');
-      localStorage.removeItem('refreshToken');
+      clearAuth();
       router.push('/login');
     }
   };
@@ -85,7 +80,7 @@ export default function StudentDashboard() {
             </div>
             <div className="flex items-center gap-2 sm:gap-4 flex-shrink-0">
               <span className="hidden md:inline text-sm text-white/90 font-medium">
-                {t.student.welcome}, {user.name}
+                {t.student.welcome}, {user?.firstName} {user?.lastName}
               </span>
               <SettingsMenu onLogout={handleLogout} />
             </div>
@@ -104,7 +99,7 @@ export default function StudentDashboard() {
             </div>
             <div className="flex-1">
               <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2">
-                {t.student.welcomeBack}, {user.name}! ⭐
+                {t.student.welcomeBack}, {user?.firstName} {user?.lastName}! ⭐
               </h2>
               <p className="text-gray-600 text-base sm:text-lg mb-3">
                 {t.student.dashboardGreeting}
