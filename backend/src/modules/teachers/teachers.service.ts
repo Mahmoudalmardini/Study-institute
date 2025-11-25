@@ -208,27 +208,49 @@ export class TeachersService {
       ]),
     );
 
-    if (classIds.length === 0) {
-      return [];
+    // Prepare OR conditions
+    const orConditions: any[] = [
+      {
+        teachers: {
+          some: {
+            teacherId: teacher.id
+          }
+        }
+      },
+      {
+        subjects: {
+          some: {
+            teacherId: teacher.id
+          }
+        }
+      }
+    ];
+
+    if (classIds.length > 0) {
+      orConditions.push({ classId: { in: classIds } });
+      orConditions.push({
+        classes: {
+          some: {
+            classId: { in: classIds },
+          },
+        },
+      });
     }
 
-    // Students either directly assigned to those classes, or via StudentClass junction
+    // Students either directly assigned to those classes, or via StudentClass junction,
+    // or via direct teacher assignment, or via subject assignment with this teacher
     const students = await this.prisma.student.findMany({
       where: {
-        OR: [
-          { classId: { in: classIds } },
-          {
-            classes: {
-              some: {
-                classId: { in: classIds },
-              },
-            },
-          },
-        ],
+        OR: orConditions,
       },
       select: {
         id: true,
         classId: true,
+        class: {
+          select: {
+            name: true,
+          },
+        },
         user: {
           select: {
             id: true,
@@ -255,10 +277,6 @@ export class TeachersService {
       },
     });
 
-    // Build a small lookup for class id -> name (from owned classes)
-    const classIdToName = new Map<string, string>();
-    for (const c of ownedClasses) classIdToName.set(c.id, c.name);
-
     // Normalize to include class names array
     return students.map((s) => ({
       id: s.id,
@@ -267,7 +285,7 @@ export class TeachersService {
       lastName: s.user.lastName,
       email: s.user.email,
       classNames: [
-        ...(s.classId ? (classIdToName.get(s.classId) ? [classIdToName.get(s.classId)!] : []) : []),
+        ...(s.class?.name ? [s.class.name] : []),
         ...s.classes.map((sc) => sc.class?.name).filter((n): n is string => Boolean(n)),
       ],
     }));
