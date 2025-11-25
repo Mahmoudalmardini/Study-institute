@@ -308,16 +308,31 @@ export class TeachersService {
         className: ss.subject.class?.name
       }));
 
+      // Deduplicate class names using a Set
+      const classNamesSet = new Set<string>();
+      if (s.class?.name) {
+        classNamesSet.add(s.class.name);
+      }
+      s.classes.forEach((sc) => {
+        if (sc.class?.name) {
+          classNamesSet.add(sc.class.name);
+        }
+      });
+      
+      // Also add class names from the subjects if they belong to a class
+      s.subjects.forEach((ss) => {
+        if (ss.subject?.class?.name) {
+          classNamesSet.add(ss.subject.class.name);
+        }
+      });
+
       return {
         id: s.id,
         userId: s.user.id,
         firstName: s.user.firstName,
         lastName: s.user.lastName,
         email: s.user.email,
-        classNames: [
-          ...(s.class?.name ? [s.class.name] : []),
-          ...s.classes.map((sc) => sc.class?.name).filter((n): n is string => Boolean(n)),
-        ],
+        classNames: Array.from(classNamesSet),
         // Add the subjects this student has with this teacher
         subjects: relevantSubjects
       };
