@@ -5,16 +5,30 @@ import { useRouter } from 'next/navigation';
 import { useI18n } from '@/lib/i18n-context';
 import SettingsMenu from '@/components/SettingsMenu';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
+import { getTeacherProfile } from '@/lib/api-client';
 
 interface User {
   name: string;
   role: string;
 }
 
+interface TeacherProfile {
+  id: string;
+  subjects: Array<{
+    subject: {
+      name: string;
+      class: {
+        name: string;
+      };
+    };
+  }>;
+}
+
 export default function TeacherDashboard() {
   const router = useRouter();
   const { t } = useI18n();
   const [user, setUser] = useState<User | null>(null);
+  const [teacherProfile, setTeacherProfile] = useState<TeacherProfile | null>(null);
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
@@ -26,6 +40,15 @@ export default function TeacherDashboard() {
 
     setUser({ name: 'Teacher', role: 'TEACHER' });
     setMounted(true);
+
+    // Fetch teacher profile
+    getTeacherProfile()
+      .then((data: any) => { // Use 'any' temporarily to bypass type check if needed, or define precise type
+        setTeacherProfile(data);
+      })
+      .catch((err) => {
+        console.error('Failed to fetch teacher profile', err);
+      });
   }, [router]);
 
   const handleLogout = () => {
@@ -103,7 +126,20 @@ export default function TeacherDashboard() {
                 </svg>
               </div>
               <h3 className="text-xl font-bold text-gray-900 mb-2">{t.teacher.myClasses}</h3>
-              <p className="text-sm text-gray-600">{t.teacher.myClassesDesc}</p>
+              {teacherProfile?.subjects && teacherProfile.subjects.length > 0 ? (
+                <div className="space-y-2">
+                  <p className="text-sm text-gray-600 font-medium mb-2">Assigned Subjects:</p>
+                  <div className="flex flex-wrap gap-2">
+                    {teacherProfile.subjects.map((ts, i) => (
+                      <span key={i} className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-teal-100 text-teal-800">
+                        {ts.subject.name} ({ts.subject.class.name})
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <p className="text-sm text-gray-600">No classes assigned yet.</p>
+              )}
             </div>
 
             {/* Homework Card - Clickable */}

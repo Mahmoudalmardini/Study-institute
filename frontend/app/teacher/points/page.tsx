@@ -42,12 +42,12 @@ export default function TeacherPointsPage() {
         // Load summaries for all students using batch endpoint
         if (mounted && studentsList.length > 0) {
           try {
-            const studentIds = studentsList.map(s => s.id);
+            const studentIds = studentsList.map((s: TeacherStudentSummary) => s.id);
             const batchSummaries = await getBatchPointSummaries(studentIds) as any;
             if (mounted && batchSummaries) {
               // Ensure all students have a summary entry (default to empty if missing)
               const summaries: Record<string, { total: number; daily: number; bySubject: { subjectId: string | null; subjectName: string; total: number; daily: number }[] }> = {};
-              studentsList.forEach(student => {
+              studentsList.forEach((student: TeacherStudentSummary) => {
                 summaries[student.id] = batchSummaries[student.id] || { total: 0, daily: 0, bySubject: [] };
               });
               setStudentSummaries(summaries);
@@ -56,7 +56,7 @@ export default function TeacherPointsPage() {
             console.error('Failed to load batch summaries:', err);
             // Fallback: set empty summaries for all students
             const summaries: Record<string, { total: number; daily: number; bySubject: { subjectId: string | null; subjectName: string; total: number; daily: number }[] }> = {};
-            studentsList.forEach(student => {
+            studentsList.forEach((student: TeacherStudentSummary) => {
               summaries[student.id] = { total: 0, daily: 0, bySubject: [] };
             });
             if (mounted) setStudentSummaries(summaries);
@@ -78,7 +78,7 @@ export default function TeacherPointsPage() {
     }
     (async () => {
       try {
-        const s = await getPointSummary(selectedStudentId);
+        const s = await getPointSummary(selectedStudentId) as any;
         setSummary(s);
       } catch (e: any) {
         setSummary(null);
@@ -339,16 +339,23 @@ export default function TeacherPointsPage() {
     })();
   };
 
-  const ensureStudentSubjects = async (studentId: string) => {
+  const ensureStudentSubjects = (studentId: string) => {
+    // We already have the subjects from the student object (filtered by backend to be only teacher's subjects)
     if (subjectsByStudent[studentId]) return;
-    try {
-      const res = await getStudentSubjects(studentId);
-      const list = Array.isArray(res) ? res : (res?.data ?? []);
-      const subjects: Subject[] = (list || [])
-        .map((row: any) => row?.subject)
-        .filter((s: any) => s && s.id && s.name);
+    
+    const student = students.find(s => s.id === studentId);
+    if (student && student.subjects) {
+      // Map the student's subjects to the Subject type expected by the dropdown
+      const subjects: Subject[] = student.subjects.map(s => ({
+        id: s.id,
+        name: s.name,
+        // Other fields are not needed for the dropdown but required by type
+        code: '', 
+        createdAt: '', 
+        updatedAt: ''
+      }));
       setSubjectsByStudent((m) => ({ ...m, [studentId]: subjects }));
-    } catch {
+    } else {
       setSubjectsByStudent((m) => ({ ...m, [studentId]: [] }));
     }
   };

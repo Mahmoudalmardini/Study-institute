@@ -154,6 +154,10 @@ export async function getTeacherMyStudents() {
   return apiClient.get('/teachers/me/students');
 }
 
+export async function getTeacherProfile() {
+  return apiClient.get('/teachers/me');
+}
+
 export async function createPoint(payload: { studentId: string; subjectId?: string; amount: number }) {
   return apiClient.post('/points', payload);
 }
