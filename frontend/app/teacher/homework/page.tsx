@@ -8,7 +8,6 @@ import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import SettingsMenu from '@/components/SettingsMenu';
-import { useAuthStore } from '@/store/auth-store';
 
 interface StudentHomeworkSubmission {
   id: string;
@@ -26,10 +25,15 @@ interface StudentHomeworkSubmission {
   };
 }
 
+interface User {
+  name: string;
+  role: string;
+}
+
 export default function TeacherHomeworkPage() {
   const router = useRouter();
   const { t, locale } = useI18n();
-  const { user } = useAuthStore();
+  const [user, setUser] = useState<User | null>(null);
   const [mounted, setMounted] = useState(false);
   const [submissions, setSubmissions] = useState<StudentHomeworkSubmission[]>([]);
   const [loading, setLoading] = useState(true);
@@ -52,6 +56,7 @@ export default function TeacherHomeworkPage() {
       return;
     }
 
+    setUser({ name: 'Teacher', role: 'TEACHER' });
     setMounted(true);
     fetchSubmissions();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -73,9 +78,20 @@ export default function TeacherHomeworkPage() {
       }
       const url = `${apiUrl}/homework/submissions/received`;
       
+      console.log('=== FETCHING TEACHER SUBMISSIONS ===');
+      console.log('NEXT_PUBLIC_API_URL:', process.env.NEXT_PUBLIC_API_URL);
+      console.log('Built API URL:', apiUrl);
+      console.log('Full URL:', url);
+      console.log('Token:', token ? 'Present' : 'Missing');
+      
       const response = await fetch(url, {
         headers: { 'Authorization': `Bearer ${token}` },
       });
+
+      console.log('Response status:', response.status);
+      console.log('Response statusText:', response.statusText);
+      console.log('Response ok:', response.ok);
+      console.log('Response headers:', Object.fromEntries(response.headers.entries()));
 
       if (!response.ok) {
         // Safely read error payload as text, then try JSON
@@ -86,6 +102,7 @@ export default function TeacherHomeworkPage() {
         } catch {
           errorPayload = {};
         }
+        console.error('Error response:', errorPayload);
         
         if (response.status === 401) {
           localStorage.clear();
@@ -99,6 +116,7 @@ export default function TeacherHomeworkPage() {
       }
 
       const data = await response.json();
+      console.log('Submissions response:', data);
       
       // Normalize response to an array
       // Handle common API envelope shapes: data, {data}, {data:{data}}, {result}
@@ -153,6 +171,8 @@ export default function TeacherHomeworkPage() {
         // Build the full URL: /api/uploads/filename
         const fullUrl = `${apiUrl}/uploads/${cleaned}`;
         
+        console.log('[buildFileUrl] Original:', u, 'Cleaned:', cleaned, 'Full URL:', fullUrl);
+        
         return fullUrl;
       };
 
@@ -185,10 +205,12 @@ export default function TeacherHomeworkPage() {
         },
       }));
 
+      console.log('Transformed submissions:', transformedSubmissions);
       setSubmissions(transformedSubmissions);
       // Clear any previous error now that we have a successful response
       setError('');
     } catch (err: unknown) {
+      console.error('Fetch submissions error:', err);
       setError((err as Error)?.message || 'Failed to load homework submissions');
     } finally {
       setLoading(false);
@@ -196,10 +218,10 @@ export default function TeacherHomeworkPage() {
   };
 
   const handleLogout = () => {
-    const { clearAuth } = useAuthStore.getState();
     const confirmLogout = window.confirm(t.messages.logoutConfirm);
     if (confirmLogout) {
-      clearAuth();
+      localStorage.removeItem('accessToken');
+      localStorage.removeItem('refreshToken');
       router.push('/login');
     }
   };
@@ -228,7 +250,7 @@ export default function TeacherHomeworkPage() {
     setSuccess('');
 
     if (!evaluationForm.feedback.trim()) {
-      setError(t.teacher.feedbackRequired);
+      setError('Feedback is required');
       return;
     }
 
@@ -260,14 +282,14 @@ export default function TeacherHomeworkPage() {
       );
 
       if (response.ok) {
-        setSuccess(t.teacher.evaluationSubmitted);
+        setSuccess('Evaluation submitted successfully and sent to admin for review');
         fetchSubmissions();
         setTimeout(() => {
           closeEvaluationModal();
         }, 1500);
       } else {
         const errorData = await response.json();
-        setError(errorData.message || t.homework.error);
+        setError(errorData.message || 'Failed to submit evaluation');
       }
     } catch (err) {
       const error = err as Error;
@@ -306,11 +328,11 @@ export default function TeacherHomeworkPage() {
   const getStatusText = (status: string) => {
     switch (status) {
       case 'APPROVED_BY_ADMIN':
-        return t.teacher.statusApproved;
+        return 'Approved';
       case 'PENDING_ADMIN_REVIEW':
-        return t.teacher.statusPendingAdmin;
+        return 'Pending Admin Review';
       case 'PENDING_TEACHER_REVIEW':
-        return t.teacher.statusPendingTeacher;
+        return 'Pending Your Review';
       case 'graded':
         return t.teacher.graded;
       default:
@@ -353,6 +375,7 @@ export default function TeacherHomeworkPage() {
       // Clean up the blob URL
       window.URL.revokeObjectURL(blobUrl);
     } catch (error) {
+      console.error('Download error:', error);
       setError('Failed to download file. Please try again.');
       setTimeout(() => setError(''), 3000);
     }
@@ -395,7 +418,7 @@ export default function TeacherHomeworkPage() {
             </div>
             <div className="flex items-center gap-2 sm:gap-4 flex-shrink-0">
               <span className="hidden md:inline text-sm text-white/90 font-medium">
-                {user?.firstName} {user?.lastName}
+                {user.name}
               </span>
               <SettingsMenu onLogout={handleLogout} />
             </div>
@@ -536,17 +559,17 @@ export default function TeacherHomeworkPage() {
                                   target="_blank"
                                   rel="noopener noreferrer"
                                   className="text-teal-600 hover:text-teal-700 text-xs font-medium"
-                                  aria-label={t.teacher.open}
+                                  aria-label="Open file"
                                 >
-                                  {t.teacher.open}
+                                  Open
                                 </a>
                                 <button
                                   type="button"
                                   onClick={() => handleDownloadFile(file.url, file.name)}
                                   className="text-teal-600 hover:text-teal-700 text-xs font-medium underline"
-                                  aria-label={t.teacher.downloadFile}
+                                  aria-label="Download file"
                                 >
-                                  {t.teacher.downloadFile}
+                                  Download
                                 </button>
                               </div>
                             </div>
@@ -583,7 +606,7 @@ export default function TeacherHomeworkPage() {
                       <svg className="w-5 h-5 inline mr-2 rtl:mr-0 rtl:ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                       </svg>
-                      {t.teacher.evaluateHomework}
+                      Evaluate Homework
                     </Button>
                   </div>
                 </div>
@@ -602,7 +625,7 @@ export default function TeacherHomeworkPage() {
               <div className="flex justify-between items-start mb-6">
                 <div className="flex-1">
                   <h3 className="text-2xl font-bold text-gray-900 mb-2">
-                    {t.teacher.evaluateHomework}
+                    Evaluate Homework
                   </h3>
                   <p className="text-sm text-gray-600">
                     {t.teacher.submittedBy}: <span className="font-semibold">{selectedSubmission.student.firstName} {selectedSubmission.student.lastName}</span>
@@ -647,9 +670,9 @@ export default function TeacherHomeworkPage() {
                             target="_blank"
                             rel="noopener noreferrer"
                             className="text-teal-600 hover:text-teal-700 text-sm font-medium"
-                            aria-label={t.teacher.open}
+                            aria-label="Open file in new tab"
                           >
-                            {t.teacher.open}
+                            Open
                           </a>
                           <button
                             type="button"
@@ -681,7 +704,7 @@ export default function TeacherHomeworkPage() {
 
                 <div>
                   <Label className="text-gray-700 font-medium mb-3 block">
-                    {t.teacher.evaluationDecision} *
+                    Evaluation Decision *
                   </Label>
                   <div className="space-y-3">
                     <label className="flex items-center p-4 border-2 rounded-lg cursor-pointer transition-all hover:bg-green-50"
@@ -702,7 +725,7 @@ export default function TeacherHomeworkPage() {
                         <svg className="w-6 h-6 text-green-600" fill="currentColor" viewBox="0 0 20 20">
                           <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
                         </svg>
-                        <span className="font-semibold text-gray-900">{t.teacher.acceptHomework}</span>
+                        <span className="font-semibold text-gray-900">Accept Homework</span>
                       </div>
                     </label>
                     
@@ -724,7 +747,7 @@ export default function TeacherHomeworkPage() {
                         <svg className="w-6 h-6 text-red-600" fill="currentColor" viewBox="0 0 20 20">
                           <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
                         </svg>
-                        <span className="font-semibold text-gray-900">{t.teacher.rejectHomework}</span>
+                        <span className="font-semibold text-gray-900">Reject Homework</span>
                       </div>
                     </label>
                   </div>
@@ -732,11 +755,11 @@ export default function TeacherHomeworkPage() {
 
                 <div>
                   <Label htmlFor="feedback" className="text-gray-700 font-medium">
-                    {t.teacher.feedback} *
+                    Feedback *
                   </Label>
                   <textarea
                     id="feedback"
-                    placeholder={t.teacher.provideFeedback}
+                    placeholder="Provide detailed feedback for the student..."
                     value={evaluationForm.feedback}
                     onChange={(e) => setEvaluationForm({ ...evaluationForm, feedback: e.target.value })}
                     disabled={submitting}
@@ -744,7 +767,7 @@ export default function TeacherHomeworkPage() {
                     rows={4}
                     className="mt-2 w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent transition-all duration-300"
                   />
-                  <p className="mt-1 text-xs text-gray-500">{t.teacher.adminReviewNote}</p>
+                  <p className="mt-1 text-xs text-gray-500">This will be reviewed by an admin before being sent to the student.</p>
                 </div>
 
                 <div className="flex flex-col-reverse sm:flex-row gap-3 pt-4">
@@ -764,10 +787,10 @@ export default function TeacherHomeworkPage() {
                     {submitting ? (
                       <div className="flex items-center justify-center gap-2">
                         <LoadingSpinner size="sm" />
-                        <span>{t.teacher.submittingEvaluation}</span>
+                        <span>Submitting...</span>
                       </div>
                     ) : (
-                      t.teacher.submitEvaluation
+                      'Submit Evaluation'
                     )}
                   </Button>
                 </div>

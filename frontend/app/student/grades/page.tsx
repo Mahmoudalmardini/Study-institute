@@ -5,9 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useI18n } from '@/lib/i18n-context';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import SettingsMenu from '@/components/SettingsMenu';
-import Pagination from '@/components/ui/Pagination';
 import apiClient from '@/lib/api-client';
-import { useAuthStore } from '@/store/auth-store';
 
 interface HomeworkResult {
   id: string;
@@ -20,21 +18,24 @@ interface HomeworkResult {
   reviewedAt: string;
 }
 
+interface User {
+  name: string;
+  role: string;
+}
+
 export default function StudentGradesPage() {
   const router = useRouter();
   const { t, locale } = useI18n();
-  const { user } = useAuthStore();
+  const [user, setUser] = useState<User | null>(null);
   const [results, setResults] = useState<HomeworkResult[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 15;
 
   const handleLogout = () => {
-    const { clearAuth } = useAuthStore.getState();
     const confirmLogout = window.confirm(t.messages.logoutConfirm);
     if (confirmLogout) {
-      clearAuth();
+      localStorage.removeItem('accessToken');
+      localStorage.removeItem('refreshToken');
       router.push('/login');
     }
   };
@@ -46,6 +47,7 @@ export default function StudentGradesPage() {
       return;
     }
 
+    setUser({ name: 'Student', role: 'STUDENT' });
     fetchHomeworkResults();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [router]);
@@ -53,7 +55,12 @@ export default function StudentGradesPage() {
   const fetchHomeworkResults = async () => {
     setLoading(true);
     try {
+      console.log('API Client base URL:', apiClient.defaults.baseURL);
+      console.log('Making request to:', `${apiClient.defaults.baseURL}/homework/my-homework-results`);
+      console.log('Access token exists:', !!localStorage.getItem('accessToken'));
+      
       const data = await apiClient.get('/homework/my-homework-results');
+      console.log('Homework results response:', data);
       
       // Handle both array response and wrapped object response
       if (Array.isArray(data)) {
@@ -61,6 +68,7 @@ export default function StudentGradesPage() {
       } else if (data.data && Array.isArray(data.data)) {
         setResults(data.data);
       } else {
+        console.error('Unexpected response format:', data);
         setResults([]);
       }
     } catch (err) {
@@ -90,17 +98,6 @@ export default function StudentGradesPage() {
 
   const getAcceptedCount = () => results.filter(r => r.result === 'ACCEPTED').length;
   const getRejectedCount = () => results.filter(r => r.result === 'REJECTED').length;
-
-  // Pagination calculations
-  const totalPages = Math.ceil(results.length / itemsPerPage);
-  const startIndex = (currentPage - 1) * itemsPerPage;
-  const endIndex = startIndex + itemsPerPage;
-  const paginatedResults = results.slice(startIndex, endIndex);
-
-  const handlePageChange = (page: number) => {
-    setCurrentPage(page);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  };
 
   if (!user) {
     return (
@@ -200,10 +197,9 @@ export default function StudentGradesPage() {
             <p className="mt-2 text-sm text-gray-500">{t.homework.homeworkResultsDesc}</p>
           </div>
         ) : (
-          <>
-            <div className="space-y-4">
-              {paginatedResults.map((result) => (
-                <div key={result.id} className="bg-white rounded-xl shadow-md hover:shadow-lg transition-all duration-300 overflow-hidden">
+          <div className="space-y-4">
+            {results.map((result) => (
+              <div key={result.id} className="bg-white rounded-xl shadow-md hover:shadow-lg transition-all duration-300 overflow-hidden">
                 <div className="p-4 sm:p-6">
                   <div className="flex flex-col gap-4">
                     {/* Top Row - Title and Badge */}
@@ -276,21 +272,8 @@ export default function StudentGradesPage() {
                   </div>
                 </div>
               </div>
-              ))}
-            </div>
-
-            {/* Pagination */}
-            {results.length > itemsPerPage && (
-              <Pagination
-                currentPage={currentPage}
-                totalPages={totalPages}
-                total={results.length}
-                limit={itemsPerPage}
-                onPageChange={handlePageChange}
-                showLimitSelector={false}
-              />
-            )}
-          </>
+            ))}
+          </div>
         )}
       </main>
     </div>

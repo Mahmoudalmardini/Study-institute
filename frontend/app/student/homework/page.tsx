@@ -8,7 +8,6 @@ import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import SettingsMenu from '@/components/SettingsMenu';
-import { useAuthStore } from '@/store/auth-store';
 
 interface HomeworkSubmission {
   id: string;
@@ -60,9 +59,8 @@ interface Subject {
 export default function StudentHomeworkPage() {
   const router = useRouter();
   const { t, locale } = useI18n();
-  const { user } = useAuthStore();
+  const [user, setUser] = useState<{ name: string; role: string } | null>(null);
   const [mounted, setMounted] = useState(false);
-  const [pageLoading, setPageLoading] = useState(true);
   const [homeworkList, setHomeworkList] = useState<HomeworkSubmission[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
@@ -131,12 +129,11 @@ export default function StudentHomeworkPage() {
       return;
     }
 
+    setUser({ name: 'Student', role: 'STUDENT' });
     setMounted(true);
-    setPageLoading(false);
     fetchStudentData();
     fetchSubjects();
     fetchHomework();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [router]);
 
   const fetchStudentData = async () => {
@@ -144,21 +141,29 @@ export default function StudentHomeworkPage() {
       const token = localStorage.getItem('accessToken');
       const apiUrl = getApiUrl();
       
+      console.log('Fetching student profile...');
+      console.log('[fetchStudentData] API URL:', apiUrl);
+      
       // Get student profile (backend auto-creates if doesn't exist)
       const profileRes = await fetch(`${apiUrl}/students/me`, {
         headers: { Authorization: `Bearer ${token}` },
       });
 
       if (!profileRes.ok) {
+        console.error('Failed to get student profile:', profileRes.status);
+        const errorData = await profileRes.json();
+        console.error('Error details:', errorData);
         return;
       }
 
       const profileData = await profileRes.json();
       const profile = profileData.data;
+      console.log('Student profile retrieved:', profile);
       
       setStudentProfileId(profile.id);
 
       // Fetch assigned teachers
+      console.log('Fetching assigned teachers for profile:', profile.id);
       const teachersRes = await fetch(
         `${apiUrl}/student-teachers/student/${profile.id}`,
         { headers: { Authorization: `Bearer ${token}` } }
@@ -166,19 +171,26 @@ export default function StudentHomeworkPage() {
 
       if (teachersRes.ok) {
         const teachersData = await teachersRes.json();
+        console.log('Raw teachers response:', teachersData);
         
         const assignments = teachersData.data || [];
+        console.log('Teacher assignments:', assignments);
         
         const teachers = assignments.map((assignment: any) => {
+          console.log('Processing assignment:', assignment);
           return assignment.teacher;
         });
         
+        console.log('Processed teachers list:', teachers);
+        console.log('Number of teachers:', teachers.length);
         setMyTeachers(teachers);
       } else {
+        const errorData = await teachersRes.json();
+        console.log('Error fetching teachers:', teachersRes.status, errorData);
         setMyTeachers([]);
       }
     } catch (err) {
-      // Silent fail
+      console.error('Error fetching student data:', err);
     }
   };
 
@@ -186,20 +198,49 @@ export default function StudentHomeworkPage() {
     try {
       const token = localStorage.getItem('accessToken');
       const apiUrl = getApiUrl();
+      console.log('[fetchSubjects] Fetching subjects from API...');
+      console.log('[fetchSubjects] API URL:', apiUrl);
       const response = await fetch(`${apiUrl}/homework/my-subjects`, {
         headers: { Authorization: `Bearer ${token}` },
       });
 
+      console.log('[fetchSubjects] Response status:', response.status);
+
       if (response.ok) {
         const data = await response.json();
+        console.log('[fetchSubjects] Student subjects raw response:', data);
         // Handle both direct array response and wrapped response
         const subjects = Array.isArray(data) ? data : (data.data || []);
+        console.log('[fetchSubjects] Processed subjects count:', subjects.length);
+        console.log('[fetchSubjects] Processed subjects:', subjects);
+        
+        // Log class information for each subject
+        subjects.forEach((subj: any) => {
+          console.log(`[fetchSubjects] Subject: ${subj.subject?.name || 'Unknown'}`, {
+            subjectId: subj.subject?.id,
+            directClass: subj.subject?.class,
+            classSubjects: subj.subject?.classSubjects,
+            finalClass: subj.subject?.class,
+            teacher: subj.teacher,
+          });
+        });
         
         setMySubjects(subjects);
+        
+        if (subjects.length === 0) {
+          console.warn('[fetchSubjects] WARNING: No subjects returned from API even though student may be enrolled');
+        }
       } else {
+        const errorData = await response.json().catch(() => ({}));
+        console.error('[fetchSubjects] Failed to fetch subjects:', {
+          status: response.status,
+          statusText: response.statusText,
+          error: errorData,
+        });
         setMySubjects([]);
       }
     } catch (err) {
+      console.error('[fetchSubjects] Error fetching subjects:', err);
       setMySubjects([]);
     }
   };
@@ -218,6 +259,7 @@ export default function StudentHomeworkPage() {
       // Mock data for now
       setHomeworkList([]);
     } catch (err: any) {
+      console.error('Fetch homework error:', err);
       setError(err.message || 'Failed to load homework');
     } finally {
       setLoading(false);
@@ -225,10 +267,10 @@ export default function StudentHomeworkPage() {
   };
 
   const handleLogout = () => {
-    const { clearAuth } = useAuthStore.getState();
     const confirmLogout = window.confirm(t.messages.logoutConfirm);
     if (confirmLogout) {
-      clearAuth();
+      localStorage.removeItem('accessToken');
+      localStorage.removeItem('refreshToken');
       router.push('/login');
     }
   };
@@ -311,7 +353,18 @@ export default function StudentHomeworkPage() {
   const multipleTeachersForSubject = subjectTeacherCount > 1;
 
   const openAddForm = () => {
+    console.log('[openAddForm] Opening add form');
+    console.log('[openAddForm] mySubjects:', mySubjects);
+    console.log('[openAddForm] Number of subjects:', (mySubjects || []).length);
+    console.log('[openAddForm] studentProfileId:', studentProfileId);
+    
     if ((mySubjects || []).length === 0) {
+      console.error('[openAddForm] No subjects available!');
+      console.error('[openAddForm] This might indicate:');
+      console.error('  1. Student is not enrolled in any subjects');
+      console.error('  2. Student has no classes assigned');
+      console.error('  3. Classes have no subjects assigned');
+      console.error('  4. API call failed or returned empty array');
       setError('You are not enrolled in any subjects. Please contact your administrator.');
       return;
     }
@@ -381,6 +434,9 @@ export default function StudentHomeworkPage() {
       const token = localStorage.getItem('accessToken');
       const apiUrl = getApiUrl();
       
+      console.log('Submitting homework to subject:', formData.subjectId);
+      console.log('[handleSubmit] API URL:', apiUrl);
+      
       const fd = new FormData();
       fd.append('subjectId', formData.subjectId);
       fd.append('title', formData.title);
@@ -397,6 +453,7 @@ export default function StudentHomeworkPage() {
       });
 
       const data = await response.json();
+      console.log('Submission response:', data);
 
       if (response.ok) {
         setSuccess(t.homework.homeworkSubmitted);
@@ -408,6 +465,7 @@ export default function StudentHomeworkPage() {
         setError(data.message || 'Failed to submit homework');
       }
     } catch (err: any) {
+      console.error('Submit error:', err);
       setError(err.message || t.homework.error);
     } finally {
       setSubmitting(false);
@@ -487,7 +545,7 @@ export default function StudentHomeworkPage() {
     return 'text-gray-500'; // Normal size
   };
 
-  if (pageLoading) {
+  if (!user) {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen gradient-bg">
         <LoadingSpinner size="lg" />
@@ -516,7 +574,7 @@ export default function StudentHomeworkPage() {
             </div>
             <div className="flex items-center gap-2 sm:gap-4 flex-shrink-0">
               <span className="hidden md:inline text-sm text-white/90 font-medium">
-                {user?.firstName} {user?.lastName}
+                {user.name}
               </span>
               <SettingsMenu onLogout={handleLogout} />
             </div>

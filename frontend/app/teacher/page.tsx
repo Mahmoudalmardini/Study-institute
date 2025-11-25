@@ -5,14 +5,17 @@ import { useRouter } from 'next/navigation';
 import { useI18n } from '@/lib/i18n-context';
 import SettingsMenu from '@/components/SettingsMenu';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
-import { useAuthStore } from '@/store/auth-store';
+
+interface User {
+  name: string;
+  role: string;
+}
 
 export default function TeacherDashboard() {
   const router = useRouter();
   const { t } = useI18n();
-  const { user } = useAuthStore();
+  const [user, setUser] = useState<User | null>(null);
   const [mounted, setMounted] = useState(false);
-  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const token = localStorage.getItem('accessToken');
@@ -21,20 +24,20 @@ export default function TeacherDashboard() {
       return;
     }
 
+    setUser({ name: 'Teacher', role: 'TEACHER' });
     setMounted(true);
-    setLoading(false);
   }, [router]);
 
   const handleLogout = () => {
-    const { clearAuth } = useAuthStore.getState();
     const confirmLogout = window.confirm(t.messages.logoutConfirm);
     if (confirmLogout) {
-      clearAuth();
+      localStorage.removeItem('accessToken');
+      localStorage.removeItem('refreshToken');
       router.push('/login');
     }
   };
 
-  if (loading) {
+  if (!user) {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen gradient-bg">
         <LoadingSpinner size="lg" />
@@ -62,7 +65,7 @@ export default function TeacherDashboard() {
             </div>
             <div className="flex items-center gap-2 sm:gap-4 flex-shrink-0">
               <span className="hidden md:inline text-sm text-white/90 font-medium">
-                {t.teacher.welcome}, {user?.firstName} {user?.lastName}
+                {t.teacher.welcome}, {user.name}
               </span>
               <SettingsMenu onLogout={handleLogout} />
             </div>
@@ -81,7 +84,7 @@ export default function TeacherDashboard() {
             </div>
             <div className="flex-1">
               <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2">
-                {t.teacher.welcomeBack}, {user?.firstName} {user?.lastName}! 📚
+                {t.teacher.welcomeBack}, {user.name}! 📚
               </h2>
               <p className="text-gray-600 text-base sm:text-lg">
                 {t.teacher.dashboardGreeting}
@@ -179,8 +182,8 @@ export default function TeacherDashboard() {
                       <path fillRule="evenodd" d="M18 9H2v5a2 2 0 002 2h12a2 2 0 002-2V9zM4 13a1 1 0 011-1h1a1 1 0 110 2H5a1 1 0 01-1-1zm5-1a1 1 0 100 2h1a1 1 0 100-2H9z" clipRule="evenodd" />
                     </svg>
                   </div>
-                  <h3 className="text-xl font-bold text-gray-900 mb-2">{t.teacher.payrollTitle}</h3>
-                  <p className="text-sm text-gray-600">{t.teacher.payrollDesc}</p>
+                  <h3 className="text-xl font-bold text-gray-900 mb-2">Payroll</h3>
+                  <p className="text-sm text-gray-600">Submit hours and view payroll</p>
                 </div>
                 <svg className="w-6 h-6 text-yellow-500 flex-shrink-0 ms-2 rtl:rotate-180 group-hover:translate-x-1 rtl:group-hover:-translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />

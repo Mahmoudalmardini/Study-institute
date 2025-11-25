@@ -6,14 +6,17 @@ import { useI18n } from '@/lib/i18n-context';
 import SettingsMenu from '@/components/SettingsMenu';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import { getMyOutstanding, getMyCurrentMonthInstallment } from '@/lib/api-client';
-import { useAuthStore } from '@/store/auth-store';
+
+interface User {
+  name: string;
+  role: string;
+}
 
 export default function StudentDashboard() {
   const router = useRouter();
   const { t } = useI18n();
-  const { user } = useAuthStore();
+  const [user, setUser] = useState<User | null>(null);
   const [mounted, setMounted] = useState(false);
-  const [loading, setLoading] = useState(true);
   const [outstanding, setOutstanding] = useState<any>(null);
   const [currentMonth, setCurrentMonth] = useState<any>(null);
   const [showTermsModal, setShowTermsModal] = useState(false);
@@ -25,9 +28,9 @@ export default function StudentDashboard() {
       return;
     }
 
+    setUser({ name: 'Student', role: 'STUDENT' });
     fetchInstallmentSummary();
     setMounted(true);
-    setLoading(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [router]);
 
@@ -41,19 +44,20 @@ export default function StudentDashboard() {
       setCurrentMonth(currentMonthData || null);
     } catch (err) {
       // Silently fail - installments are optional
+      console.error('Failed to load installment summary:', err);
     }
   };
 
   const handleLogout = () => {
-    const { clearAuth } = useAuthStore.getState();
     const confirmLogout = window.confirm(t.messages.logoutConfirm);
     if (confirmLogout) {
-      clearAuth();
+      localStorage.removeItem('accessToken');
+      localStorage.removeItem('refreshToken');
       router.push('/login');
     }
   };
 
-  if (loading) {
+  if (!user) {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen gradient-bg">
         <LoadingSpinner size="lg" />
@@ -81,7 +85,7 @@ export default function StudentDashboard() {
             </div>
             <div className="flex items-center gap-2 sm:gap-4 flex-shrink-0">
               <span className="hidden md:inline text-sm text-white/90 font-medium">
-                {t.student.welcome}, {user?.firstName} {user?.lastName}
+                {t.student.welcome}, {user.name}
               </span>
               <SettingsMenu onLogout={handleLogout} />
             </div>
@@ -100,7 +104,7 @@ export default function StudentDashboard() {
             </div>
             <div className="flex-1">
               <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2">
-                {t.student.welcomeBack}, {user?.firstName} {user?.lastName}! ⭐
+                {t.student.welcomeBack}, {user.name}! ⭐
               </h2>
               <p className="text-gray-600 text-base sm:text-lg mb-3">
                 {t.student.dashboardGreeting}
