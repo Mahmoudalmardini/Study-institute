@@ -399,6 +399,55 @@
     "view": "View",
     "loading": "Loading homework..."
   },
+  "homeworkReview": {
+    "title": "Review Homework Submissions",
+    "subtitle": "Review and approve teacher evaluations",
+    "pendingReviews": "Pending Reviews",
+    "allCaughtUp": "All caught up!",
+    "noPendingSubmissions": "No homework submissions pending review",
+    "student": "Student",
+    "teachersDecision": "Teacher's Decision",
+    "feedback": "Feedback",
+    "reviewAndApprove": "Review & Approve",
+    "reviewSubmission": "Review Homework Submission",
+    "finalDecision": "Final Decision",
+    "acceptHomework": "Accept Homework",
+    "rejectHomework": "Reject Homework",
+    "finalFeedback": "Final Feedback to Student",
+    "feedbackPlaceholder": "Modify or keep the teacher's feedback...",
+    "feedbackHelper": "This feedback will be sent directly to the student.",
+    "submitting": "Submitting...",
+    "approveAndSend": "Approve & Send to Student",
+    "feedbackRequired": "Feedback is required",
+    "reviewSubmitted": "Review submitted successfully! Student will be notified.",
+    "failedToLoad": "Failed to load pending submissions",
+    "failedToSubmit": "Failed to submit review",
+    "directSubmission": "Direct Submission",
+    "noDescription": "No description provided",
+    "submitted": "Submitted",
+    "noTitle": "No Title",
+    "noDescriptionLabel": "No Description"
+  },
+  "homeworkEvaluation": {
+    "title": "Evaluate Homework",
+    "evaluationDecision": "Evaluation Decision",
+    "acceptHomework": "Accept Homework",
+    "rejectHomework": "Reject Homework",
+    "feedback": "Feedback",
+    "feedbackPlaceholder": "Provide detailed feedback for the student...",
+    "feedbackHelper": "This will be reviewed by an admin before being sent to the student.",
+    "submitting": "Submitting...",
+    "submitEvaluation": "Submit Evaluation",
+    "feedbackRequired": "Feedback is required",
+    "evaluationSubmitted": "Evaluation submitted successfully and sent to admin for review",
+    "failedToSubmit": "Failed to submit evaluation",
+    "failedToDownload": "Failed to download file. Please try again.",
+    "open": "Open",
+    "download": "Download",
+    "approved": "Approved",
+    "pendingAdminReview": "Pending Admin Review",
+    "pendingYourReview": "Pending Your Review"
+  },
   "points": {
     "title": "Points Management",
     "titleStudent": "My Points",
@@ -546,7 +595,18 @@
     "statusOverdue": "Overdue"
   },
   "messages": {
-    "logoutConfirm": "Are you sure you want to logout?"
+    "logoutConfirm": "Are you sure you want to logout?",
+    "errorOccurred": "An error occurred",
+    "failedToLoad": "Failed to load data",
+    "failedToSave": "Failed to save changes",
+    "failedToDelete": "Failed to delete",
+    "failedToUpdate": "Failed to update",
+    "networkError": "Network error. Please check your connection.",
+    "unauthorized": "You are not authorized to perform this action",
+    "notFound": "The requested resource was not found",
+    "serverError": "Server error. Please try again later.",
+    "validationError": "Please check your input and try again",
+    "timeout": "Request timed out. Please try again."
   }
 }
 

@@ -399,6 +399,55 @@
     "view": "عرض",
     "loading": "جاري تحميل الواجبات..."
   },
+  "homeworkReview": {
+    "title": "مراجعة واجبات الطلاب",
+    "subtitle": "مراجعة والموافقة على تقييمات المعلمين",
+    "pendingReviews": "المراجعات المعلقة",
+    "allCaughtUp": "تم الانتهاء من كل شيء!",
+    "noPendingSubmissions": "لا توجد واجبات معلقة للمراجعة",
+    "student": "الطالب",
+    "teachersDecision": "قرار المعلم",
+    "feedback": "الملاحظات",
+    "reviewAndApprove": "مراجعة والموافقة",
+    "reviewSubmission": "مراجعة واجب الطالب",
+    "finalDecision": "القرار النهائي",
+    "acceptHomework": "قبول الواجب",
+    "rejectHomework": "رفض الواجب",
+    "finalFeedback": "الملاحظات النهائية للطالب",
+    "feedbackPlaceholder": "قم بتعديل أو احتفظ بملاحظات المعلم...",
+    "feedbackHelper": "سيتم إرسال هذه الملاحظات مباشرة إلى الطالب.",
+    "submitting": "جاري الإرسال...",
+    "approveAndSend": "الموافقة والإرسال للطالب",
+    "feedbackRequired": "الملاحظات مطلوبة",
+    "reviewSubmitted": "تم إرسال المراجعة بنجاح! سيتم إشعار الطالب.",
+    "failedToLoad": "فشل تحميل الواجبات المعلقة",
+    "failedToSubmit": "فشل إرسال المراجعة",
+    "directSubmission": "تقديم مباشر",
+    "noDescription": "لا يوجد وصف",
+    "submitted": "تم التقديم",
+    "noTitle": "لا يوجد عنوان",
+    "noDescriptionLabel": "لا يوجد وصف"
+  },
+  "homeworkEvaluation": {
+    "title": "تقييم الواجب",
+    "evaluationDecision": "قرار التقييم",
+    "acceptHomework": "قبول الواجب",
+    "rejectHomework": "رفض الواجب",
+    "feedback": "الملاحظات",
+    "feedbackPlaceholder": "قدم ملاحظات مفصلة للطالب...",
+    "feedbackHelper": "سيتم مراجعة هذا من قبل المسؤول قبل إرساله إلى الطالب.",
+    "submitting": "جاري الإرسال...",
+    "submitEvaluation": "إرسال التقييم",
+    "feedbackRequired": "الملاحظات مطلوبة",
+    "evaluationSubmitted": "تم إرسال التقييم بنجاح وإرساله إلى المسؤول للمراجعة",
+    "failedToSubmit": "فشل إرسال التقييم",
+    "failedToDownload": "فشل تحميل الملف. يرجى المحاولة مرة أخرى.",
+    "open": "فتح",
+    "download": "تحميل",
+    "approved": "موافق عليه",
+    "pendingAdminReview": "قيد مراجعة المسؤول",
+    "pendingYourReview": "قيد مراجعتك"
+  },
   "points": {
     "title": "إدارة النقاط",
     "titleStudent": "نقاطي",
@@ -546,7 +595,18 @@
     "statusOverdue": "متأخر"
   },
   "messages": {
-    "logoutConfirm": "هل أنت متأكد من تسجيل الخروج؟"
+    "logoutConfirm": "هل أنت متأكد من تسجيل الخروج؟",
+    "errorOccurred": "حدث خطأ",
+    "failedToLoad": "فشل تحميل البيانات",
+    "failedToSave": "فشل حفظ التغييرات",
+    "failedToDelete": "فشل الحذف",
+    "failedToUpdate": "فشل التحديث",
+    "networkError": "خطأ في الشبكة. يرجى التحقق من اتصالك.",
+    "unauthorized": "غير مصرح لك بتنفيذ هذا الإجراء",
+    "notFound": "لم يتم العثور على المورد المطلوب",
+    "serverError": "خطأ في الخادم. يرجى المحاولة مرة أخرى لاحقاً.",
+    "validationError": "يرجى التحقق من المدخلات والمحاولة مرة أخرى",
+    "timeout": "انتهت مهلة الطلب. يرجى المحاولة مرة أخرى."
   }
 }
 

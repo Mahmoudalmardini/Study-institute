@@ -100,7 +100,7 @@ export default function AdminHomeworkReviewPage() {
         router.push('/login');
         return;
       }
-      const errorMessage = err.response?.data?.message || err.message || 'Failed to load pending submissions';
+      const errorMessage = err.response?.data?.message || err.message || t.homeworkReview.failedToLoad;
       setError(errorMessage);
       setSubmissions([]);
     } finally {
@@ -132,7 +132,7 @@ export default function AdminHomeworkReviewPage() {
     setSuccess('');
 
     if (!reviewForm.feedback.trim()) {
-      setError('Feedback is required');
+      setError(t.homeworkReview.feedbackRequired);
       return;
     }
 
@@ -149,7 +149,7 @@ export default function AdminHomeworkReviewPage() {
         }
       );
 
-      setSuccess('Review submitted successfully! Student will be notified.');
+      setSuccess(t.homeworkReview.reviewSubmitted);
       fetchPendingSubmissions();
       setTimeout(() => {
         closeReviewModal();
@@ -161,7 +161,7 @@ export default function AdminHomeworkReviewPage() {
         router.push('/login');
         return;
       }
-      const errorMessage = err.response?.data?.message || err.message || 'Failed to submit review';
+      const errorMessage = err.response?.data?.message || err.message || t.homeworkReview.failedToSubmit;
       setError(errorMessage);
     } finally {
       setSubmitting(false);
@@ -197,10 +197,10 @@ export default function AdminHomeworkReviewPage() {
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
             <div className="flex-1">
               <h1 className="text-3xl sm:text-4xl font-extrabold mb-2 tracking-tight">
-                Review Homework Submissions
+                {t.homeworkReview.title}
               </h1>
               <p className="text-teal-100 text-sm sm:text-base">
-                Review and approve teacher evaluations
+                {t.homeworkReview.subtitle}
               </p>
             </div>
             <SettingsMenu onLogout={handleLogout} />
@@ -232,7 +232,7 @@ export default function AdminHomeworkReviewPage() {
             </div>
             <div>
               <p className="text-2xl font-bold text-gray-900">{submissions.length}</p>
-              <p className="text-sm text-gray-600">Pending Reviews</p>
+              <p className="text-sm text-gray-600">{t.homeworkReview.pendingReviews}</p>
             </div>
           </div>
         </div>
@@ -246,8 +246,8 @@ export default function AdminHomeworkReviewPage() {
             <svg className="mx-auto h-16 w-16 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
-            <h3 className="mt-4 text-lg font-medium text-gray-900">All caught up!</h3>
-            <p className="mt-2 text-sm text-gray-500">No homework submissions pending review</p>
+            <h3 className="mt-4 text-lg font-medium text-gray-900">{t.homeworkReview.allCaughtUp}</h3>
+            <p className="mt-2 text-sm text-gray-500">{t.homeworkReview.noPendingSubmissions}</p>
           </div>
         ) : (
           <div className="space-y-4">
@@ -258,8 +258,8 @@ export default function AdminHomeworkReviewPage() {
                     {/* Left Side - Info */}
                     <div className="flex-1 space-y-3">
                       <div>
-                        <h3 className="text-xl font-bold text-gray-900 mb-1">{submission.title || submission.homework?.title || 'No Title'}</h3>
-                        <p className="text-sm text-gray-600">{submission.description || submission.homework?.description || 'No Description'}</p>
+                        <h3 className="text-xl font-bold text-gray-900 mb-1">{submission.title || submission.homework?.title || t.homeworkReview.noTitle}</h3>
+                        <p className="text-sm text-gray-600">{submission.description || submission.homework?.description || t.homeworkReview.noDescriptionLabel}</p>
                       </div>
                       
                       <div className="flex flex-wrap gap-4 text-sm">
@@ -267,7 +267,7 @@ export default function AdminHomeworkReviewPage() {
                           <svg className="w-5 h-5 text-blue-500" fill="currentColor" viewBox="0 0 20 20">
                             <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
                           </svg>
-                          <span className="font-semibold">Student:</span>
+                          <span className="font-semibold">{t.homeworkReview.student}:</span>
                           <span>{submission.student.user.firstName} {submission.student.user.lastName}</span>
                         </div>
                         <div className="flex items-center gap-2">
@@ -297,11 +297,11 @@ export default function AdminHomeworkReviewPage() {
                           <span className={`font-bold ${
                             submission.teacherEvaluation === 'ACCEPTED' ? 'text-green-800' : 'text-red-800'
                           }`}>
-                            Teacher's Decision: {submission.teacherEvaluation}
+                            {t.homeworkReview.teachersDecision}: {submission.teacherEvaluation}
                           </span>
                         </div>
                         <p className="text-sm text-gray-700">
-                          <span className="font-semibold">Feedback:</span> {submission.teacherFeedback}
+                          <span className="font-semibold">{t.homeworkReview.feedback}:</span> {submission.teacherFeedback}
                         </p>
                       </div>
                     </div>
@@ -315,7 +315,7 @@ export default function AdminHomeworkReviewPage() {
                         <svg className="w-5 h-5 inline mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                         </svg>
-                        Review & Approve
+                        {t.homeworkReview.reviewAndApprove}
                       </Button>
                     </div>
                   </div>
@@ -335,10 +335,10 @@ export default function AdminHomeworkReviewPage() {
               <div className="flex justify-between items-start mb-6">
                 <div className="flex-1">
                   <h3 className="text-2xl font-bold text-gray-900 mb-2">
-                    Review Homework Submission
+                    {t.homeworkReview.reviewSubmission}
                   </h3>
                   <p className="text-sm text-gray-600">
-                    Student: <span className="font-semibold">{selectedSubmission.student.user.firstName} {selectedSubmission.student.user.lastName}</span>
+                    {t.homeworkReview.student}: <span className="font-semibold">{selectedSubmission.student.user.firstName} {selectedSubmission.student.user.lastName}</span>
                   </p>
                 </div>
                 <button
@@ -362,8 +362,8 @@ export default function AdminHomeworkReviewPage() {
                   </>
                 ) : (
                   <>
-                    <h4 className="font-bold text-gray-900 mb-2">{selectedSubmission.title || 'Direct Submission'}</h4>
-                    <p className="text-gray-700 mb-3">{selectedSubmission.description || 'No description provided'}</p>
+                    <h4 className="font-bold text-gray-900 mb-2">{selectedSubmission.title || t.homeworkReview.directSubmission}</h4>
+                    <p className="text-gray-700 mb-3">{selectedSubmission.description || t.homeworkReview.noDescription}</p>
                   </>
                 )}
                 <p className="text-xs text-gray-500">Submitted: {formatDate(selectedSubmission.submittedAt)}</p>
@@ -384,7 +384,7 @@ export default function AdminHomeworkReviewPage() {
 
                 <div>
                   <Label className="text-gray-700 font-medium mb-3 block">
-                    Final Decision *
+                    {t.homeworkReview.finalDecision} *
                   </Label>
                   <div className="space-y-3">
                     <label className="flex items-center p-4 border-2 rounded-lg cursor-pointer transition-all hover:bg-green-50"
@@ -405,7 +405,7 @@ export default function AdminHomeworkReviewPage() {
                         <svg className="w-6 h-6 text-green-600" fill="currentColor" viewBox="0 0 20 20">
                           <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
                         </svg>
-                        <span className="font-semibold text-gray-900">Accept Homework</span>
+                        <span className="font-semibold text-gray-900">{t.homeworkReview.acceptHomework}</span>
                       </div>
                     </label>
                     
@@ -427,7 +427,7 @@ export default function AdminHomeworkReviewPage() {
                         <svg className="w-6 h-6 text-red-600" fill="currentColor" viewBox="0 0 20 20">
                           <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
                         </svg>
-                        <span className="font-semibold text-gray-900">Reject Homework</span>
+                        <span className="font-semibold text-gray-900">{t.homeworkReview.rejectHomework}</span>
                       </div>
                     </label>
                   </div>
@@ -435,11 +435,11 @@ export default function AdminHomeworkReviewPage() {
 
                 <div>
                   <Label htmlFor="feedback" className="text-gray-700 font-medium">
-                    Final Feedback to Student *
+                    {t.homeworkReview.finalFeedback} *
                   </Label>
                   <textarea
                     id="feedback"
-                    placeholder="Modify or keep the teacher's feedback..."
+                    placeholder={t.homeworkReview.feedbackPlaceholder}
                     value={reviewForm.feedback}
                     onChange={(e) => setReviewForm({ ...reviewForm, feedback: e.target.value })}
                     disabled={submitting}
@@ -447,7 +447,7 @@ export default function AdminHomeworkReviewPage() {
                     rows={5}
                     className="mt-2 w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent transition-all duration-300"
                   />
-                  <p className="mt-1 text-xs text-gray-500">This feedback will be sent directly to the student.</p>
+                  <p className="mt-1 text-xs text-gray-500">{t.homeworkReview.feedbackHelper}</p>
                 </div>
 
                 <div className="flex flex-col-reverse sm:flex-row gap-3 pt-4">
@@ -457,7 +457,7 @@ export default function AdminHomeworkReviewPage() {
                     disabled={submitting}
                     className="flex-1 bg-gray-600 hover:bg-gray-700 text-white"
                   >
-                    Cancel
+                    {t.common.cancel}
                   </Button>
                   <Button
                     type="submit"
@@ -467,10 +467,10 @@ export default function AdminHomeworkReviewPage() {
                     {submitting ? (
                       <div className="flex items-center justify-center gap-2">
                         <LoadingSpinner size="sm" />
-                        <span>Submitting...</span>
+                        <span>{t.homeworkReview.submitting}</span>
                       </div>
                     ) : (
-                      'Approve & Send to Student'
+                      t.homeworkReview.approveAndSend
                     )}
                   </Button>
                 </div>

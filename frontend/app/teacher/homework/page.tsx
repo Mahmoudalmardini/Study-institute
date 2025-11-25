@@ -111,7 +111,7 @@ export default function TeacherHomeworkPage() {
         }
         const errorMessage = typeof errorPayload?.message === 'string' 
           ? errorPayload.message 
-          : 'Failed to fetch submissions';
+          : t.messages.failedToLoad;
         throw new Error(errorMessage);
       }
 
@@ -211,7 +211,7 @@ export default function TeacherHomeworkPage() {
       setError('');
     } catch (err: unknown) {
       console.error('Fetch submissions error:', err);
-      setError((err as Error)?.message || 'Failed to load homework submissions');
+      setError((err as Error)?.message || t.messages.failedToLoad);
     } finally {
       setLoading(false);
     }
@@ -250,7 +250,7 @@ export default function TeacherHomeworkPage() {
     setSuccess('');
 
     if (!evaluationForm.feedback.trim()) {
-      setError('Feedback is required');
+      setError(t.homeworkEvaluation.feedbackRequired);
       return;
     }
 
@@ -282,18 +282,18 @@ export default function TeacherHomeworkPage() {
       );
 
       if (response.ok) {
-        setSuccess('Evaluation submitted successfully and sent to admin for review');
+        setSuccess(t.homeworkEvaluation.evaluationSubmitted);
         fetchSubmissions();
         setTimeout(() => {
           closeEvaluationModal();
         }, 1500);
       } else {
         const errorData = await response.json();
-        setError(errorData.message || 'Failed to submit evaluation');
+        setError(errorData.message || t.homeworkEvaluation.failedToSubmit);
       }
     } catch (err) {
       const error = err as Error;
-      setError(error.message || t.homework.error);
+      setError(error.message || t.homeworkEvaluation.failedToSubmit);
     } finally {
       setSubmitting(false);
     }
@@ -328,11 +328,11 @@ export default function TeacherHomeworkPage() {
   const getStatusText = (status: string) => {
     switch (status) {
       case 'APPROVED_BY_ADMIN':
-        return 'Approved';
+        return t.homeworkEvaluation.approved;
       case 'PENDING_ADMIN_REVIEW':
-        return 'Pending Admin Review';
+        return t.homeworkEvaluation.pendingAdminReview;
       case 'PENDING_TEACHER_REVIEW':
-        return 'Pending Your Review';
+        return t.homeworkEvaluation.pendingYourReview;
       case 'graded':
         return t.teacher.graded;
       default:
@@ -353,7 +353,7 @@ export default function TeacherHomeworkPage() {
       // Fetch the file as a blob
       const response = await fetch(fileUrl);
       if (!response.ok) {
-        throw new Error('Failed to download file');
+        throw new Error(t.homeworkEvaluation.failedToDownload);
       }
       
       const blob = await response.blob();
@@ -376,7 +376,7 @@ export default function TeacherHomeworkPage() {
       window.URL.revokeObjectURL(blobUrl);
     } catch (error) {
       console.error('Download error:', error);
-      setError('Failed to download file. Please try again.');
+      setError(t.homeworkEvaluation.failedToDownload);
       setTimeout(() => setError(''), 3000);
     }
   };
@@ -559,17 +559,17 @@ export default function TeacherHomeworkPage() {
                                   target="_blank"
                                   rel="noopener noreferrer"
                                   className="text-teal-600 hover:text-teal-700 text-xs font-medium"
-                                  aria-label="Open file"
+                                  aria-label={t.homeworkEvaluation.open}
                                 >
-                                  Open
+                                  {t.homeworkEvaluation.open}
                                 </a>
                                 <button
                                   type="button"
                                   onClick={() => handleDownloadFile(file.url, file.name)}
                                   className="text-teal-600 hover:text-teal-700 text-xs font-medium underline"
-                                  aria-label="Download file"
+                                  aria-label={t.homeworkEvaluation.download}
                                 >
-                                  Download
+                                  {t.homeworkEvaluation.download}
                                 </button>
                               </div>
                             </div>
@@ -599,15 +599,15 @@ export default function TeacherHomeworkPage() {
 
                   {/* Right Side - Action Button */}
                   <div className="flex-shrink-0">
-                    <Button
-                      onClick={() => openEvaluationModal(submission)}
-                      className="w-full lg:w-auto gradient-secondary text-white font-semibold px-6 py-3 rounded-lg hover:shadow-lg transition-all duration-300 hover:scale-105"
-                    >
-                      <svg className="w-5 h-5 inline mr-2 rtl:mr-0 rtl:ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                      </svg>
-                      Evaluate Homework
-                    </Button>
+                      <Button
+                        onClick={() => openEvaluationModal(submission)}
+                        className="w-full lg:w-auto gradient-secondary text-white font-semibold px-6 py-3 rounded-lg hover:shadow-lg transition-all duration-300 hover:scale-105"
+                      >
+                        <svg className="w-5 h-5 inline mr-2 rtl:mr-0 rtl:ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                        </svg>
+                        {t.homeworkEvaluation.title}
+                      </Button>
                   </div>
                 </div>
               </div>
@@ -625,7 +625,7 @@ export default function TeacherHomeworkPage() {
               <div className="flex justify-between items-start mb-6">
                 <div className="flex-1">
                   <h3 className="text-2xl font-bold text-gray-900 mb-2">
-                    Evaluate Homework
+                    {t.homeworkEvaluation.title}
                   </h3>
                   <p className="text-sm text-gray-600">
                     {t.teacher.submittedBy}: <span className="font-semibold">{selectedSubmission.student.firstName} {selectedSubmission.student.lastName}</span>
@@ -670,17 +670,17 @@ export default function TeacherHomeworkPage() {
                             target="_blank"
                             rel="noopener noreferrer"
                             className="text-teal-600 hover:text-teal-700 text-sm font-medium"
-                            aria-label="Open file in new tab"
+                            aria-label={t.homeworkEvaluation.open}
                           >
-                            Open
+                            {t.homeworkEvaluation.open}
                           </a>
                           <button
                             type="button"
                             onClick={() => handleDownloadFile(file.url, file.name)}
                             className="text-teal-600 hover:text-teal-700 text-sm font-medium underline"
-                            aria-label="Download file"
+                            aria-label={t.homeworkEvaluation.download}
                           >
-                            {t.teacher.downloadFile}
+                            {t.homeworkEvaluation.download}
                           </button>
                         </div>
                       </div>
@@ -704,7 +704,7 @@ export default function TeacherHomeworkPage() {
 
                 <div>
                   <Label className="text-gray-700 font-medium mb-3 block">
-                    Evaluation Decision *
+                    {t.homeworkEvaluation.evaluationDecision} *
                   </Label>
                   <div className="space-y-3">
                     <label className="flex items-center p-4 border-2 rounded-lg cursor-pointer transition-all hover:bg-green-50"
@@ -725,7 +725,7 @@ export default function TeacherHomeworkPage() {
                         <svg className="w-6 h-6 text-green-600" fill="currentColor" viewBox="0 0 20 20">
                           <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
                         </svg>
-                        <span className="font-semibold text-gray-900">Accept Homework</span>
+                        <span className="font-semibold text-gray-900">{t.homeworkEvaluation.acceptHomework}</span>
                       </div>
                     </label>
                     
@@ -747,7 +747,7 @@ export default function TeacherHomeworkPage() {
                         <svg className="w-6 h-6 text-red-600" fill="currentColor" viewBox="0 0 20 20">
                           <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
                         </svg>
-                        <span className="font-semibold text-gray-900">Reject Homework</span>
+                        <span className="font-semibold text-gray-900">{t.homeworkEvaluation.rejectHomework}</span>
                       </div>
                     </label>
                   </div>
@@ -755,11 +755,11 @@ export default function TeacherHomeworkPage() {
 
                 <div>
                   <Label htmlFor="feedback" className="text-gray-700 font-medium">
-                    Feedback *
+                    {t.homeworkEvaluation.feedback} *
                   </Label>
                   <textarea
                     id="feedback"
-                    placeholder="Provide detailed feedback for the student..."
+                    placeholder={t.homeworkEvaluation.feedbackPlaceholder}
                     value={evaluationForm.feedback}
                     onChange={(e) => setEvaluationForm({ ...evaluationForm, feedback: e.target.value })}
                     disabled={submitting}
@@ -767,7 +767,7 @@ export default function TeacherHomeworkPage() {
                     rows={4}
                     className="mt-2 w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent transition-all duration-300"
                   />
-                  <p className="mt-1 text-xs text-gray-500">This will be reviewed by an admin before being sent to the student.</p>
+                  <p className="mt-1 text-xs text-gray-500">{t.homeworkEvaluation.feedbackHelper}</p>
                 </div>
 
                 <div className="flex flex-col-reverse sm:flex-row gap-3 pt-4">
@@ -787,10 +787,10 @@ export default function TeacherHomeworkPage() {
                     {submitting ? (
                       <div className="flex items-center justify-center gap-2">
                         <LoadingSpinner size="sm" />
-                        <span>Submitting...</span>
+                        <span>{t.homeworkEvaluation.submitting}</span>
                       </div>
                     ) : (
-                      'Submit Evaluation'
+                      t.homeworkEvaluation.submitEvaluation
                     )}
                   </Button>
                 </div>
