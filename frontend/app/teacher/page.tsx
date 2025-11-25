@@ -137,7 +137,7 @@ export default function TeacherDashboard() {
                       <div className="flex flex-wrap gap-2">
                         {teacherProfile.subjects.slice(0, 3).map((ts, i) => (
                           <span key={i} className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-teal-100 text-teal-800">
-                            {ts.subject.name} ({ts.subject.class.name})
+                            {ts.subject?.name} ({ts.subject?.class?.name || 'Unknown Class'})
                           </span>
                         ))}
                         {teacherProfile.subjects.length > 3 && (
