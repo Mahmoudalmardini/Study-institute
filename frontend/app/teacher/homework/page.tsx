@@ -73,20 +73,9 @@ export default function TeacherHomeworkPage() {
       }
       const url = `${apiUrl}/homework/submissions/received`;
       
-      console.log('=== FETCHING TEACHER SUBMISSIONS ===');
-      console.log('NEXT_PUBLIC_API_URL:', process.env.NEXT_PUBLIC_API_URL);
-      console.log('Built API URL:', apiUrl);
-      console.log('Full URL:', url);
-      console.log('Token:', token ? 'Present' : 'Missing');
-      
       const response = await fetch(url, {
         headers: { 'Authorization': `Bearer ${token}` },
       });
-
-      console.log('Response status:', response.status);
-      console.log('Response statusText:', response.statusText);
-      console.log('Response ok:', response.ok);
-      console.log('Response headers:', Object.fromEntries(response.headers.entries()));
 
       if (!response.ok) {
         // Safely read error payload as text, then try JSON
@@ -97,7 +86,6 @@ export default function TeacherHomeworkPage() {
         } catch {
           errorPayload = {};
         }
-        console.error('Error response:', errorPayload);
         
         if (response.status === 401) {
           localStorage.clear();
@@ -111,7 +99,6 @@ export default function TeacherHomeworkPage() {
       }
 
       const data = await response.json();
-      console.log('Submissions response:', data);
       
       // Normalize response to an array
       // Handle common API envelope shapes: data, {data}, {data:{data}}, {result}
@@ -166,8 +153,6 @@ export default function TeacherHomeworkPage() {
         // Build the full URL: /api/uploads/filename
         const fullUrl = `${apiUrl}/uploads/${cleaned}`;
         
-        console.log('[buildFileUrl] Original:', u, 'Cleaned:', cleaned, 'Full URL:', fullUrl);
-        
         return fullUrl;
       };
 
@@ -200,12 +185,10 @@ export default function TeacherHomeworkPage() {
         },
       }));
 
-      console.log('Transformed submissions:', transformedSubmissions);
       setSubmissions(transformedSubmissions);
       // Clear any previous error now that we have a successful response
       setError('');
     } catch (err: unknown) {
-      console.error('Fetch submissions error:', err);
       setError((err as Error)?.message || 'Failed to load homework submissions');
     } finally {
       setLoading(false);
@@ -370,7 +353,6 @@ export default function TeacherHomeworkPage() {
       // Clean up the blob URL
       window.URL.revokeObjectURL(blobUrl);
     } catch (error) {
-      console.error('Download error:', error);
       setError('Failed to download file. Please try again.');
       setTimeout(() => setError(''), 3000);
     }

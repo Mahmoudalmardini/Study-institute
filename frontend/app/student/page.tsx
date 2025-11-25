@@ -13,6 +13,7 @@ export default function StudentDashboard() {
   const { t } = useI18n();
   const { user } = useAuthStore();
   const [mounted, setMounted] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [outstanding, setOutstanding] = useState<any>(null);
   const [currentMonth, setCurrentMonth] = useState<any>(null);
   const [showTermsModal, setShowTermsModal] = useState(false);
@@ -26,6 +27,7 @@ export default function StudentDashboard() {
 
     fetchInstallmentSummary();
     setMounted(true);
+    setLoading(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [router]);
 
@@ -39,7 +41,6 @@ export default function StudentDashboard() {
       setCurrentMonth(currentMonthData || null);
     } catch (err) {
       // Silently fail - installments are optional
-      console.error('Failed to load installment summary:', err);
     }
   };
 
@@ -52,7 +53,7 @@ export default function StudentDashboard() {
     }
   };
 
-  if (!user) {
+  if (loading) {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen gradient-bg">
         <LoadingSpinner size="lg" />

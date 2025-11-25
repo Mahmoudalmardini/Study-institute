@@ -53,12 +53,7 @@ export default function StudentGradesPage() {
   const fetchHomeworkResults = async () => {
     setLoading(true);
     try {
-      console.log('API Client base URL:', apiClient.defaults.baseURL);
-      console.log('Making request to:', `${apiClient.defaults.baseURL}/homework/my-homework-results`);
-      console.log('Access token exists:', !!localStorage.getItem('accessToken'));
-      
       const data = await apiClient.get('/homework/my-homework-results');
-      console.log('Homework results response:', data);
       
       // Handle both array response and wrapped object response
       if (Array.isArray(data)) {
@@ -66,7 +61,6 @@ export default function StudentGradesPage() {
       } else if (data.data && Array.isArray(data.data)) {
         setResults(data.data);
       } else {
-        console.error('Unexpected response format:', data);
         setResults([]);
       }
     } catch (err) {

@@ -5,17 +5,14 @@ import { useRouter } from 'next/navigation';
 import { useI18n } from '@/lib/i18n-context';
 import SettingsMenu from '@/components/SettingsMenu';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
-
-interface User {
-  name: string;
-  role: string;
-}
+import { useAuthStore } from '@/store/auth-store';
 
 export default function TeacherDashboard() {
   const router = useRouter();
   const { t } = useI18n();
-  const [user, setUser] = useState<User | null>(null);
+  const { user } = useAuthStore();
   const [mounted, setMounted] = useState(false);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const token = localStorage.getItem('accessToken');
@@ -24,20 +21,20 @@ export default function TeacherDashboard() {
       return;
     }
 
-    setUser({ name: 'Teacher', role: 'TEACHER' });
     setMounted(true);
+    setLoading(false);
   }, [router]);
 
   const handleLogout = () => {
+    const { clearAuth } = useAuthStore.getState();
     const confirmLogout = window.confirm(t.messages.logoutConfirm);
     if (confirmLogout) {
-      localStorage.removeItem('accessToken');
-      localStorage.removeItem('refreshToken');
+      clearAuth();
       router.push('/login');
     }
   };
 
-  if (!user) {
+  if (loading) {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen gradient-bg">
         <LoadingSpinner size="lg" />
@@ -65,7 +62,7 @@ export default function TeacherDashboard() {
             </div>
             <div className="flex items-center gap-2 sm:gap-4 flex-shrink-0">
               <span className="hidden md:inline text-sm text-white/90 font-medium">
-                {t.teacher.welcome}, {user.name}
+                {t.teacher.welcome}, {user?.firstName} {user?.lastName}
               </span>
               <SettingsMenu onLogout={handleLogout} />
             </div>
@@ -84,7 +81,7 @@ export default function TeacherDashboard() {
             </div>
             <div className="flex-1">
               <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2">
-                {t.teacher.welcomeBack}, {user.name}! 📚
+                {t.teacher.welcomeBack}, {user?.firstName} {user?.lastName}! 📚
               </h2>
               <p className="text-gray-600 text-base sm:text-lg">
                 {t.teacher.dashboardGreeting}
