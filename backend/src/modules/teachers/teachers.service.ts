@@ -187,61 +187,65 @@ export class TeachersService {
       throw new NotFoundException('Teacher not found');
     }
 
-    // Find classes owned by this teacher
-    const ownedClasses = await this.prisma.class.findMany({
+    // Fetch subjects taught by this teacher
+    const taughtSubjectIds = await this.prisma.teacherSubject.findMany({
       where: { teacherId: teacher.id },
-      select: { id: true, name: true },
-    });
-
-    // Find classes where the teacher teaches a subject (via TeacherSubject -> Subject.classId)
-    const taughtSubjects = await this.prisma.teacherSubject.findMany({
-      where: { teacherId: teacher.id },
-      select: { subject: { select: { classId: true } } },
-    });
-
-    const classIds = Array.from(
-      new Set([
-        ...ownedClasses.map((c) => c.id),
-        ...taughtSubjects
-          .map((ts) => ts.subject?.classId)
-          .filter((id): id is string => Boolean(id)),
-      ]),
-    );
-
-    // Prepare OR conditions
-    const orConditions: any[] = [
-      {
-        teachers: {
-          some: {
-            teacherId: teacher.id
+      select: { 
+        subjectId: true,
+        subject: {
+          select: {
+            name: true,
+            classId: true,
+            class: {
+              select: {
+                name: true
+              }
+            }
           }
         }
       },
-      {
-        subjects: {
-          some: {
-            teacherId: teacher.id
-          }
+    });
+
+    const subjectIds = taughtSubjectIds.map(ts => ts.subjectId);
+
+    // Prepare query conditions - focus on specific subject-class relationships
+    // We want students who are ENROLLED in subjects TAUGHT BY THIS TEACHER
+    const whereCondition: any = {
+      subjects: {
+        some: {
+          subjectId: { in: subjectIds },
+          // Optionally check for direct teacher assignment in StudentSubject if applicable
+          // OR if the teacher teaches this subject globally (via TeacherSubject)
         }
       }
-    ];
+    };
 
-    if (classIds.length > 0) {
-      orConditions.push({ classId: { in: classIds } });
-      orConditions.push({
-        classes: {
-          some: {
-            classId: { in: classIds },
-          },
-        },
-      });
-    }
-
-    // Students either directly assigned to those classes, or via StudentClass junction,
-    // or via direct teacher assignment, or via subject assignment with this teacher
+    // If we want to be more specific: only show students who are taking a subject 
+    // that THIS teacher is assigned to teach.
+    
+    // 1. Students who have a StudentSubject record where teacherId is THIS teacher
+    // 2. OR Students who have a StudentSubject record for a subject where THIS teacher is assigned via TeacherSubject
+    
     const students = await this.prisma.student.findMany({
       where: {
-        OR: orConditions,
+        OR: [
+          // Direct assignment: Student assigned to this teacher
+          {
+            teachers: {
+              some: {
+                teacherId: teacher.id
+              }
+            }
+          },
+          // Subject assignment: Student taking a subject taught by this teacher
+          {
+            subjects: {
+              some: {
+                subjectId: { in: subjectIds }
+              }
+            }
+          }
+        ]
       },
       select: {
         id: true,
@@ -269,6 +273,24 @@ export class TeachersService {
             },
           },
         },
+        subjects: {
+          where: {
+            subjectId: { in: subjectIds }
+          },
+          select: {
+            subject: {
+              select: {
+                id: true,
+                name: true,
+                class: {
+                  select: {
+                    name: true
+                  }
+                }
+              }
+            }
+          }
+        }
       },
       orderBy: {
         user: {
@@ -277,18 +299,29 @@ export class TeachersService {
       },
     });
 
-    // Normalize to include class names array
-    return students.map((s) => ({
-      id: s.id,
-      userId: s.user.id,
-      firstName: s.user.firstName,
-      lastName: s.user.lastName,
-      email: s.user.email,
-      classNames: [
-        ...(s.class?.name ? [s.class.name] : []),
-        ...s.classes.map((sc) => sc.class?.name).filter((n): n is string => Boolean(n)),
-      ],
-    }));
+    // Normalize to include class names array and relevant subjects
+    return students.map((s) => {
+      // Get subjects relevant to this teacher
+      const relevantSubjects = s.subjects.map(ss => ({
+        id: ss.subject.id,
+        name: ss.subject.name,
+        className: ss.subject.class?.name
+      }));
+
+      return {
+        id: s.id,
+        userId: s.user.id,
+        firstName: s.user.firstName,
+        lastName: s.user.lastName,
+        email: s.user.email,
+        classNames: [
+          ...(s.class?.name ? [s.class.name] : []),
+          ...s.classes.map((sc) => sc.class?.name).filter((n): n is string => Boolean(n)),
+        ],
+        // Add the subjects this student has with this teacher
+        subjects: relevantSubjects
+      };
+    });
   }
 }
 

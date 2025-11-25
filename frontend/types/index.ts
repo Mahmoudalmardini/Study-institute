@@ -249,6 +249,7 @@ export interface TeacherStudentSummary {
   lastName: string;
   email: string;
   classNames: string[];
+  subjects?: { id: string; name: string; className?: string }[];
 }
 
 // Payroll types

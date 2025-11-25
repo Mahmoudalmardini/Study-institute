@@ -104,10 +104,18 @@ export default function TeacherStudentsPage() {
                       <Label className="text-sm text-gray-500">Name</Label>
                       <div className="font-semibold text-gray-900 truncate">{s.firstName} {s.lastName}</div>
                     </div>
-                    <div className="mt-3 flex flex-col gap-1">
-                      <Label className="text-sm text-gray-500">Email</Label>
-                      <div className="text-gray-700 break-all">{s.email || '-'}</div>
-                    </div>
+                    {s.subjects && s.subjects.length > 0 && (
+                      <div className="mt-3 flex flex-col gap-1">
+                        <Label className="text-sm text-gray-500">Subjects</Label>
+                        <div className="flex flex-wrap gap-2">
+                          {s.subjects.map((sub, i) => (
+                            <span key={i} className="px-2 py-1 rounded-full bg-teal-50 text-teal-700 text-xs border border-teal-100">
+                              {sub.name}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                     {s.classNames?.length > 0 && (
                       <div className="mt-3 flex flex-col gap-1">
                         <Label className="text-sm text-gray-500">Classes</Label>
