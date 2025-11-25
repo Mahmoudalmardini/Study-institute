@@ -9,6 +9,7 @@ import { Card } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import type { TeacherStudentSummary } from '@/types';
 import { getTeacherMyStudents } from '@/lib/api-client';
+import { useAuthStore } from '@/store/auth-store';
 
 export default function TeacherStudentsPage() {
   const router = useRouter();
@@ -62,8 +63,8 @@ export default function TeacherStudentsPage() {
             </div>
             <div className="flex items-center gap-2 sm:gap-4 flex-shrink-0">
               <SettingsMenu onLogout={() => {
-                localStorage.removeItem('accessToken');
-                localStorage.removeItem('refreshToken');
+                const { clearAuth } = useAuthStore.getState();
+                clearAuth();
                 router.push('/login');
               }} />
             </div>
