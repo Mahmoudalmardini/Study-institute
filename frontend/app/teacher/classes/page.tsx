@@ -60,16 +60,24 @@ export default function TeacherClassesPage() {
   
   if (profile?.subjects) {
     profile.subjects.forEach((item) => {
+      // Add null checks for subject and class
+      if (!item?.subject?.class) return;
+      
       const classId = item.subject.class.id;
+      // Skip if classId is missing
+      if (!classId) return;
+
       if (!classesMap.has(classId)) {
         classesMap.set(classId, {
           id: classId,
-          name: item.subject.class.name,
-          grade: item.subject.class.grade,
+          name: item.subject.class.name || 'Unknown Class',
+          grade: item.subject.class.grade || 'Unknown Grade',
           subjects: []
         });
       }
-      classesMap.get(classId)?.subjects.push(item.subject.name);
+      if (item.subject?.name) {
+        classesMap.get(classId)?.subjects.push(item.subject.name);
+      }
     });
   }
 
