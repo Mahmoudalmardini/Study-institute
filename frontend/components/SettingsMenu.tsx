@@ -11,6 +11,9 @@ export default function SettingsMenu({ onLogout }: SettingsMenuProps) {
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const { t, locale, setLocale } = useI18n();
+  
+  // Determine if we're in RTL mode
+  const isRTL = locale === 'ar';
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -66,10 +69,10 @@ export default function SettingsMenu({ onLogout }: SettingsMenuProps) {
         <div 
           className="absolute z-[9999] mt-2 rounded-xl bg-white shadow-2xl ring-1 ring-black ring-opacity-5 focus:outline-none animate-scale-in"
           style={{
-            right: '0',
+            ...(isRTL ? { left: '0' } : { right: '0' }),
             width: 'min(14rem, calc(100vw - 2rem))', // 14rem = w-56, but never wider than viewport minus padding
             maxWidth: 'calc(100vw - 2rem)',
-            transformOrigin: 'top right',
+            transformOrigin: isRTL ? 'top left' : 'top right',
           }}
         >
           <div className="py-1">
