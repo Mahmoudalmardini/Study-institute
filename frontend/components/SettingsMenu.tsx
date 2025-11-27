@@ -9,9 +9,7 @@ interface SettingsMenuProps {
 
 export default function SettingsMenu({ onLogout }: SettingsMenuProps) {
   const [isOpen, setIsOpen] = useState(false);
-  const [menuPosition, setMenuPosition] = useState<'right' | 'left'>('right');
   const dropdownRef = useRef<HTMLDivElement>(null);
-  const buttonRef = useRef<HTMLButtonElement>(null);
   const { t, locale, setLocale } = useI18n();
 
   // Close dropdown when clicking outside
@@ -28,24 +26,6 @@ export default function SettingsMenu({ onLogout }: SettingsMenuProps) {
     }
   }, [isOpen]);
 
-  // Calculate and adjust menu position to stay within viewport
-  useEffect(() => {
-    if (isOpen && buttonRef.current) {
-      const buttonRect = buttonRef.current.getBoundingClientRect();
-      const menuWidth = 224; // 56 * 4 (w-56 in Tailwind)
-      const viewportWidth = window.innerWidth;
-      const spaceOnRight = viewportWidth - buttonRect.right;
-      const spaceOnLeft = buttonRect.left;
-
-      // Check if there's enough space on the right
-      if (spaceOnRight < menuWidth && spaceOnLeft > spaceOnRight) {
-        setMenuPosition('left');
-      } else {
-        setMenuPosition('right');
-      }
-    }
-  }, [isOpen]);
-
   const handleLanguageChange = (newLocale: 'en' | 'ar') => {
     setLocale(newLocale);
     setIsOpen(false);
@@ -55,7 +35,6 @@ export default function SettingsMenu({ onLogout }: SettingsMenuProps) {
     <div className="relative z-50" ref={dropdownRef}>
       {/* Settings Button - Enhanced for light header */}
       <button
-        ref={buttonRef}
         onClick={() => setIsOpen(!isOpen)}
         className="flex items-center gap-2 px-3 sm:px-4 py-2 text-sm font-medium bg-white/20 text-white border border-white/30 rounded-lg hover:bg-white/30 focus:outline-none focus:ring-2 focus:ring-white/50 backdrop-blur-sm transition-all duration-300 hover:scale-105"
         aria-label={t.common.settings}
@@ -85,13 +64,12 @@ export default function SettingsMenu({ onLogout }: SettingsMenuProps) {
       {/* Dropdown Menu with Animation */}
       {isOpen && (
         <div 
-          className={`absolute z-[9999] mt-2 w-56 rounded-xl bg-white shadow-2xl ring-1 ring-black ring-opacity-5 focus:outline-none animate-scale-in ${
-            menuPosition === 'right' 
-              ? 'right-0 origin-top-right' 
-              : 'left-0 origin-top-left'
-          }`}
+          className="absolute z-[9999] mt-2 rounded-xl bg-white shadow-2xl ring-1 ring-black ring-opacity-5 focus:outline-none animate-scale-in"
           style={{
-            maxWidth: 'calc(100vw - 2rem)', // Ensure menu never exceeds viewport width minus padding
+            right: '0',
+            width: 'min(14rem, calc(100vw - 2rem))', // 14rem = w-56, but never wider than viewport minus padding
+            maxWidth: 'calc(100vw - 2rem)',
+            transformOrigin: 'top right',
           }}
         >
           <div className="py-1">
