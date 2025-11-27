@@ -45,3 +45,5 @@ The frontend automatically proxies `/api/*` requests to the backend.
 - If backend isn't starting, check for missing environment variables
 - Make sure PostgreSQL is running and accessible
 - Check console output for error messages
+
+
