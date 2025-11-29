@@ -101,12 +101,12 @@ export default function TeacherStudentsPage() {
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex flex-col gap-1">
-                      <Label className="text-sm text-gray-500">Name</Label>
+                      <Label className="text-sm text-gray-500">{t.teacher.name}</Label>
                       <div className="font-semibold text-gray-900 truncate">{s.firstName} {s.lastName}</div>
                     </div>
                     {s.subjects && s.subjects.length > 0 && (
                       <div className="mt-3 flex flex-col gap-1">
-                        <Label className="text-sm text-gray-500">Subjects</Label>
+                        <Label className="text-sm text-gray-500">{t.teacher.subjects}</Label>
                         <div className="flex flex-wrap gap-2">
                           {s.subjects.map((sub, i) => (
                             <span key={i} className="px-2 py-1 rounded-full bg-teal-50 text-teal-700 text-xs border border-teal-100">
@@ -118,7 +118,7 @@ export default function TeacherStudentsPage() {
                     )}
                     {s.classNames?.length > 0 && (
                       <div className="mt-3 flex flex-col gap-1">
-                        <Label className="text-sm text-gray-500">Classes</Label>
+                        <Label className="text-sm text-gray-500">{t.teacher.classes}</Label>
                         <div className="flex flex-wrap gap-2">
                           {s.classNames.map((cn, i) => (
                             <span key={i} className="px-2 py-1 rounded-full bg-gray-100 text-gray-700 text-xs border">

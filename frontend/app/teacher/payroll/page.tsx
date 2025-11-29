@@ -114,7 +114,7 @@ export default function TeacherPayrollPage() {
     }
   };
 
-  const monthNames = [
+  const monthNames = t.installments?.monthNames || [
     'January', 'February', 'March', 'April', 'May', 'June',
     'July', 'August', 'September', 'October', 'November', 'December'
   ];
@@ -154,7 +154,7 @@ export default function TeacherPayrollPage() {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
                 </svg>
               </button>
-              <h1 className="text-xl font-bold text-white">My Payroll</h1>
+              <h1 className="text-xl font-bold text-white">{t.teacher.myPayroll}</h1>
             </div>
             <SettingsMenu onLogout={() => router.push('/login')} />
           </div>
@@ -176,22 +176,22 @@ export default function TeacherPayrollPage() {
 
         {/* Salary Info Card */}
         <div className="bg-white rounded-lg shadow-md p-6 mb-6 border border-gray-200">
-          <h2 className="text-xl font-semibold mb-4">Salary Information</h2>
+          <h2 className="text-xl font-semibold mb-4">{t.teacher.salaryInformation}</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <span className="text-sm text-gray-600">Monthly Salary:</span>
+              <span className="text-sm text-gray-600">{t.teacher.monthlySalary}:</span>
               <p className="text-lg font-semibold">
                 {salary?.monthlySalary
                   ? `${Number(salary.monthlySalary).toFixed(2)} SYP`
-                  : 'Not set'}
+                  : t.teacher.notSet}
               </p>
             </div>
             <div>
-              <span className="text-sm text-gray-600">Hourly Wage:</span>
+              <span className="text-sm text-gray-600">{t.teacher.hourlyWage}:</span>
               <p className="text-lg font-semibold">
                 {salary?.hourlyWage
                   ? `${Number(salary.hourlyWage).toFixed(2)} SYP/hour`
-                  : 'Not set'}
+                  : t.teacher.notSet}
               </p>
             </div>
           </div>
@@ -215,8 +215,8 @@ export default function TeacherPayrollPage() {
                   </svg>
                 </div>
                 <div>
-                  <h3 className="font-semibold text-gray-900">Submit Hour Request</h3>
-                  <p className="text-sm text-gray-600">Submit your daily working hours</p>
+                  <h3 className="font-semibold text-gray-900">{t.teacher.submitHourRequest}</h3>
+                  <p className="text-sm text-gray-600">{t.teacher.submitDailyHours}</p>
                 </div>
               </div>
             </button>
@@ -232,8 +232,8 @@ export default function TeacherPayrollPage() {
                 </svg>
               </div>
               <div>
-                <h3 className="font-semibold text-gray-900">View Payroll Records</h3>
-                <p className="text-sm text-gray-600">View your monthly payroll history</p>
+                <h3 className="font-semibold text-gray-900">{t.teacher.viewPayrollRecords}</h3>
+                <p className="text-sm text-gray-600">{t.teacher.viewMonthlyHistory}</p>
               </div>
             </div>
           </button>
@@ -242,7 +242,7 @@ export default function TeacherPayrollPage() {
         {/* Hour Requests */}
         <div className="bg-white rounded-lg shadow-md p-6 border border-gray-200">
           <div className="flex justify-between items-center mb-4">
-            <h2 className="text-xl font-semibold">Hour Requests</h2>
+            <h2 className="text-xl font-semibold">{t.teacher.hourRequests}</h2>
             <button
               onClick={() => {
                 if (!salary?.hourlyWage) {
@@ -259,15 +259,15 @@ export default function TeacherPayrollPage() {
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
               </svg>
-              Submit Hour Request
+{t.teacher.submitHourRequest}
             </button>
           </div>
           {hourRequests.length === 0 ? (
             <div className="text-center py-8">
-              <p className="text-gray-600 mb-4">No hour requests submitted yet</p>
+              <p className="text-gray-600 mb-4">{t.teacher.noHourRequests}</p>
               {!salary?.hourlyWage && (
                 <p className="text-sm text-orange-600">
-                  Note: Hourly wage must be configured by admin before you can submit hour requests.
+                  {t.teacher.hourlyWageNote}
                 </p>
               )}
             </div>
@@ -285,12 +285,12 @@ export default function TeacherPayrollPage() {
                       </p>
                       <p className="text-sm text-gray-600">
                         {request.status === HourRequestStatus.MODIFIED && request.adminModifiedHours !== undefined
-                          ? `${Number(request.adminModifiedHours)}h ${request.adminModifiedMinutes || 0}m (Modified)`
+                          ? `${Number(request.adminModifiedHours)}h ${request.adminModifiedMinutes || 0}m (${t.teacher.modified})`
                           : `${Number(request.hours)}h ${request.minutes}m`}
                       </p>
                       {request.adminFeedback && (
                         <p className="text-sm text-gray-600 mt-1 italic">
-                          Feedback: {request.adminFeedback}
+                          {t.teacher.feedbackLabel}: {request.adminFeedback}
                         </p>
                       )}
                     </div>
@@ -311,7 +311,7 @@ export default function TeacherPayrollPage() {
           <div className="bg-white rounded-lg shadow-xl max-w-md w-full">
             <div className="p-6">
               <div className="flex justify-between items-center mb-4">
-                <h3 className="text-lg font-semibold">Submit Hour Request</h3>
+                <h3 className="text-lg font-semibold">{t.teacher.submitHourRequest}</h3>
                 <button
                   onClick={() => {
                     setShowSubmitModal(false);
@@ -331,7 +331,7 @@ export default function TeacherPayrollPage() {
               <div className="space-y-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Hours *
+                    {t.teacher.hours} *
                   </label>
                   <input
                     type="text"
@@ -346,11 +346,11 @@ export default function TeacherPayrollPage() {
                     placeholder="0"
                     required
                   />
-                  <p className="text-xs text-gray-500 mt-1">Enter whole number of hours (0-24)</p>
+                  <p className="text-xs text-gray-500 mt-1">{t.teacher.enterHours}</p>
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Minutes
+                    {t.teacher.minutes}
                   </label>
                   <input
                     type="text"
@@ -364,7 +364,7 @@ export default function TeacherPayrollPage() {
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
                     placeholder="0"
                   />
-                  <p className="text-xs text-gray-500 mt-1">Enter whole number of minutes (0-59)</p>
+                  <p className="text-xs text-gray-500 mt-1">{t.teacher.enterMinutes}</p>
                 </div>
               </div>
 
@@ -380,14 +380,14 @@ export default function TeacherPayrollPage() {
                   }}
                   className="flex-1 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
                 >
-                  Cancel
+                  {t.common.cancel}
                 </button>
                 <button
                   onClick={handleSubmitHourRequest}
                   disabled={submitting}
                   className="flex-1 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50"
                 >
-                  {submitting ? 'Submitting...' : 'Submit'}
+                  {submitting ? t.teacher.submitting : t.teacher.submit}
                 </button>
               </div>
             </div>
@@ -401,7 +401,7 @@ export default function TeacherPayrollPage() {
           <div className="bg-white rounded-lg shadow-xl max-w-3xl w-full max-h-[90vh] overflow-y-auto">
             <div className="p-6">
               <div className="flex justify-between items-center mb-4">
-                <h3 className="text-lg font-semibold">Payroll Records</h3>
+                <h3 className="text-lg font-semibold">{t.teacher.payrollRecords}</h3>
                 <button
                   onClick={() => setShowRecordsModal(false)}
                   className="text-gray-400 hover:text-gray-600"
@@ -419,7 +419,7 @@ export default function TeacherPayrollPage() {
               ) : (
                 <div className="space-y-4">
                   {payrollRecords.length === 0 ? (
-                    <p className="text-gray-600 text-center py-8">No payroll records found</p>
+                    <p className="text-gray-600 text-center py-8">{t.teacher.noPayrollRecords}</p>
                   ) : (
                     payrollRecords.map((record) => (
                       <div
@@ -436,13 +436,13 @@ export default function TeacherPayrollPage() {
                         </div>
                         <div className="grid grid-cols-3 gap-2 text-sm text-gray-600">
                           <div>
-                            <span className="font-medium">Monthly:</span> {Number(record.monthlySalary).toFixed(2)} SYP
+                            <span className="font-medium">{t.teacher.monthly}:</span> {Number(record.monthlySalary).toFixed(2)} SYP
                           </div>
                           <div>
-                            <span className="font-medium">Hours:</span> {Number(record.totalHours).toFixed(2)}h
+                            <span className="font-medium">{t.teacher.hours}:</span> {Number(record.totalHours).toFixed(2)}h
                           </div>
                           <div>
-                            <span className="font-medium">Hourly:</span> {Number(record.hourlyWage).toFixed(2)} SYP/hr
+                            <span className="font-medium">{t.teacher.hourly}:</span> {Number(record.hourlyWage).toFixed(2)} SYP/hr
                           </div>
                         </div>
                       </div>

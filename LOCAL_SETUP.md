@@ -47,3 +47,5 @@ The frontend automatically proxies `/api/*` requests to the backend.
 - Check console output for error messages
 
 
+
+

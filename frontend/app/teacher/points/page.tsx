@@ -482,15 +482,15 @@ export default function TeacherPointsPage() {
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex flex-col gap-1">
-                        <Label className="text-sm text-gray-500">Name</Label>
+                        <Label className="text-sm text-gray-500">{t.teacher.name}</Label>
                         <div className="font-semibold text-gray-900 truncate">{s.firstName} {s.lastName}</div>
                       </div>
                       <div className="mt-2 flex flex-col gap-1">
-                        <Label className="text-sm text-gray-500">Email</Label>
+                        <Label className="text-sm text-gray-500">{t.teacher.email}</Label>
                         <div className="text-gray-700 break-all">{s.email || '-'}</div>
                       </div>
                       <div className="mt-3">
-                        <Label className="text-xs text-gray-500 mb-2 block">Points by Subject</Label>
+                        <Label className="text-xs text-gray-500 mb-2 block">{t.teacher.pointsBySubject}</Label>
                         {studentSummaries[s.id]?.bySubject && studentSummaries[s.id].bySubject.length > 0 ? (
                           <div className="space-y-2">
                             {studentSummaries[s.id].bySubject.slice(0, 3).map((subj, idx) => (
@@ -502,22 +502,22 @@ export default function TeacherPointsPage() {
                             ))}
                             {studentSummaries[s.id].bySubject.length > 3 && (
                               <div className="text-xs text-gray-500 text-center pt-1">
-                                +{studentSummaries[s.id].bySubject.length - 3} more
+                                +{studentSummaries[s.id].bySubject.length - 3} {t.teacher.more}
                               </div>
                             )}
                           </div>
                         ) : (
-                          <div className="text-xs text-gray-400 italic py-2">No points yet</div>
+                          <div className="text-xs text-gray-400 italic py-2">{t.teacher.noPointsYet}</div>
                         )}
                         <div className="mt-2 pt-2 border-t flex gap-4">
                           <div className="flex-1">
-                            <Label className="text-xs text-gray-500">Daily Total</Label>
+                            <Label className="text-xs text-gray-500">{t.teacher.dailyTotal}</Label>
                             <div className="text-sm font-bold text-teal-600">
                               {studentSummaries[s.id]?.daily ?? 0}
                             </div>
                           </div>
                           <div className="flex-1">
-                            <Label className="text-xs text-gray-500">Total Points</Label>
+                            <Label className="text-xs text-gray-500">{t.teacher.totalPoints}</Label>
                             <div className="text-sm font-bold text-blue-600">
                               {studentSummaries[s.id]?.total ?? 0}
                             </div>
@@ -526,7 +526,7 @@ export default function TeacherPointsPage() {
                       </div>
                       <div className="mt-4 space-y-3">
                         <div>
-                          <Label className="text-sm text-gray-700">Subject *</Label>
+                          <Label className="text-sm text-gray-700">{t.teacher.subject} *</Label>
                           <select
                             onFocus={() => ensureStudentSubjects(s.id)}
                             value={subjectForStudent[s.id] || ''}
@@ -625,11 +625,11 @@ export default function TeacherPointsPage() {
             <Card className="p-5">
               <div className="flex flex-wrap gap-6">
                 <div>
-                  <Label className="text-sm text-gray-500">Daily</Label>
+                  <Label className="text-sm text-gray-500">{t.teacher.daily}</Label>
                   <div className="text-2xl font-bold text-gray-900">{summary.daily}</div>
                 </div>
                 <div>
-                  <Label className="text-sm text-gray-500">Total</Label>
+                  <Label className="text-sm text-gray-500">{t.teacher.total}</Label>
                   <div className="text-2xl font-bold text-gray-900">{summary.total}</div>
                 </div>
               </div>
@@ -638,8 +638,8 @@ export default function TeacherPointsPage() {
                   {summary.bySubject.map((b, i) => (
                     <div key={i} className="p-3 rounded-lg border bg-gray-50">
                       <div className="font-semibold text-gray-800 mb-1">{b.subjectName}</div>
-                      <div className="text-sm text-gray-600">Daily: {b.daily}</div>
-                      <div className="text-sm text-gray-600">Total: {b.total}</div>
+                      <div className="text-sm text-gray-600">{t.teacher.daily}: {b.daily}</div>
+                      <div className="text-sm text-gray-600">{t.teacher.total}: {b.total}</div>
                       {selectedStudentId && b.subjectId && (
                         <div className="mt-2 flex gap-2">
                           <Button 
