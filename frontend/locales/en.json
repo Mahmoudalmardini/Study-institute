@@ -135,6 +135,8 @@
     "studentsDesc": "View student list",
     "grades": "Points",
     "gradesDesc": "Manage student points",
+    "payroll": "Payroll",
+    "payrollDesc": "Submit hours and view payroll",
     "studentHomework": "Student Homework Submissions",
     "backToDashboard": "Back to Dashboard",
     "submittedBy": "Submitted by",

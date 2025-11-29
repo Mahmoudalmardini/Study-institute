@@ -135,6 +135,8 @@
     "studentsDesc": "عرض قائمة الطلاب",
     "grades": "النقاط",
     "gradesDesc": "إدارة نقاط الطلاب",
+    "payroll": "الرواتب",
+    "payrollDesc": "تقديم الساعات وعرض الرواتب",
     "studentHomework": "واجبات الطلاب المقدمة",
     "backToDashboard": "العودة إلى لوحة التحكم",
     "submittedBy": "قدمه",
