@@ -55,46 +55,16 @@ export default function UsersPage() {
   const fetchTimeoutRef = useRef<NodeJS.Timeout>();
   const isSubmittingRef = useRef(false);
 
-  useEffect(() => {
-    const token = localStorage.getItem('accessToken');
-    if (!token) {
-      router.push('/login');
-      return;
-    }
-    
-    // For page/limit changes, fetch immediately (no debounce)
-    // For roleFilter changes, debounce to prevent rapid-fire requests
-    if (fetchTimeoutRef.current) {
-      clearTimeout(fetchTimeoutRef.current);
-    }
-    
-    const shouldDebounce = roleFilter !== ''; // Only debounce filter changes
-    
-    if (shouldDebounce) {
-      fetchTimeoutRef.current = setTimeout(() => {
-        fetchUsers();
-      }, 300); // 300ms debounce for filter changes
-    } else {
-      // Fetch immediately for page/limit changes
-      fetchUsers();
-    }
-    
-    return () => {
-      if (fetchTimeoutRef.current) {
-        clearTimeout(fetchTimeoutRef.current);
-      }
-    };
-  }, [router, roleFilter, page, limit]);
-
-  const fetchUsers = async () => {
+  // Fetch users function - defined with useCallback to ensure it uses latest values
+  const fetchUsers = useCallback(async (currentPage: number, currentLimit: number, currentRoleFilter: string) => {
     try {
       setLoading(true);
       setError(''); // Clear previous errors
 
       // Use apiClient which handles the API URL and authentication automatically
-      const url = roleFilter 
-        ? `/users?role=${roleFilter}&page=${page}&limit=${limit}` 
-        : `/users?page=${page}&limit=${limit}`;
+      const url = currentRoleFilter 
+        ? `/users?role=${currentRoleFilter}&page=${currentPage}&limit=${currentLimit}` 
+        : `/users?page=${currentPage}&limit=${currentLimit}`;
       const usersData = await apiClient.get(url);
       
       // Handle paginated response format
@@ -124,9 +94,9 @@ export default function UsersPage() {
           // Rate limit hit - don't logout, show friendly message
           errorMessage = 'Too many requests. Please wait a moment before trying again.';
           setError(errorMessage);
-          // Retry after 2 seconds
+          // Retry after 2 seconds with current values
           setTimeout(() => {
-            fetchUsers();
+            fetchUsers(currentPage, currentLimit, currentRoleFilter);
           }, 2000);
           return;
         } else if (status === 401) {
@@ -154,7 +124,39 @@ export default function UsersPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [t.users.error, router]);
+
+  // Effect to fetch users when page, limit, or filter changes
+  useEffect(() => {
+    const token = localStorage.getItem('accessToken');
+    if (!token) {
+      router.push('/login');
+      return;
+    }
+    
+    // For page/limit changes, fetch immediately (no debounce)
+    // For roleFilter changes, debounce to prevent rapid-fire requests
+    if (fetchTimeoutRef.current) {
+      clearTimeout(fetchTimeoutRef.current);
+    }
+    
+    const shouldDebounce = roleFilter !== ''; // Only debounce filter changes
+    
+    if (shouldDebounce) {
+      fetchTimeoutRef.current = setTimeout(() => {
+        fetchUsers(page, limit, roleFilter);
+      }, 300); // 300ms debounce for filter changes
+    } else {
+      // Fetch immediately for page/limit changes
+      fetchUsers(page, limit, roleFilter);
+    }
+    
+    return () => {
+      if (fetchTimeoutRef.current) {
+        clearTimeout(fetchTimeoutRef.current);
+      }
+    };
+  }, [page, limit, roleFilter, router, fetchUsers]);
 
   const handleLogout = () => {
     const confirmLogout = window.confirm(t.messages.logoutConfirm);
@@ -243,7 +245,7 @@ export default function UsersPage() {
         setSuccess(t.users.userAdded);
       }
 
-      fetchUsers();
+      fetchUsers(page, limit, roleFilter);
       setTimeout(() => {
         closeModal();
         isSubmittingRef.current = false;
@@ -296,7 +298,7 @@ export default function UsersPage() {
     try {
       await apiClient.delete(`/users/${userId}`);
       setSuccess(t.users.userDeleted);
-      fetchUsers();
+      fetchUsers(page, limit, roleFilter);
       setTimeout(() => setSuccess(''), 3000);
     } catch (err: any) {
       console.error('Delete error:', err);

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useI18n } from '@/lib/i18n-context';
 import SettingsMenu from '@/components/SettingsMenu';
@@ -51,16 +51,8 @@ export default function StudentsPage() {
   const [loadingTeachers, setLoadingTeachers] = useState<Record<string, boolean>>({});
   const [saving, setSaving] = useState(false);
 
-  useEffect(() => {
-    const token = localStorage.getItem('accessToken');
-    if (!token) {
-      router.push('/login');
-      return;
-    }
-    fetchData();
-  }, [router, page, limit]);
-
-  const fetchData = async () => {
+  // Import useCallback
+  const fetchData = useCallback(async (currentPage: number, currentLimit: number) => {
     try {
       setLoading(true);
       const token = localStorage.getItem('accessToken');
@@ -72,8 +64,8 @@ export default function StudentsPage() {
 
       // Fetch paginated users with STUDENT role and student profiles
       const [usersRes, studentsRes, classesRes, subjectsRes] = await Promise.all([
-        apiClient.get(`/users?role=STUDENT&page=${page}&limit=${limit}`),
-        apiClient.get(`/students?page=${page}&limit=${limit}`),
+        apiClient.get(`/users?role=STUDENT&page=${currentPage}&limit=${currentLimit}`),
+        apiClient.get(`/students?page=${currentPage}&limit=${currentLimit}`),
         apiClient.get('/classes'),
         apiClient.get('/subjects'),
       ]);
@@ -160,7 +152,7 @@ export default function StudentsPage() {
           errorMessage = 'Too many requests. Please wait a moment...';
           setError(errorMessage);
           setTimeout(() => {
-            fetchData();
+            fetchData(currentPage, currentLimit);
           }, 2000);
           return;
         } else if (status === 401) {
@@ -175,7 +167,16 @@ export default function StudentsPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [router, t.students?.errorLoadingStudents]);
+
+  useEffect(() => {
+    const token = localStorage.getItem('accessToken');
+    if (!token) {
+      router.push('/login');
+      return;
+    }
+    fetchData(page, limit);
+  }, [router, page, limit, fetchData]);
 
 
   const openStudentModal = async (student: Student) => {
@@ -384,7 +385,7 @@ export default function StudentsPage() {
       }
       setTimeout(() => {
         setShowModal(false);
-        fetchData();
+        fetchData(page, limit);
       }, 1500);
       
     } catch (err: any) {
