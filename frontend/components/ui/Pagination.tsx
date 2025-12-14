@@ -8,8 +8,6 @@ interface PaginationProps {
   total: number;
   limit: number;
   onPageChange: (page: number) => void;
-  onLimitChange?: (limit: number) => void;
-  showLimitSelector?: boolean;
 }
 
 export default function Pagination({
@@ -18,8 +16,6 @@ export default function Pagination({
   total,
   limit,
   onPageChange,
-  onLimitChange,
-  showLimitSelector = false,
 }: PaginationProps) {
   const getPageNumbers = () => {
     const pages: (number | string)[] = [];
@@ -69,24 +65,6 @@ export default function Pagination({
       </div>
 
       <div className="flex items-center gap-2">
-        {showLimitSelector && onLimitChange && (
-          <div className="flex items-center gap-2 mr-4">
-            <label className="text-sm text-gray-600 dark:text-gray-400">
-              Per page:
-            </label>
-            <select
-              value={limit}
-              onChange={(e) => onLimitChange(Number(e.target.value))}
-              className="px-3 py-1 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-sm"
-            >
-              <option value={10}>10</option>
-              <option value={20}>20</option>
-              <option value={50}>50</option>
-              <option value={100}>100</option>
-            </select>
-          </div>
-        )}
-
         <Button
           variant="outline"
           size="sm"

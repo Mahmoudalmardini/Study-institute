@@ -47,7 +47,7 @@ export default function UsersPage() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [page, setPage] = useState(1);
-  const [limit, setLimit] = useState(20);
+  const [limit] = useState(15);
   const [total, setTotal] = useState(0);
   const [totalPages, setTotalPages] = useState(0);
   
@@ -134,7 +134,7 @@ export default function UsersPage() {
       return;
     }
     
-    // For page/limit changes, fetch immediately (no debounce)
+    // For page changes, fetch immediately (no debounce)
     // For roleFilter changes, debounce to prevent rapid-fire requests
     if (fetchTimeoutRef.current) {
       clearTimeout(fetchTimeoutRef.current);
@@ -147,7 +147,7 @@ export default function UsersPage() {
         fetchUsers(page, limit, roleFilter);
       }, 300); // 300ms debounce for filter changes
     } else {
-      // Fetch immediately for page/limit changes
+      // Fetch immediately for page changes
       fetchUsers(page, limit, roleFilter);
     }
     
@@ -156,7 +156,7 @@ export default function UsersPage() {
         clearTimeout(fetchTimeoutRef.current);
       }
     };
-  }, [page, limit, roleFilter, router, fetchUsers]);
+  }, [page, roleFilter, router, fetchUsers]);
 
   const handleLogout = () => {
     const confirmLogout = window.confirm(t.messages.logoutConfirm);
@@ -558,11 +558,6 @@ export default function UsersPage() {
                         setPage(newPage);
                         window.scrollTo({ top: 0, behavior: 'smooth' });
                       }}
-                      onLimitChange={(newLimit) => {
-                        setLimit(newLimit);
-                        setPage(1);
-                      }}
-                      showLimitSelector={true}
                     />
                   </div>
                 )}

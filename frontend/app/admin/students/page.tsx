@@ -37,7 +37,7 @@ export default function StudentsPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [error, setError] = useState('');
   const [page, setPage] = useState(1);
-  const [limit, setLimit] = useState(20);
+  const [limit] = useState(15);
   const [total, setTotal] = useState(0);
   const [totalPages, setTotalPages] = useState(0);
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
@@ -176,7 +176,7 @@ export default function StudentsPage() {
       return;
     }
     fetchData(page, limit);
-  }, [router, page, limit, fetchData]);
+  }, [router, page, fetchData]);
 
 
   const openStudentModal = async (student: Student) => {
@@ -767,11 +767,6 @@ export default function StudentsPage() {
                   setPage(newPage);
                   window.scrollTo({ top: 0, behavior: 'smooth' });
                 }}
-                onLimitChange={(newLimit) => {
-                  setLimit(newLimit);
-                  setPage(1);
-                }}
-                showLimitSelector={true}
               />
             )}
 

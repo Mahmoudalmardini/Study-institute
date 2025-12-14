@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useI18n } from '@/lib/i18n-context';
 import SettingsMenu from '@/components/SettingsMenu';
@@ -50,7 +50,7 @@ export default function SubjectsPage() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [page, setPage] = useState(1);
-  const [limit, setLimit] = useState(20);
+  const [limit] = useState(15);
   const [total, setTotal] = useState(0);
   const [totalPages, setTotalPages] = useState(0);
 
@@ -64,15 +64,15 @@ export default function SubjectsPage() {
     setUser({ name: 'Administrator', role: 'ADMIN' });
     setMounted(true);
     fetchData();
-  }, [router, page, limit]);
+  }, [router, page]);
 
-  const fetchData = async () => {
-    await fetchSubjects();
-  };
+  const fetchData = useCallback(async () => {
+    await fetchSubjects(page, limit);
+  }, [page, limit, fetchSubjects]);
 
-  const fetchSubjects = async () => {
+  const fetchSubjects = useCallback(async (currentPage: number, currentLimit: number) => {
     try {
-      const data = await apiClient.get(`/subjects?page=${page}&limit=${limit}`);
+      const data = await apiClient.get(`/subjects?page=${currentPage}&limit=${currentLimit}`);
       const subjectsData = data?.data || (Array.isArray(data) ? data : []);
       const meta = data?.meta || { total: subjectsData.length, totalPages: 1 };
       
@@ -94,7 +94,7 @@ export default function SubjectsPage() {
           errorMessage = 'Too many requests. Please wait a moment...';
           setError(errorMessage);
           setTimeout(() => {
-            fetchSubjects();
+            fetchSubjects(currentPage, currentLimit);
           }, 2000);
           return;
         } else if (status === 401) {
@@ -110,7 +110,7 @@ export default function SubjectsPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [router, t.subjects?.failedToLoad]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -450,11 +450,6 @@ export default function SubjectsPage() {
               setPage(newPage);
               window.scrollTo({ top: 0, behavior: 'smooth' });
             }}
-            onLimitChange={(newLimit) => {
-              setLimit(newLimit);
-              setPage(1);
-            }}
-            showLimitSelector={true}
           />
         )}
 

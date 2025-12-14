@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useI18n } from '@/lib/i18n-context';
 import SettingsMenu from '@/components/SettingsMenu';
@@ -60,7 +60,7 @@ export default function TeachersPage() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [page, setPage] = useState(1);
-  const [limit, setLimit] = useState(20);
+  const [limit] = useState(15);
   const [total, setTotal] = useState(0);
   const [totalPages, setTotalPages] = useState(0);
   const [selectedTeacher, setSelectedTeacher] = useState<Teacher | null>(null);
@@ -106,12 +106,12 @@ export default function TeachersPage() {
       router.push('/login');
       return;
     }
-    fetchTeachers();
+    fetchTeachers(page, limit);
     fetchSubjects();
     fetchClasses();
-  }, [router, page, limit]);
+  }, [router, page, fetchTeachers]);
 
-  const fetchTeachers = async () => {
+  const fetchTeachers = useCallback(async (currentPage: number, currentLimit: number) => {
     try {
       setLoading(true);
       const token = localStorage.getItem('accessToken');
@@ -121,7 +121,7 @@ export default function TeachersPage() {
         return [];
       }
 
-      const response = await apiClient.get(`/teachers?page=${page}&limit=${limit}`);
+      const response = await apiClient.get(`/teachers?page=${currentPage}&limit=${currentLimit}`);
       const teachersData = response?.data || (Array.isArray(response) ? response : []);
       const meta = response?.meta || { total: teachersData.length, totalPages: 1 };
       
@@ -144,7 +144,7 @@ export default function TeachersPage() {
           errorMessage = 'Too many requests. Please wait a moment...';
           setError(errorMessage);
           setTimeout(() => {
-            fetchTeachers();
+            fetchTeachers(currentPage, currentLimit);
           }, 2000);
           return [];
         } else if (status === 401) {
@@ -160,7 +160,7 @@ export default function TeachersPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [router]);
 
   const fetchSubjects = async () => {
     try {
@@ -1147,11 +1147,6 @@ export default function TeachersPage() {
                   setPage(newPage);
                   window.scrollTo({ top: 0, behavior: 'smooth' });
                 }}
-                onLimitChange={(newLimit) => {
-                  setLimit(newLimit);
-                  setPage(1);
-                }}
-                showLimitSelector={true}
               />
             )}
 

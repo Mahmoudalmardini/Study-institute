@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useI18n } from '@/lib/i18n-context';
 import SettingsMenu from '@/components/SettingsMenu';
@@ -60,7 +60,7 @@ export default function ClassesPage() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [page, setPage] = useState(1);
-  const [limit, setLimit] = useState(20);
+  const [limit] = useState(15);
   const [total, setTotal] = useState(0);
   const [totalPages, setTotalPages] = useState(0);
   const [showSubjectModal, setShowSubjectModal] = useState(false);
@@ -82,13 +82,13 @@ export default function ClassesPage() {
 
     setUser({ name: 'Administrator', role: 'ADMIN' });
     setMounted(true);
-    fetchClasses();
+    fetchClasses(page, limit);
     fetchTeachers();
-  }, [router, page, limit]);
+  }, [router, page, fetchClasses]);
 
-  const fetchClasses = async () => {
+  const fetchClasses = useCallback(async (currentPage: number, currentLimit: number) => {
     try {
-      const data = await apiClient.get(`/classes?page=${page}&limit=${limit}`);
+      const data = await apiClient.get(`/classes?page=${currentPage}&limit=${currentLimit}`);
       const classesData = data?.data || (Array.isArray(data) ? data : []);
       const meta = data?.meta || { total: classesData.length, totalPages: 1 };
       
@@ -110,7 +110,7 @@ export default function ClassesPage() {
           errorMessage = 'Too many requests. Please wait a moment...';
           setError(errorMessage);
           setTimeout(() => {
-            fetchClasses();
+            fetchClasses(currentPage, currentLimit);
           }, 2000);
           return;
         } else if (status === 401) {
@@ -126,7 +126,7 @@ export default function ClassesPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [router]);
 
   const fetchTeachers = async () => {
     try {
@@ -669,11 +669,6 @@ export default function ClassesPage() {
               setPage(newPage);
               window.scrollTo({ top: 0, behavior: 'smooth' });
             }}
-            onLimitChange={(newLimit) => {
-              setLimit(newLimit);
-              setPage(1);
-            }}
-            showLimitSelector={true}
           />
         )}
 

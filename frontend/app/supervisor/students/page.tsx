@@ -35,7 +35,7 @@ export default function SupervisorStudentsPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [error, setError] = useState('');
   const [page, setPage] = useState(1);
-  const [limit, setLimit] = useState(20);
+  const [limit] = useState(15);
   const [total, setTotal] = useState(0);
   const [totalPages, setTotalPages] = useState(0);
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
@@ -55,8 +55,8 @@ export default function SupervisorStudentsPage() {
       router.push('/login');
       return;
     }
-    fetchData();
-  }, [router, page, limit]);
+    fetchData(page, limit);
+  }, [router, page, fetchData]);
 
   const fetchData = async () => {
     try {
@@ -692,11 +692,6 @@ export default function SupervisorStudentsPage() {
                   setPage(newPage);
                   window.scrollTo({ top: 0, behavior: 'smooth' });
                 }}
-                onLimitChange={(newLimit) => {
-                  setLimit(newLimit);
-                  setPage(1);
-                }}
-                showLimitSelector={true}
               />
             )}
 
