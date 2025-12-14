@@ -658,8 +658,8 @@ export default function ClassesPage() {
         </div>
 
         {/* Empty State */}
-        {/* Pagination */}
-        {filteredClasses.length > 0 && (
+        {/* Pagination - Show based on totalPages, not filteredClasses */}
+        {totalPages > 0 && (
           <Pagination
             currentPage={page}
             totalPages={totalPages}

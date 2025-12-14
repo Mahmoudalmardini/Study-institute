@@ -681,8 +681,8 @@ export default function SupervisorStudentsPage() {
               ))}
             </div>
 
-            {/* Pagination */}
-            {filteredStudents.length > 0 && (
+            {/* Pagination - Show based on totalPages, not filteredStudents */}
+            {totalPages > 0 && (
               <Pagination
                 currentPage={page}
                 totalPages={totalPages}

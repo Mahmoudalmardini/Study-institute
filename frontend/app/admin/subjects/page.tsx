@@ -439,8 +439,8 @@ export default function SubjectsPage() {
           ))}
         </div>
 
-        {/* Pagination */}
-        {filteredSubjects.length > 0 && (
+        {/* Pagination - Show based on totalPages, not filteredSubjects */}
+        {totalPages > 0 && (
           <Pagination
             currentPage={page}
             totalPages={totalPages}

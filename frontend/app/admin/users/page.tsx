@@ -62,14 +62,22 @@ export default function UsersPage() {
       return;
     }
     
-    // Debounce fetchUsers to prevent rapid-fire requests
+    // For page/limit changes, fetch immediately (no debounce)
+    // For roleFilter changes, debounce to prevent rapid-fire requests
     if (fetchTimeoutRef.current) {
       clearTimeout(fetchTimeoutRef.current);
     }
     
-    fetchTimeoutRef.current = setTimeout(() => {
+    const shouldDebounce = roleFilter !== ''; // Only debounce filter changes
+    
+    if (shouldDebounce) {
+      fetchTimeoutRef.current = setTimeout(() => {
+        fetchUsers();
+      }, 300); // 300ms debounce for filter changes
+    } else {
+      // Fetch immediately for page/limit changes
       fetchUsers();
-    }, 300); // 300ms debounce
+    }
     
     return () => {
       if (fetchTimeoutRef.current) {
@@ -536,8 +544,8 @@ export default function UsersPage() {
                   ))}
                 </div>
 
-                {/* Pagination */}
-                {filteredUsers.length > 0 && (
+                {/* Pagination - Show based on totalPages, not filteredUsers */}
+                {totalPages > 0 && (
                   <div className="px-4 py-4 border-t">
                     <Pagination
                       currentPage={page}

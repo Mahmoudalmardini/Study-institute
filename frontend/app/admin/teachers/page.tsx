@@ -1136,8 +1136,8 @@ export default function TeachersPage() {
               ))}
             </div>
 
-            {/* Pagination */}
-            {filteredTeachers.length > 0 && (
+            {/* Pagination - Show based on totalPages, not filteredTeachers */}
+            {totalPages > 0 && (
               <Pagination
                 currentPage={page}
                 totalPages={totalPages}
