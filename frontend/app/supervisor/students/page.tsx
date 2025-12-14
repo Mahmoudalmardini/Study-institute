@@ -145,9 +145,31 @@ export default function SupervisorStudentsPage() {
       const subjectsData = await apiClient.get('/subjects');
       setAllSubjects(Array.isArray(subjectsData) ? subjectsData : ((subjectsData as any)?.data || []));
 
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error fetching data:', err);
-      setError('Error loading students');
+      
+      let errorMessage = 'Error loading students';
+      
+      if (err.response) {
+        const status = err.response.status;
+        
+        if (status === 429) {
+          // Rate limit hit - don't logout, retry after delay
+          errorMessage = 'Too many requests. Please wait a moment...';
+          setError(errorMessage);
+          setTimeout(() => {
+            fetchData();
+          }, 2000);
+          return;
+        } else if (status === 401) {
+          localStorage.removeItem('accessToken');
+          localStorage.removeItem('refreshToken');
+          router.push('/login');
+          return;
+        }
+      }
+      
+      setError(errorMessage);
     } finally {
       setLoading(false);
     }

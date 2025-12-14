@@ -97,10 +97,32 @@ export default function ClassesPage() {
         setTotal(meta.total || 0);
         setTotalPages(meta.totalPages || 1);
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error fetching classes:', error);
+      
+      let errorMessage = 'Failed to load classes';
+      
+      if (error.response) {
+        const status = error.response.status;
+        
+        if (status === 429) {
+          // Rate limit hit - don't logout, retry after delay
+          errorMessage = 'Too many requests. Please wait a moment...';
+          setError(errorMessage);
+          setTimeout(() => {
+            fetchClasses();
+          }, 2000);
+          return;
+        } else if (status === 401) {
+          localStorage.removeItem('accessToken');
+          localStorage.removeItem('refreshToken');
+          router.push('/login');
+          return;
+        }
+      }
+      
       setClasses([]);
-      setError('Failed to load classes');
+      setError(errorMessage);
     } finally {
       setLoading(false);
     }

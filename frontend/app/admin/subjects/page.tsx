@@ -81,10 +81,32 @@ export default function SubjectsPage() {
         setTotal(meta.total || 0);
         setTotalPages(meta.totalPages || 1);
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error fetching subjects:', error);
+      
+      let errorMessage = t.subjects?.failedToLoad || 'Failed to load subjects';
+      
+      if (error.response) {
+        const status = error.response.status;
+        
+        if (status === 429) {
+          // Rate limit hit - don't logout, retry after delay
+          errorMessage = 'Too many requests. Please wait a moment...';
+          setError(errorMessage);
+          setTimeout(() => {
+            fetchSubjects();
+          }, 2000);
+          return;
+        } else if (status === 401) {
+          localStorage.removeItem('accessToken');
+          localStorage.removeItem('refreshToken');
+          router.push('/login');
+          return;
+        }
+      }
+      
       setSubjects([]);
-      setError(t.subjects?.failedToLoad || 'Failed to load subjects');
+      setError(errorMessage);
     } finally {
       setLoading(false);
     }

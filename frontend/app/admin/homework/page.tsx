@@ -95,12 +95,27 @@ export default function AdminHomeworkReviewPage() {
       }
     } catch (err: any) {
       console.error('Error fetching pending submissions:', err);
-      if (err.response?.status === 401) {
-        localStorage.clear();
-        router.push('/login');
-        return;
+      
+      let errorMessage = err.response?.data?.message || err.message || t.homeworkReview.failedToLoad;
+      
+      if (err.response) {
+        const status = err.response.status;
+        
+        if (status === 429) {
+          // Rate limit hit - don't logout, retry after delay
+          errorMessage = 'Too many requests. Please wait a moment...';
+          setError(errorMessage);
+          setTimeout(() => {
+            fetchPendingSubmissions();
+          }, 2000);
+          return;
+        } else if (status === 401) {
+          localStorage.clear();
+          router.push('/login');
+          return;
+        }
       }
-      const errorMessage = err.response?.data?.message || err.message || t.homeworkReview.failedToLoad;
+      
       setError(errorMessage);
       setSubmissions([]);
     } finally {

@@ -149,13 +149,29 @@ export default function StudentsPage() {
 
     } catch (err: any) {
       console.error('Error fetching data:', err);
-      if (err.response?.status === 401) {
-        localStorage.removeItem('accessToken');
-        localStorage.removeItem('refreshToken');
-        router.push('/login');
-        return;
+      
+      let errorMessage = t.students?.errorLoadingStudents || 'Error loading students';
+      
+      if (err.response) {
+        const status = err.response.status;
+        
+        if (status === 429) {
+          // Rate limit hit - don't logout, retry after delay
+          errorMessage = 'Too many requests. Please wait a moment...';
+          setError(errorMessage);
+          setTimeout(() => {
+            fetchData();
+          }, 2000);
+          return;
+        } else if (status === 401) {
+          localStorage.removeItem('accessToken');
+          localStorage.removeItem('refreshToken');
+          router.push('/login');
+          return;
+        }
       }
-      setError(t.students?.errorLoadingStudents || 'Error loading students');
+      
+      setError(errorMessage);
     } finally {
       setLoading(false);
     }

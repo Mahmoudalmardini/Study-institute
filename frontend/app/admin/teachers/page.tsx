@@ -131,9 +131,31 @@ export default function TeachersPage() {
         setTotalPages(meta.totalPages || 1);
       }
       return Array.isArray(teachersData) ? teachersData : [];
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error fetching teachers:', err);
-      setError('Error loading teachers');
+      
+      let errorMessage = 'Error loading teachers';
+      
+      if (err.response) {
+        const status = err.response.status;
+        
+        if (status === 429) {
+          // Rate limit hit - don't logout, retry after delay
+          errorMessage = 'Too many requests. Please wait a moment...';
+          setError(errorMessage);
+          setTimeout(() => {
+            fetchTeachers();
+          }, 2000);
+          return [];
+        } else if (status === 401) {
+          localStorage.removeItem('accessToken');
+          localStorage.removeItem('refreshToken');
+          router.push('/login');
+          return [];
+        }
+      }
+      
+      setError(errorMessage);
       return [];
     } finally {
       setLoading(false);
