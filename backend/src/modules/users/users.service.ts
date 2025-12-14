@@ -2,6 +2,7 @@ import {
   Injectable,
   NotFoundException,
   ConflictException,
+  Logger,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateUserDto, UpdateUserDto } from './dto';
@@ -10,46 +11,69 @@ import { PaginationResponse } from '../../common/interfaces/pagination-response.
 
 @Injectable()
 export class UsersService {
+  private readonly logger = new Logger(UsersService.name);
+  
   constructor(private prisma: PrismaService) {}
 
   async create(dto: CreateUserDto) {
+    // Check if user exists before starting transaction
     const existingUser = await this.prisma.user.findUnique({
       where: { email: dto.email },
     });
 
     if (existingUser) {
+      this.logger.warn(`User creation failed: Email ${dto.email} already exists`);
       throw new ConflictException('User with this email already exists');
     }
 
     const hashedPassword = await bcrypt.hash(dto.password, 10);
 
-    const user = await this.prisma.user.create({
-      data: {
-        ...dto,
-        password: hashedPassword,
-      },
-    });
+    try {
+      // Wrap in transaction to ensure atomicity
+      // If Student/Teacher creation fails, User creation will be rolled back
+      const user = await this.prisma.$transaction(async (tx) => {
+        const createdUser = await tx.user.create({
+          data: {
+            ...dto,
+            password: hashedPassword,
+          },
+        });
 
-    // Create Teacher or Student record based on role
-    if (dto.role === 'TEACHER') {
-      await this.prisma.teacher.create({
-        data: {
-          userId: user.id,
-          hireDate: new Date(),
-        },
+        this.logger.log(`User created successfully: ${createdUser.email} (ID: ${createdUser.id}, Role: ${createdUser.role})`);
+
+        // Create Teacher or Student record based on role
+        // These must succeed or the entire transaction rolls back
+        if (dto.role === 'TEACHER') {
+          await tx.teacher.create({
+            data: {
+              userId: createdUser.id,
+              hireDate: new Date(),
+            },
+          });
+          this.logger.log(`Teacher record created for user: ${createdUser.email}`);
+        } else if (dto.role === 'STUDENT') {
+          await tx.student.create({
+            data: {
+              userId: createdUser.id,
+              enrollmentDate: new Date(),
+            },
+          });
+          this.logger.log(`Student record created for user: ${createdUser.email}`);
+        }
+
+        return createdUser;
       });
-    } else if (dto.role === 'STUDENT') {
-      await this.prisma.student.create({
-        data: {
-          userId: user.id,
-          enrollmentDate: new Date(),
-        },
-      });
+
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const { password, ...userWithoutPassword } = user;
+      return userWithoutPassword;
+    } catch (error) {
+      this.logger.error(
+        `Failed to create user ${dto.email}: ${error.message}`,
+        error.stack,
+      );
+      throw error;
     }
-
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const { password, ...userWithoutPassword } = user;
-    return userWithoutPassword;
   }
 
   async findAll(
@@ -160,6 +184,7 @@ export class UsersService {
     });
 
     if (!existingUser) {
+      this.logger.warn(`User update failed: User ${id} not found`);
       throw new NotFoundException('User not found');
     }
 
@@ -169,6 +194,7 @@ export class UsersService {
       });
 
       if (emailExists) {
+        this.logger.warn(`User update failed: Email ${dto.email} already in use`);
         throw new ConflictException('Email already in use');
       }
     }
@@ -179,31 +205,48 @@ export class UsersService {
       updateData.password = await bcrypt.hash(dto.password, 10);
     }
 
-    const user = await this.prisma.user.update({
-      where: { id },
-      data: updateData,
-    });
+    try {
+      // Wrap in transaction to ensure role changes are atomic
+      const user = await this.prisma.$transaction(async (tx) => {
+        const updatedUser = await tx.user.update({
+          where: { id },
+          data: updateData,
+        });
 
-    // Handle role changes - create Teacher/Student records if needed
-    if (dto.role === 'TEACHER' && !existingUser.teacher) {
-      await this.prisma.teacher.create({
-        data: {
-          userId: user.id,
-          hireDate: new Date(),
-        },
+        this.logger.log(`User updated successfully: ${updatedUser.email} (ID: ${updatedUser.id})`);
+
+        // Handle role changes - create Teacher/Student records if needed
+        if (dto.role === 'TEACHER' && !existingUser.teacher) {
+          await tx.teacher.create({
+            data: {
+              userId: updatedUser.id,
+              hireDate: new Date(),
+            },
+          });
+          this.logger.log(`Teacher record created for user: ${updatedUser.email}`);
+        } else if (dto.role === 'STUDENT' && !existingUser.student) {
+          await tx.student.create({
+            data: {
+              userId: updatedUser.id,
+              enrollmentDate: new Date(),
+            },
+          });
+          this.logger.log(`Student record created for user: ${updatedUser.email}`);
+        }
+
+        return updatedUser;
       });
-    } else if (dto.role === 'STUDENT' && !existingUser.student) {
-      await this.prisma.student.create({
-        data: {
-          userId: user.id,
-          enrollmentDate: new Date(),
-        },
-      });
+
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const { password, ...userWithoutPassword } = user;
+      return userWithoutPassword;
+    } catch (error) {
+      this.logger.error(
+        `Failed to update user ${id}: ${error.message}`,
+        error.stack,
+      );
+      throw error;
     }
-
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const { password, ...userWithoutPassword } = user;
-    return userWithoutPassword;
   }
 
   async remove(id: string) {
@@ -212,14 +255,24 @@ export class UsersService {
     });
 
     if (!user) {
+      this.logger.warn(`User deletion failed: User ${id} not found`);
       throw new NotFoundException('User not found');
     }
 
-    await this.prisma.user.delete({
-      where: { id },
-    });
+    try {
+      await this.prisma.user.delete({
+        where: { id },
+      });
 
-    return { message: 'User deleted successfully' };
+      this.logger.log(`User deleted successfully: ${user.email} (ID: ${id})`);
+      return { message: 'User deleted successfully' };
+    } catch (error) {
+      this.logger.error(
+        `Failed to delete user ${id}: ${error.message}`,
+        error.stack,
+      );
+      throw error;
+    }
   }
 
   async getProfile(userId: string) {

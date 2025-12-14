@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useI18n } from '@/lib/i18n-context';
 import SettingsMenu from '@/components/SettingsMenu';
@@ -50,6 +50,10 @@ export default function UsersPage() {
   const [limit, setLimit] = useState(20);
   const [total, setTotal] = useState(0);
   const [totalPages, setTotalPages] = useState(0);
+  
+  // Debounce and request management
+  const fetchTimeoutRef = useRef<NodeJS.Timeout>();
+  const isSubmittingRef = useRef(false);
 
   useEffect(() => {
     const token = localStorage.getItem('accessToken');
@@ -57,7 +61,21 @@ export default function UsersPage() {
       router.push('/login');
       return;
     }
-    fetchUsers();
+    
+    // Debounce fetchUsers to prevent rapid-fire requests
+    if (fetchTimeoutRef.current) {
+      clearTimeout(fetchTimeoutRef.current);
+    }
+    
+    fetchTimeoutRef.current = setTimeout(() => {
+      fetchUsers();
+    }, 300); // 300ms debounce
+    
+    return () => {
+      if (fetchTimeoutRef.current) {
+        clearTimeout(fetchTimeoutRef.current);
+      }
+    };
   }, [router, roleFilter, page, limit]);
 
   const fetchUsers = async () => {
@@ -94,7 +112,16 @@ export default function UsersPage() {
         errorMessage = errorData?.message || errorData?.error || errorMessage;
         
         // Handle specific error codes
-        if (status === 401) {
+        if (status === 429) {
+          // Rate limit hit - don't logout, show friendly message
+          errorMessage = 'Too many requests. Please wait a moment before trying again.';
+          setError(errorMessage);
+          // Retry after 2 seconds
+          setTimeout(() => {
+            fetchUsers();
+          }, 2000);
+          return;
+        } else if (status === 401) {
           errorMessage = 'Unauthorized. Please login again.';
           setTimeout(() => {
             localStorage.removeItem('accessToken');
@@ -167,6 +194,13 @@ export default function UsersPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Prevent double-submission
+    if (isSubmittingRef.current) {
+      return;
+    }
+    
+    isSubmittingRef.current = true;
     setError('');
     setSuccess('');
 
@@ -204,6 +238,7 @@ export default function UsersPage() {
       fetchUsers();
       setTimeout(() => {
         closeModal();
+        isSubmittingRef.current = false;
       }, 1500);
     } catch (err: any) {
       console.error('Submit error:', err);
@@ -216,7 +251,17 @@ export default function UsersPage() {
         
         errorMessage = errorData?.message || errorData?.error || errorMessage;
         
-        if (status === 401) {
+        if (status === 429) {
+          // Rate limit hit - don't logout, show friendly message
+          errorMessage = 'Too many requests. Please wait a moment before trying again.';
+          setError(errorMessage);
+          isSubmittingRef.current = false;
+          // Retry after 3 seconds
+          setTimeout(() => {
+            handleSubmit(e);
+          }, 3000);
+          return;
+        } else if (status === 401) {
           errorMessage = 'Unauthorized. Please login again.';
           setTimeout(() => {
             router.push('/login');
@@ -231,6 +276,7 @@ export default function UsersPage() {
       }
       
       setError(errorMessage);
+      isSubmittingRef.current = false;
     }
   };
 
@@ -255,7 +301,16 @@ export default function UsersPage() {
         
         errorMessage = errorData?.message || errorData?.error || errorMessage;
         
-        if (status === 401) {
+        if (status === 429) {
+          // Rate limit hit - don't logout, show friendly message
+          errorMessage = 'Too many requests. Please wait a moment before trying again.';
+          setError(errorMessage);
+          // Retry after 2 seconds
+          setTimeout(() => {
+            handleDelete(userId);
+          }, 2000);
+          return;
+        } else if (status === 401) {
           errorMessage = 'Unauthorized. Please login again.';
           setTimeout(() => {
             router.push('/login');

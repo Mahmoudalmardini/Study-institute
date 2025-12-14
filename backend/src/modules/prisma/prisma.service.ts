@@ -13,9 +13,12 @@ export class PrismaService
     // Add connection pool parameters if not already present
     let connectionUrl = databaseUrl || process.env.DATABASE_URL || '';
     
+    // Optimize for Railway deployment
     if (connectionUrl && !connectionUrl.includes('connection_limit')) {
       const separator = connectionUrl.includes('?') ? '&' : '?';
-      connectionUrl = `${connectionUrl}${separator}connection_limit=20&pool_timeout=20`;
+      // Increase connection limit for Railway from 20 to 30
+      // Add pool_timeout to handle connection exhaustion gracefully
+      connectionUrl = `${connectionUrl}${separator}connection_limit=30&pool_timeout=30&connect_timeout=10`;
     }
     
     super({
@@ -24,6 +27,19 @@ export class PrismaService
           url: connectionUrl,
         },
       },
+      log: [
+        { level: 'warn', emit: 'event' },
+        { level: 'error', emit: 'event' },
+      ],
+    });
+
+    // Log database errors for debugging
+    this.$on('error' as never, (e: any) => {
+      console.error('Prisma Client Error:', e);
+    });
+
+    this.$on('warn' as never, (e: any) => {
+      console.warn('Prisma Client Warning:', e);
     });
   }
 
