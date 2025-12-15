@@ -54,22 +54,6 @@ export default function SubjectsPage() {
   const [total, setTotal] = useState(0);
   const [totalPages, setTotalPages] = useState(0);
 
-  useEffect(() => {
-    const token = localStorage.getItem('accessToken');
-    if (!token) {
-      router.push('/login');
-      return;
-    }
-
-    setUser({ name: 'Administrator', role: 'ADMIN' });
-    setMounted(true);
-    fetchData();
-  }, [router, page]);
-
-  const fetchData = useCallback(async () => {
-    await fetchSubjects(page, limit);
-  }, [page, limit, fetchSubjects]);
-
   const fetchSubjects = useCallback(async (currentPage: number, currentLimit: number) => {
     try {
       const data = await apiClient.get(`/subjects?page=${currentPage}&limit=${currentLimit}`);
@@ -111,6 +95,22 @@ export default function SubjectsPage() {
       setLoading(false);
     }
   }, [router, t.subjects?.failedToLoad]);
+
+  const fetchData = useCallback(async () => {
+    await fetchSubjects(page, limit);
+  }, [page, limit, fetchSubjects]);
+
+  useEffect(() => {
+    const token = localStorage.getItem('accessToken');
+    if (!token) {
+      router.push('/login');
+      return;
+    }
+
+    setUser({ name: 'Administrator', role: 'ADMIN' });
+    setMounted(true);
+    fetchData();
+  }, [router, page, fetchData]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
