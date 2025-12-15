@@ -58,13 +58,21 @@ export default function SubjectsPage() {
     try {
       const data = await apiClient.get(`/subjects?page=${currentPage}&limit=${currentLimit}`);
       const subjectsData = data?.data || (Array.isArray(data) ? data : []);
-      const meta = data?.meta || { total: subjectsData.length, totalPages: 1 };
+      const meta = data?.meta || {};
+
+      const totalCount =
+        typeof meta.total === 'number' ? meta.total : subjectsData.length;
+
+      const totalPagesCount =
+        typeof meta.totalPages === 'number' && meta.totalPages > 0
+          ? meta.totalPages
+          : totalCount > 0
+            ? Math.ceil(totalCount / currentLimit)
+            : 0;
       
       setSubjects(Array.isArray(subjectsData) ? subjectsData : []);
-      if (meta) {
-        setTotal(meta.total || 0);
-        setTotalPages(meta.totalPages || 1);
-      }
+      setTotal(totalCount);
+      setTotalPages(totalPagesCount);
     } catch (error: any) {
       console.error('Error fetching subjects:', error);
       

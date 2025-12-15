@@ -69,13 +69,21 @@ export default function UsersPage() {
       
       // Handle paginated response format
       const users = usersData?.data || (Array.isArray(usersData) ? usersData : []);
-      const meta = usersData?.meta || { total: users.length, totalPages: 1 };
+      const meta = usersData?.meta || {};
+
+      const totalCount =
+        typeof meta.total === 'number' ? meta.total : users.length;
+
+      const totalPagesCount =
+        typeof meta.totalPages === 'number' && meta.totalPages > 0
+          ? meta.totalPages
+          : totalCount > 0
+            ? Math.ceil(totalCount / currentLimit)
+            : 0;
       
       setUsers(Array.isArray(users) ? users : []);
-      if (meta) {
-        setTotal(meta.total || 0);
-        setTotalPages(meta.totalPages || 1);
-      }
+      setTotal(totalCount);
+      setTotalPages(totalPagesCount);
       setError(''); // Clear any previous errors on success
     } catch (err: any) {
       console.error('Error fetching users:', err);
