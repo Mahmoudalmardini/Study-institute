@@ -75,7 +75,21 @@ apiClient.interceptors.request.use(
 // Response interceptor to handle token refresh
 apiClient.interceptors.response.use(
   (response) => {
-    // Return the data directly
+    // If it's a paginated response (has data AND meta), return the whole body
+    if (response.data && response.data.data && response.data.meta) {
+      const data = response.data;
+      // Clear inflight cache logic (duplicated below but needed here to return early)
+      try {
+        const key = buildKey(response.config);
+        inflight.delete(key);
+        if ((response.config.method || 'get').toLowerCase() === 'get') {
+          cache.set(key, { expires: Date.now() + GET_CACHE_TTL_MS, data });
+        }
+      } catch {}
+      return data;
+    }
+
+    // Return the data directly for non-paginated responses
     const data = response.data?.data || response.data;
     // Clear inflight cache for this response
     try {

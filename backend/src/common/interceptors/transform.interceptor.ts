@@ -31,11 +31,7 @@ export class TransformInterceptor<T>
           'meta' in data &&
           Array.isArray(data.data) &&
           data.meta &&
-          typeof data.meta === 'object' &&
-          'page' in data.meta &&
-          'limit' in data.meta &&
-          'total' in data.meta &&
-          'totalPages' in data.meta
+          typeof data.meta === 'object'
         ) {
           // Return pagination response as-is without wrapping
           return {
