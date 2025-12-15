@@ -30,7 +30,12 @@ export default function LoginPage() {
     setLoading(true);
 
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || (typeof window !== 'undefined' ? `${window.location.origin}/api` : 'http://localhost:3001/api');
+      const apiUrl =
+        process.env.NEXT_PUBLIC_API_URL ||
+        (typeof window !== 'undefined'
+          ? `${window.location.origin}/api`
+          : 'http://localhost:3001/api');
+
       const response = await fetch(`${apiUrl}/auth/login`, {
         method: 'POST',
         headers: {
@@ -42,10 +47,27 @@ export default function LoginPage() {
         }),
       });
 
-      const data = await response.json();
+      // Safely parse JSON, but fall back to plain text for non-JSON errors
+      const rawText = await response.text();
+      let data: any = null;
+      try {
+        data = rawText ? JSON.parse(rawText) : null;
+      } catch {
+        // Ignore JSON parse error; we'll use rawText below
+      }
 
       if (!response.ok) {
-        throw new Error(data.message || 'Login failed');
+        const message =
+          data?.message ||
+          (typeof data === 'string' ? data : '') ||
+          rawText ||
+          'Login failed';
+        throw new Error(message);
+      }
+
+      // If we reach here, we expect a valid JSON structure
+      if (!data || !data.data) {
+        throw new Error('Unexpected response from server. Please try again.');
       }
 
       // Store tokens and user data
