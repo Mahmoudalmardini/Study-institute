@@ -72,19 +72,7 @@ export default function ClassesPage() {
   const [editingInstallmentSubjectId, setEditingInstallmentSubjectId] = useState<string | null>(null);
   const [editingInstallmentValue, setEditingInstallmentValue] = useState<string>('');
 
-  useEffect(() => {
-    const token = localStorage.getItem('accessToken');
-    if (!token) {
-      router.push('/login');
-      return;
-    }
-
-    setUser({ name: 'Administrator', role: 'ADMIN' });
-    setMounted(true);
-    fetchClasses(page, limit);
-    fetchTeachers();
-  }, [router, page, fetchClasses]);
-
+  // Define fetchClasses BEFORE useEffect to avoid TDZ error
   const fetchClasses = useCallback(async (currentPage: number, currentLimit: number) => {
     try {
       const data = await apiClient.get(`/classes?page=${currentPage}&limit=${currentLimit}`);
@@ -126,6 +114,19 @@ export default function ClassesPage() {
       setLoading(false);
     }
   }, [router]);
+
+  useEffect(() => {
+    const token = localStorage.getItem('accessToken');
+    if (!token) {
+      router.push('/login');
+      return;
+    }
+
+    setUser({ name: 'Administrator', role: 'ADMIN' });
+    setMounted(true);
+    fetchClasses(page, limit);
+    fetchTeachers();
+  }, [router, page, fetchClasses]);
 
   const fetchTeachers = async () => {
     try {
