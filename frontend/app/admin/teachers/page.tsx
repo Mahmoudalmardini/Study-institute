@@ -100,18 +100,11 @@ export default function TeachersPage() {
   const getClassId = (subject: Subject) =>
     resolveSubjectClass(subject)?.id || null;
 
-  useEffect(() => {
-    const token = localStorage.getItem('accessToken');
-    if (!token) {
-      router.push('/login');
-      return;
-    }
-    fetchTeachers(page, limit);
-    fetchSubjects();
-    fetchClasses();
-  }, [router, page, fetchTeachers]);
-
-  const fetchTeachers = useCallback(async (currentPage: number, currentLimit: number) => {
+  // Define fetchTeachers BEFORE useEffect to avoid TDZ error
+  const fetchTeachers = useCallback(async (currentPage?: number, currentLimit?: number) => {
+    const pg = currentPage || page;
+    const lmt = currentLimit || limit;
+    
     try {
       setLoading(true);
       const token = localStorage.getItem('accessToken');
@@ -121,7 +114,7 @@ export default function TeachersPage() {
         return [];
       }
 
-      const response = await apiClient.get(`/teachers?page=${currentPage}&limit=${currentLimit}`);
+      const response = await apiClient.get(`/teachers?page=${pg}&limit=${lmt}`);
       const teachersData = response?.data || (Array.isArray(response) ? response : []);
       const meta = response?.meta || { total: teachersData.length, totalPages: 1 };
       
@@ -144,7 +137,7 @@ export default function TeachersPage() {
           errorMessage = 'Too many requests. Please wait a moment...';
           setError(errorMessage);
           setTimeout(() => {
-            fetchTeachers(currentPage, currentLimit);
+            fetchTeachers(pg, lmt);
           }, 2000);
           return [];
         } else if (status === 401) {
@@ -160,7 +153,18 @@ export default function TeachersPage() {
     } finally {
       setLoading(false);
     }
-  }, [router]);
+  }, [router, page, limit]);
+
+  useEffect(() => {
+    const token = localStorage.getItem('accessToken');
+    if (!token) {
+      router.push('/login');
+      return;
+    }
+    fetchTeachers();
+    fetchSubjects();
+    fetchClasses();
+  }, [router, page, fetchTeachers]);
 
   const fetchSubjects = async () => {
     try {
