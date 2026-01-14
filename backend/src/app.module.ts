@@ -28,6 +28,7 @@ import { PointsModule } from './modules/points/points.module';
 import { PayrollModule } from './modules/payroll/payroll.module';
 import { InstallmentsModule } from './modules/installments/installments.module';
 import { FilesModule } from './modules/files/files.module';
+import { HealthModule } from './health/health.module';
 
 @Module({
   imports: [
@@ -82,6 +83,7 @@ import { FilesModule } from './modules/files/files.module';
     PayrollModule,
     InstallmentsModule,
     FilesModule,
+    HealthModule,
   ],
   controllers: [AppController],
   providers: [
