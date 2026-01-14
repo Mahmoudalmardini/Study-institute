@@ -1,3 +1,4 @@
-2026-01-14-force-rebuild
+2026-01-14-force-rebuild-v3
 This file forces Railway to invalidate build cache and rebuild with new webpack config.
+Update: Using named IDs, no runtime chunk, aggressive code splitting.
 
