@@ -12,8 +12,9 @@ WORKDIR /app/backend
 COPY backend/package*.json ./
 COPY backend/prisma ./prisma/
 
-# Install dependencies
-RUN npm ci --legacy-peer-deps --omit=dev
+# Install ALL dependencies (including devDependencies needed for build)
+# @nestjs/cli is a devDependency and is required for 'npm run build'
+RUN npm ci --legacy-peer-deps
 
 # Copy backend source
 COPY backend/ ./
@@ -21,16 +22,20 @@ COPY backend/ ./
 # Generate Prisma Client
 RUN npx prisma generate
 
-# Build backend
+# Build backend (requires @nestjs/cli from devDependencies)
 RUN npm run build
+
+# Remove development dependencies after build to reduce image size
+# This keeps only production dependencies in node_modules
+RUN npm prune --production
 
 # ============================================================================
 # Stage 2: Build Frontend with Standalone Output
 # ============================================================================
 FROM node:20-alpine AS frontend-build
 
-# CACHE BUST: Force rebuild - 2026-01-15-standalone
-ARG CACHEBUST=2026-01-15-standalone-v2
+# CACHE BUST: Force rebuild - 2026-01-15-standalone-v2
+ARG CACHEBUST=2026-01-15-standalone-v3
 RUN echo "Cache bust: $CACHEBUST"
 
 WORKDIR /app/frontend
@@ -39,6 +44,7 @@ WORKDIR /app/frontend
 COPY frontend/package*.json ./
 
 # Install ALL dependencies (including devDependencies for build)
+# Next.js build requires devDependencies like TypeScript, ESLint, etc.
 RUN npm ci
 
 # Copy frontend source
