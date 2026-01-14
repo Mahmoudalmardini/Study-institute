@@ -10,46 +10,29 @@ const nextConfig: NextConfig = {
     ignoreBuildErrors: true,
   },
   
+  // Prevent circular dependency issues
+  experimental: {
+    // Optimize tree-shaking and imports
+    optimizePackageImports: ['lucide-react'],
+  },
+  
   // Configure webpack to prevent circular dependency errors
-  webpack: (config, { isServer, dev }) => {
-    // Only modify client-side production builds
-    if (!isServer && !dev) {
-      // Use simpler, more reliable optimization
-      config.optimization = {
-        ...config.optimization,
-        // Use deterministic module IDs (consistent across builds)
-        moduleIds: 'deterministic',
-        // Single runtime chunk to avoid cross-chunk dependencies
-        runtimeChunk: {
-          name: 'runtime',
-        },
-        // Simplified code splitting
-        splitChunks: {
-          chunks: 'all',
-          cacheGroups: {
-            default: false,
-            vendors: false,
-            // All vendor code in one chunk
-            vendor: {
-              test: /[\\/]node_modules[\\/]/,
-              name: 'vendor',
-              chunks: 'all',
-              priority: 20,
-            },
-            // Common code shared between pages
-            common: {
-              name: 'common',
-              minChunks: 2,
-              chunks: 'all',
-              priority: 10,
-              reuseExistingChunk: true,
-            },
-          },
-        },
-      };
+  webpack: (config, { isServer }) => {
+    // Only modify client-side builds
+    if (!isServer) {
+      // Completely disable module concatenation to prevent TDZ errors
+      config.optimization.concatenateModules = false;
+      
+      // Use simple, deterministic module IDs
+      config.optimization.moduleIds = 'deterministic';
+      
+      // Use single runtime chunk
+      config.optimization.runtimeChunk = 'single';
     }
+    
     return config;
   },
+  
   // Rewrite API requests and file uploads to backend (for Railway deployment)
   async rewrites() {
     // Backend uses fixed internal port 3001 (strictly enforced)
