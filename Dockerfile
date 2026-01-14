@@ -29,6 +29,10 @@ RUN npm run build
 # ============================================================================
 FROM node:20-alpine AS frontend-build
 
+# CACHE BUST: Force rebuild - 2026-01-15-standalone
+ARG CACHEBUST=2026-01-15-standalone-v2
+RUN echo "Cache bust: $CACHEBUST"
+
 WORKDIR /app/frontend
 
 # Copy frontend package files
@@ -74,9 +78,9 @@ COPY --from=backend-build --chown=appuser:nodejs /app/backend/prisma ./backend/p
 # Copy Frontend Files (Standalone Output)
 # ============================================================================
 # Copy standalone server (optimized, includes only necessary code)
-COPY --from=frontend-build --chown=appuser:nodejs /app/frontend/.next/standalone ./frontend
+COPY --from=frontend-build --chown=appuser:nodejs /app/frontend/.next/standalone ./frontend/
 
-# Copy static files
+# Copy static files to the correct location within standalone
 COPY --from=frontend-build --chown=appuser:nodejs /app/frontend/.next/static ./frontend/.next/static
 COPY --from=frontend-build --chown=appuser:nodejs /app/frontend/public ./frontend/public
 
