@@ -27,33 +27,31 @@ const nextConfig: NextConfig = {
   // ============================================================================
   webpack: (config, { isServer }) => {
     if (!isServer) {
-      // Disable module concatenation (scope hoisting) to prevent TDZ errors
+      // CRITICAL: Disable module concatenation to prevent TDZ errors
       config.optimization.concatenateModules = false;
       
-      // Use deterministic module IDs for consistent builds
-      config.optimization.moduleIds = 'deterministic';
+      // Use named module IDs for better debugging
+      config.optimization.moduleIds = 'named';
       
-      // Simple code splitting strategy
+      // Disable minimize temporarily to debug issues
+      config.optimization.minimize = false;
+      
+      // Very simple code splitting - one chunk per type
       config.optimization.splitChunks = {
         chunks: 'all',
         cacheGroups: {
           default: false,
-          vendors: false,
-          // Framework bundle
-          framework: {
-            name: 'framework',
-            test: /[\\/]node_modules[\\/](react|react-dom|scheduler)[\\/]/,
-            priority: 40,
-            enforce: true,
-          },
-          // Libraries bundle
-          lib: {
+          vendors: {
             test: /[\\/]node_modules[\\/]/,
-            name: 'lib',
-            priority: 30,
+            name: 'vendors',
+            chunks: 'all',
+            priority: 10,
           },
         },
       };
+      
+      // Remove runtime chunk to avoid cross-chunk initialization issues
+      config.optimization.runtimeChunk = false;
     }
     
     return config;
