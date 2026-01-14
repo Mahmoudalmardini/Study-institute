@@ -1,9 +1,6 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  // Use Terser for minification instead of SWC (more reliable for circular dependencies)
-  swcMinify: false,
-  
   // Skip ESLint during build (for production deployment)
   eslint: {
     ignoreDuringBuilds: true,
@@ -13,83 +10,42 @@ const nextConfig: NextConfig = {
     ignoreBuildErrors: true,
   },
   
-  // Optimize production build to prevent circular dependency errors
-  experimental: {
-    optimizePackageImports: ['@/components', '@/lib'],
-    // Use loose mode for ESM externals
-    esmExternals: 'loose',
-  },
-  
-  // Optimize imports to prevent circular dependencies
-  modularizeImports: {
-    '@/components': {
-      transform: '@/components/{{member}}',
-    },
-    '@/lib': {
-      transform: '@/lib/{{member}}',
-    },
-  },
-  
-  // Configure webpack to better handle circular dependencies
+  // Configure webpack to prevent circular dependency errors
   webpack: (config, { isServer, dev }) => {
-    // Fix for "Cannot access before initialization" errors in production
+    // Only modify client-side production builds
     if (!isServer && !dev) {
-      // Use named modules for better debugging
+      // Use simpler, more reliable optimization
       config.optimization = {
         ...config.optimization,
-        moduleIds: 'named',
-        // Don't use runtime chunk to avoid cross-chunk dependencies
-        runtimeChunk: false,
+        // Use deterministic module IDs (consistent across builds)
+        moduleIds: 'deterministic',
+        // Single runtime chunk to avoid cross-chunk dependencies
+        runtimeChunk: {
+          name: 'runtime',
+        },
+        // Simplified code splitting
         splitChunks: {
           chunks: 'all',
-          maxInitialRequests: 25,
-          minSize: 20000,
           cacheGroups: {
             default: false,
             vendors: false,
-            // Framework chunk (React, Next.js)
-            framework: {
-              name: 'framework',
+            // All vendor code in one chunk
+            vendor: {
+              test: /[\\/]node_modules[\\/]/,
+              name: 'vendor',
               chunks: 'all',
-              test: /[\\/]node_modules[\\/](react|react-dom|scheduler|next)[\\/]/,
-              priority: 40,
-              enforce: true,
-            },
-            // Vendor chunk for other node_modules
-            lib: {
-              test(module: any) {
-                return (
-                  module.size() > 160000 &&
-                  /node_modules[/\\]/.test(module.identifier())
-                );
-              },
-              name(module: any) {
-                const hash = require('crypto')
-                  .createHash('sha1')
-                  .update(module.identifier())
-                  .digest('hex')
-                  .substring(0, 8);
-                return `lib-${hash}`;
-              },
-              priority: 30,
-              minChunks: 1,
-              reuseExistingChunk: true,
-            },
-            commons: {
-              name: 'commons',
-              minChunks: 2,
               priority: 20,
             },
-            shared: {
-              name: false,
-              priority: 10,
+            // Common code shared between pages
+            common: {
+              name: 'common',
               minChunks: 2,
+              chunks: 'all',
+              priority: 10,
               reuseExistingChunk: true,
             },
           },
         },
-        // Ensure consistent module concatenation
-        concatenateModules: true,
       };
     }
     return config;
