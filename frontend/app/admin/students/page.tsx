@@ -142,9 +142,15 @@ export default function StudentsPage() {
     } catch (err: any) {
       console.error('Error fetching data:', err);
       
-      let errorMessage = t.students?.errorLoadingStudents || 'Error loading students';
+      let errorMessage = 'Error loading students';
+      try {
+        errorMessage = t.students?.errorLoadingStudents || 'Error loading students';
+      } catch (e) {
+        // Fallback if translation fails
+        errorMessage = 'Error loading students';
+      }
       
-      if (err.response) {
+      if (err?.response) {
         const status = err.response.status;
         
         if (status === 429) {
@@ -160,14 +166,18 @@ export default function StudentsPage() {
           localStorage.removeItem('refreshToken');
           router.push('/login');
           return;
+        } else if (err.response?.data?.message) {
+          errorMessage = err.response.data.message;
         }
+      } else if (err?.message) {
+        errorMessage = err.message;
       }
       
       setError(errorMessage);
     } finally {
       setLoading(false);
     }
-  }, [router, t.students?.errorLoadingStudents]);
+  }, [router, t]);
 
   useEffect(() => {
     const token = localStorage.getItem('accessToken');

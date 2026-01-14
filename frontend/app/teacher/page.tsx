@@ -17,30 +17,42 @@ export default function TeacherDashboard() {
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
-    const token = localStorage.getItem('accessToken');
-    if (!token) {
-      router.push('/login');
-      return;
-    }
+    try {
+      const token = localStorage.getItem('accessToken');
+      if (!token) {
+        router.push('/login');
+        return;
+      }
 
-    setUser({ name: 'Teacher', role: 'TEACHER' });
-    setMounted(true);
+      setUser({ name: 'Teacher', role: 'TEACHER' });
+      setMounted(true);
+    } catch (error) {
+      console.error('Error in teacher dashboard useEffect:', error);
+      router.push('/login');
+    }
   }, [router]);
 
   const handleLogout = () => {
-    const confirmLogout = window.confirm(t.messages.logoutConfirm);
-    if (confirmLogout) {
+    try {
+      const confirmLogout = window.confirm(t?.messages?.logoutConfirm || 'Are you sure you want to logout?');
+      if (confirmLogout) {
+        localStorage.removeItem('accessToken');
+        localStorage.removeItem('refreshToken');
+        router.push('/login');
+      }
+    } catch (error) {
+      console.error('Error in logout:', error);
       localStorage.removeItem('accessToken');
       localStorage.removeItem('refreshToken');
       router.push('/login');
     }
   };
 
-  if (!user) {
+  if (!user || !t) {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen gradient-bg">
         <LoadingSpinner size="lg" />
-        <p className="mt-4 text-gray-600">{t.common.loading}</p>
+        <p className="mt-4 text-gray-600">{t?.common?.loading || 'Loading...'}</p>
       </div>
     );
   }
@@ -58,13 +70,13 @@ export default function TeacherDashboard() {
                 </svg>
               </div>
               <h1 className="text-lg sm:text-xl font-bold text-white truncate">
-                <span className="hidden sm:inline">{t.common.appName} - </span>
-                {t.teacher.title}
+                <span className="hidden sm:inline">{t?.common?.appName || 'Study Institute'} - </span>
+                {t?.teacher?.title || 'Teacher Dashboard'}
               </h1>
             </div>
             <div className="flex items-center gap-2 sm:gap-4 flex-shrink-0">
               <span className="hidden md:inline text-sm text-white/90 font-medium">
-                {t.teacher.welcome}, {user.name}
+                {t?.teacher?.welcome || 'Welcome'}, {user.name}
               </span>
               <SettingsMenu onLogout={handleLogout} />
             </div>
@@ -83,10 +95,10 @@ export default function TeacherDashboard() {
             </div>
             <div className="flex-1">
               <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2">
-                {t.teacher.welcomeBack}, {user.name}! 📚
+                {t?.teacher?.welcomeBack || 'Welcome back'}, {user.name}! 📚
               </h2>
               <p className="text-gray-600 text-base sm:text-lg">
-                {t.teacher.dashboardGreeting}
+                {t?.teacher?.dashboardGreeting || 'Inspiring minds and shaping futures'}
               </p>
             </div>
           </div>
@@ -106,8 +118,8 @@ export default function TeacherDashboard() {
                       <path d="M9 4.804A7.968 7.968 0 005.5 4c-1.255 0-2.443.29-3.5.804v10A7.969 7.969 0 015.5 14c1.669 0 3.218.51 4.5 1.385A7.962 7.962 0 0114.5 14c1.255 0 2.443.29 3.5.804v-10A7.968 7.968 0 0014.5 4c-1.255 0-2.443.29-3.5.804V12a1 1 0 11-2 0V4.804z" />
                     </svg>
                   </div>
-                  <h3 className="text-xl font-bold text-gray-900 mb-2">{t.teacher.homework}</h3>
-                  <p className="text-sm text-gray-600">{t.teacher.homeworkDesc}</p>
+                  <h3 className="text-xl font-bold text-gray-900 mb-2">{t?.teacher?.homework || 'Homework'}</h3>
+                  <p className="text-sm text-gray-600">{t?.teacher?.homeworkDesc || 'Create and grade homework'}</p>
                 </div>
                 <svg className="w-6 h-6 text-orange-500 flex-shrink-0 ms-2 rtl:rotate-180 group-hover:translate-x-1 rtl:group-hover:-translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
@@ -127,8 +139,8 @@ export default function TeacherDashboard() {
                       <path d="M9 6a3 3 0 11-6 0 3 3 0 016 0zM17 6a3 3 0 11-6 0 3 3 0 016 0zM12.93 17c.046-.327.07-.66.07-1a6.97 6.97 0 00-1.5-4.33A5 5 0 0119 16v1h-6.07zM6 11a5 5 0 015 5v1H1v-1a5 5 0 015-5z" />
                     </svg>
                   </div>
-                  <h3 className="text-xl font-bold text-gray-900 mb-2">{t.teacher.students}</h3>
-                  <p className="text-sm text-gray-600">{t.teacher.studentsDesc}</p>
+                  <h3 className="text-xl font-bold text-gray-900 mb-2">{t?.teacher?.students || 'Students'}</h3>
+                  <p className="text-sm text-gray-600">{t?.teacher?.studentsDesc || 'View student list'}</p>
                 </div>
                 <svg className="w-6 h-6 text-emerald-500 flex-shrink-0 ms-2 rtl:rotate-180 group-hover:translate-x-1 rtl:group-hover:-translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
@@ -148,8 +160,8 @@ export default function TeacherDashboard() {
                       <path d="M2 11a1 1 0 011-1h2a1 1 0 011 1v5a1 1 0 01-1 1H3a1 1 0 01-1-1v-5zM8 7a1 1 0 011-1h2a1 1 0 011 1v9a1 1 0 01-1 1H9a1 1 0 01-1-1V7zM14 4a1 1 0 011-1h2a1 1 0 011 1v12a1 1 0 01-1 1h-2a1 1 0 01-1-1V4z" />
                     </svg>
                   </div>
-                  <h3 className="text-xl font-bold text-gray-900 mb-2">{t.teacher.grades}</h3>
-                  <p className="text-sm text-gray-600">{t.teacher.gradesDesc}</p>
+                  <h3 className="text-xl font-bold text-gray-900 mb-2">{t?.teacher?.grades || 'Points'}</h3>
+                  <p className="text-sm text-gray-600">{t?.teacher?.gradesDesc || 'Manage student points'}</p>
                 </div>
                 <svg className="w-6 h-6 text-blue-500 flex-shrink-0 ms-2 rtl:rotate-180 group-hover:translate-x-1 rtl:group-hover:-translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
@@ -170,8 +182,8 @@ export default function TeacherDashboard() {
                       <path fillRule="evenodd" d="M18 9H2v5a2 2 0 002 2h12a2 2 0 002-2V9zM4 13a1 1 0 011-1h1a1 1 0 110 2H5a1 1 0 01-1-1zm5-1a1 1 0 100 2h1a1 1 0 100-2H9z" clipRule="evenodd" />
                     </svg>
                   </div>
-                  <h3 className="text-xl font-bold text-gray-900 mb-2">{t.teacher.payroll}</h3>
-                  <p className="text-sm text-gray-600">{t.teacher.payrollDesc}</p>
+                  <h3 className="text-xl font-bold text-gray-900 mb-2">{t?.teacher?.payroll || 'Payroll'}</h3>
+                  <p className="text-sm text-gray-600">{t?.teacher?.payrollDesc || 'Submit hours and view payroll'}</p>
                 </div>
                 <svg className="w-6 h-6 text-yellow-500 flex-shrink-0 ms-2 rtl:rotate-180 group-hover:translate-x-1 rtl:group-hover:-translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
