@@ -8,6 +8,9 @@ import {
   Delete,
   Query,
   UseGuards,
+  Logger,
+  HttpException,
+  HttpStatus,
 } from '@nestjs/common';
 import { PayrollService } from './payroll.service';
 import {
@@ -26,13 +29,27 @@ import { Role, HourRequestStatus } from '@prisma/client';
 @Controller('payroll')
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class PayrollController {
+  private readonly logger = new Logger(PayrollController.name);
+
   constructor(private readonly payrollService: PayrollService) {}
 
   // Admin: Get all teachers with salaries
   @Get('salaries')
   @Roles(Role.ADMIN, Role.SUPERVISOR)
-  getAllSalaries(@Query('search') search?: string) {
-    return this.payrollService.getAllSalaries(search);
+  async getAllSalaries(@Query('search') search?: string) {
+    try {
+      return await this.payrollService.getAllSalaries(search);
+    } catch (error: any) {
+      this.logger.error('Error in getAllSalaries:', error.stack || error.message);
+      throw new HttpException(
+        {
+          statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
+          message: error.message || 'Failed to fetch salaries',
+          error: 'Internal Server Error',
+        },
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
   }
 
   // Admin: Create salary for a teacher
@@ -103,8 +120,20 @@ export class PayrollController {
   // Admin: Get all pending hour requests
   @Get('hour-requests/pending')
   @Roles(Role.ADMIN)
-  getPendingHourRequests() {
-    return this.payrollService.getPendingHourRequests();
+  async getPendingHourRequests() {
+    try {
+      return await this.payrollService.getPendingHourRequests();
+    } catch (error: any) {
+      this.logger.error('Error in getPendingHourRequests:', error.stack || error.message);
+      throw new HttpException(
+        {
+          statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
+          message: error.message || 'Failed to fetch pending hour requests',
+          error: 'Internal Server Error',
+        },
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
   }
 
   // Admin: Review hour request (approve/reject/modify)
