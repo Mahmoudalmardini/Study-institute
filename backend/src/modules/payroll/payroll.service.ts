@@ -60,6 +60,18 @@ export class PayrollService {
   // Get all teachers with their current salaries (Admin/Supervisor)
   async getAllSalaries(search?: string) {
     try {
+      // First check if payroll tables exist by trying a simple query
+      try {
+        await this.prisma.$queryRaw`SELECT 1 FROM teacher_salaries LIMIT 1`;
+      } catch (tableError: any) {
+        if (tableError.message?.includes('does not exist') || tableError.message?.includes('relation') || tableError.code === '42P01') {
+          throw new BadRequestException(
+            'Payroll tables do not exist. Please run database migrations: npx prisma migrate deploy',
+          );
+        }
+        // If it's a different error, continue - might just be empty table
+      }
+
       const teachers = await this.prisma.teacher.findMany({
         where: search
           ? {
@@ -349,6 +361,17 @@ export class PayrollService {
   // Get all pending hour requests (Admin)
   async getPendingHourRequests() {
     try {
+      // First check if payroll tables exist
+      try {
+        await this.prisma.$queryRaw`SELECT 1 FROM hour_requests LIMIT 1`;
+      } catch (tableError: any) {
+        if (tableError.message?.includes('does not exist') || tableError.message?.includes('relation') || tableError.code === '42P01') {
+          throw new BadRequestException(
+            'Payroll tables do not exist. Please run database migrations: npx prisma migrate deploy',
+          );
+        }
+      }
+
       const requests = await this.prisma.hourRequest.findMany({
         where: {
           status: HourRequestStatus.PENDING,
