@@ -46,16 +46,7 @@ export default function PayrollPage() {
   const [payrollRecords, setPayrollRecords] = useState<MonthlyPayrollRecord[]>([]);
   const [loadingRecords, setLoadingRecords] = useState(false);
 
-  useEffect(() => {
-    const token = localStorage.getItem('accessToken');
-    if (!token) {
-      router.push('/login');
-      return;
-    }
-    fetchTeachers();
-    fetchPendingRequests();
-  }, [router]);
-
+  // Define fetch functions BEFORE useEffect to avoid TDZ error
   const fetchTeachers = async () => {
     try {
       setLoading(true);
@@ -80,6 +71,16 @@ export default function PayrollPage() {
       console.error('Error fetching pending requests:', err);
     }
   };
+
+  useEffect(() => {
+    const token = localStorage.getItem('accessToken');
+    if (!token) {
+      router.push('/login');
+      return;
+    }
+    fetchTeachers();
+    fetchPendingRequests();
+  }, [router]);
 
   const handleAddSalary = (teacher: TeacherWithSalary) => {
     setSelectedTeacher(teacher);
