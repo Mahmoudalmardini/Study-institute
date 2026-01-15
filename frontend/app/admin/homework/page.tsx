@@ -63,18 +63,7 @@ export default function AdminHomeworkReviewPage() {
     }
   };
 
-  useEffect(() => {
-    const token = localStorage.getItem('accessToken');
-    if (!token) {
-      router.push('/login');
-      return;
-    }
-
-    setUser({ name: 'Admin', role: 'ADMIN' });
-    fetchPendingSubmissions();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [router]);
-
+  // Define fetchPendingSubmissions BEFORE useEffect to avoid TDZ error
   const fetchPendingSubmissions = async () => {
     setLoading(true);
     setError('');
