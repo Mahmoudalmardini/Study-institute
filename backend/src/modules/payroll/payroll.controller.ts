@@ -33,6 +33,25 @@ export class PayrollController {
 
   constructor(private readonly payrollService: PayrollService) {}
 
+  // Health check endpoint - Check if payroll tables exist
+  @Get('health')
+  @Roles(Role.ADMIN, Role.SUPERVISOR)
+  async checkPayrollHealth() {
+    try {
+      return await this.payrollService.checkPayrollTables();
+    } catch (error: any) {
+      this.logger.error('Error in checkPayrollHealth:', error.stack || error.message);
+      throw new HttpException(
+        {
+          statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
+          message: error.message || 'Failed to check payroll health',
+          error: 'Internal Server Error',
+        },
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
   // Admin: Get all teachers with salaries
   @Get('salaries')
   @Roles(Role.ADMIN, Role.SUPERVISOR)
