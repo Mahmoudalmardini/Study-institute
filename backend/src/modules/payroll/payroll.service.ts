@@ -59,58 +59,71 @@ export class PayrollService {
 
   // Get all teachers with their current salaries (Admin/Supervisor)
   async getAllSalaries(search?: string) {
-    const teachers = await this.prisma.teacher.findMany({
-      where: search
-        ? {
-            user: {
-              OR: [
-                { firstName: { contains: search, mode: 'insensitive' } },
-                { lastName: { contains: search, mode: 'insensitive' } },
-                { email: { contains: search, mode: 'insensitive' } },
-              ],
+    try {
+      const teachers = await this.prisma.teacher.findMany({
+        where: search
+          ? {
+              user: {
+                OR: [
+                  { firstName: { contains: search, mode: 'insensitive' } },
+                  { lastName: { contains: search, mode: 'insensitive' } },
+                  { email: { contains: search, mode: 'insensitive' } },
+                ],
+              },
+            }
+          : undefined,
+        include: {
+          user: {
+            select: {
+              id: true,
+              email: true,
+              firstName: true,
+              lastName: true,
             },
-          }
-        : undefined,
-      include: {
-        user: {
-          select: {
-            id: true,
-            email: true,
-            firstName: true,
-            lastName: true,
           },
         },
-      },
-    });
+      });
 
-    const teachersWithSalaries = await Promise.all(
-      teachers.map(async (teacher) => {
-        // Get the most recent salary (regardless of effective date) for display
-        // This shows all salaries including ones that will be effective in the future
-        const salary = await this.prisma.teacherSalary.findFirst({
-          where: {
-            teacherId: teacher.id,
-          },
-          orderBy: {
-            effectiveFrom: 'desc',
-          },
-        });
+      const teachersWithSalaries = await Promise.all(
+        teachers.map(async (teacher) => {
+          try {
+            // Get the most recent salary (regardless of effective date) for display
+            // This shows all salaries including ones that will be effective in the future
+            const salary = await this.prisma.teacherSalary.findFirst({
+              where: {
+                teacherId: teacher.id,
+              },
+              orderBy: {
+                effectiveFrom: 'desc',
+              },
+            });
 
-        return {
-          ...teacher,
-          currentSalary: salary
-            ? {
-                id: salary.id,
-                monthlySalary: salary.monthlySalary,
-                hourlyWage: salary.hourlyWage,
-                effectiveFrom: salary.effectiveFrom,
-              }
-            : null,
-        };
-      }),
-    );
+            return {
+              ...teacher,
+              currentSalary: salary
+                ? {
+                    id: salary.id,
+                    monthlySalary: salary.monthlySalary,
+                    hourlyWage: salary.hourlyWage,
+                    effectiveFrom: salary.effectiveFrom,
+                  }
+                : null,
+            };
+          } catch (error) {
+            console.error(`Error fetching salary for teacher ${teacher.id}:`, error);
+            return {
+              ...teacher,
+              currentSalary: null,
+            };
+          }
+        }),
+      );
 
-    return teachersWithSalaries;
+      return teachersWithSalaries;
+    } catch (error) {
+      console.error('Error in getAllSalaries:', error);
+      throw error;
+    }
   }
 
   // Create salary for a teacher (Admin)
@@ -335,30 +348,35 @@ export class PayrollService {
 
   // Get all pending hour requests (Admin)
   async getPendingHourRequests() {
-    const requests = await this.prisma.hourRequest.findMany({
-      where: {
-        status: HourRequestStatus.PENDING,
-      },
-      orderBy: {
-        createdAt: 'desc',
-      },
-      include: {
-        teacher: {
-          include: {
-            user: {
-              select: {
-                id: true,
-                email: true,
-                firstName: true,
-                lastName: true,
+    try {
+      const requests = await this.prisma.hourRequest.findMany({
+        where: {
+          status: HourRequestStatus.PENDING,
+        },
+        orderBy: {
+          createdAt: 'desc',
+        },
+        include: {
+          teacher: {
+            include: {
+              user: {
+                select: {
+                  id: true,
+                  email: true,
+                  firstName: true,
+                  lastName: true,
+                },
               },
             },
           },
         },
-      },
-    });
+      });
 
-    return requests;
+      return requests;
+    } catch (error) {
+      console.error('Error in getPendingHourRequests:', error);
+      throw error;
+    }
   }
 
   // Review hour request (Admin)
