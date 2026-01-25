@@ -18,11 +18,18 @@ import { Role } from '@prisma/client';
 import { CreateDiscountDto } from './dto/create-discount.dto';
 import { CreatePaymentDto } from './dto/create-payment.dto';
 import { CalculateInstallmentDto } from './dto/calculate-installment.dto';
+import { GetInstallmentsFilterDto } from './dto/get-installments-filter.dto';
 
 @Controller('installments')
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class InstallmentsController {
   constructor(private readonly installmentsService: InstallmentsService) {}
+
+  @Get('overview')
+  @Roles(Role.ADMIN, Role.SUPERVISOR)
+  getInstallmentsOverview(@Query() filters: GetInstallmentsFilterDto) {
+    return this.installmentsService.findAll(filters);
+  }
 
   @Get('student/:studentId')
   @Roles(Role.ADMIN, Role.SUPERVISOR)

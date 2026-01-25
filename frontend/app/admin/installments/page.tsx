@@ -13,6 +13,7 @@ import apiClient, {
   recordPayment,
   createDiscount,
   cancelDiscount,
+  getInstallmentsOverview,
 } from '@/lib/api-client';
 import type { StudentInstallment, StudentDiscount } from '@/types';
 
@@ -94,6 +95,8 @@ export default function InstallmentsPage() {
   const [selectedStudentTotalOutstanding, setSelectedStudentTotalOutstanding] = useState<number>(0);
   const [page, setPage] = useState(1);
   const [limit] = useState(15);
+  const [totalItems, setTotalItems] = useState(0);
+  const [totalPages, setTotalPages] = useState(0);
 
   const isAmountDiscount = discountForm.type === 'AMOUNT';
   const parsedDiscountAmount = parseFloat(discountForm.amount || 'NaN');
@@ -147,30 +150,24 @@ export default function InstallmentsPage() {
   const fetchData = async () => {
     try {
       setLoading(true);
-      const [usersRes, studentsRes] = await Promise.all([
-        apiClient.get('/users?role=STUDENT'),
-        apiClient.get('/students'),
-      ]);
+      
+      const response = await getInstallmentsOverview({
+        page,
+        limit,
+        search: searchTerm,
+        status: filterStatus,
+        month: filterMonth === '' ? undefined : Number(filterMonth),
+        year: filterYear,
+      });
 
-      const users = Array.isArray(usersRes) ? usersRes : (usersRes as any)?.data || [];
-      const studentProfiles = Array.isArray(studentsRes) ? studentsRes : (studentsRes as any)?.data || [];
-
-      const studentsWithProfiles = users
-        .filter((user: any) => user.role === 'STUDENT')
-        .map((user: any) => {
-          const profile = studentProfiles.find((sp: any) => sp.userId === user.id);
-          return {
-            id: user.id,
-            email: user.email,
-            firstName: user.firstName,
-            lastName: user.lastName,
-            studentProfile: profile,
-          };
-        });
+      const { data: studentsData, meta } = response as any;
+      
+      setTotalItems(meta.total);
+      setTotalPages(meta.totalPages);
 
       // Fetch installments and subjects for each student
       const studentsWithInstallments = await Promise.all(
-        studentsWithProfiles.map(async (student: Student) => {
+        studentsData.map(async (student: StudentWithInstallments) => {
           if (!student.studentProfile?.id) return student;
 
           try {
@@ -187,7 +184,6 @@ export default function InstallmentsPage() {
             try {
               const studentSubjects = await apiClient.get(`/students/${student.studentProfile.id}/subjects`);
               subjects = Array.isArray(studentSubjects) ? studentSubjects : [];
-              console.log(`[Installments] Student ${student.studentProfile.id} has ${subjects.length} subjects`);
               
               // Calculate total monthly cost and create breakdown
               subjects.forEach((ss: any) => {
@@ -195,40 +191,32 @@ export default function InstallmentsPage() {
                 // Check if monthlyInstallment exists and is not null/undefined
                 let monthlyInstallmentValue = subject.monthlyInstallment;
                 
-                // Handle Prisma Decimal serialization (can be string, number, or object with toString/toNumber)
+                // Handle Prisma Decimal serialization
                 let monthlyInstallment = 0;
                 if (monthlyInstallmentValue !== null && monthlyInstallmentValue !== undefined) {
-                  // Try multiple methods to extract the value
                   if (typeof monthlyInstallmentValue === 'number') {
                     monthlyInstallment = monthlyInstallmentValue;
                   } else if (typeof monthlyInstallmentValue === 'string') {
                     monthlyInstallment = parseFloat(monthlyInstallmentValue);
                   } else if (typeof monthlyInstallmentValue === 'object') {
-                    // Handle Prisma Decimal object - try different methods
                     if (typeof monthlyInstallmentValue.toNumber === 'function') {
                       monthlyInstallment = monthlyInstallmentValue.toNumber();
                     } else if (typeof monthlyInstallmentValue.toString === 'function') {
                       monthlyInstallment = parseFloat(monthlyInstallmentValue.toString());
                     } else if (monthlyInstallmentValue.value !== undefined) {
-                      // Some Decimal implementations use .value
                       monthlyInstallment = parseFloat(String(monthlyInstallmentValue.value));
                     } else {
-                      // Try to parse the object as string
                       monthlyInstallment = parseFloat(String(monthlyInstallmentValue));
                     }
                   } else {
                     monthlyInstallment = parseFloat(String(monthlyInstallmentValue));
                   }
                   
-                  // Handle NaN and ensure it's a valid number
                   if (isNaN(monthlyInstallment) || !isFinite(monthlyInstallment)) {
                     monthlyInstallment = 0;
                   }
                 }
                 
-                console.log(`[Installments] Subject ${subject.name} (${subject.id}): monthlyInstallment=${JSON.stringify(monthlyInstallmentValue)} (type: ${typeof monthlyInstallmentValue}), parsed=${monthlyInstallment}`);
-                
-                // Always add to breakdown, even if 0, so we can show all subjects
                 subjectBreakdown.push({
                   subjectId: subject.id,
                   subjectName: subject.name,
@@ -238,43 +226,19 @@ export default function InstallmentsPage() {
                 
                 if (monthlyInstallment > 0) {
                   totalMonthlyCost += monthlyInstallment;
-                } else if (monthlyInstallmentValue !== null && monthlyInstallmentValue !== undefined) {
-                  console.warn(`[Installments] Subject ${subject.name} (${subject.id}) has monthlyInstallment value but parsed to 0. Raw value:`, monthlyInstallmentValue);
-                } else {
-                  console.warn(`[Installments] Subject ${subject.name} (${subject.id}) has no monthlyInstallment value set!`);
                 }
               });
-              console.log(`[Installments] Student ${student.studentProfile.id} totalMonthlyCost: ${totalMonthlyCost}, breakdown:`, subjectBreakdown);
-              if (totalMonthlyCost === 0 && subjects.length > 0) {
-                console.warn(`[Installments] WARNING: Student ${student.studentProfile.id} has ${subjects.length} subjects but totalMonthlyCost is 0. Subjects may not have monthlyInstallment values set in the database.`);
-              }
             } catch (subjectsErr: any) {
-              // Silently ignore if we can't fetch subjects
               console.warn(`Could not fetch subjects for student ${student.studentProfile.id}:`, subjectsErr);
             }
 
-            // Try to get existing installments
-            let installments: any[] = [];
-            try {
-              const installmentsData = await getStudentInstallments(student.studentProfile.id, filterYear);
-              // Backend returns empty array if no installments, not 404
-              installments = Array.isArray(installmentsData) ? installmentsData : [];
-              console.log(`Student ${student.studentProfile.id} - Found ${installments.length} existing installments`);
-            } catch (err: any) {
-              // 404 can mean either student doesn't exist OR no installments exist yet
-              // Both are handled the same way - empty array
-              if (err.response?.status === 404) {
-                // Silently handle 404 - this is expected when student doesn't exist or has no installments
-                installments = [];
-              } else {
-                // Only log non-404 errors
-                console.error(`Student ${student.studentProfile.id} - Error fetching installments:`, err);
-                installments = [];
-              }
-            }
+            // Installments are already included in the response from backend
+            let installments: any[] = student.installments || [];
+            
+            // Note: student.outstanding is also already included from backend
+            let outstanding = student.outstanding;
 
             // Always calculate/update installment for current month if student has subjects with installments
-            // This ensures installments are created even if they were enrolled before the auto-calculation was added
             if (totalMonthlyCost > 0) {
               const now = new Date();
               const currentMonth = now.getMonth() + 1;
@@ -284,82 +248,43 @@ export default function InstallmentsPage() {
                   i.month === currentMonth && i.year === currentYear,
               );
 
-              // Always calculate to ensure installments are up-to-date (handles new enrollments and updates)
+              // Always calculate to ensure installments are up-to-date
               try {
-                console.log(`[Installments] Calculating for student ${student.studentProfile.id}, month ${currentMonth}, year ${currentYear}, totalCost: ${totalMonthlyCost}, hasExisting: ${!!currentMonthInst}`);
-                const calcResult = await calculateInstallment(
+                await calculateInstallment(
                   student.studentProfile.id,
                   currentMonth,
                   currentYear,
                 );
-                console.log(`[Installments] Calculation result:`, calcResult);
                 
-                // Wait a bit for the database to update
-                await new Promise(resolve => setTimeout(resolve, 300));
-                
-                // Fetch installments again after calculation
-                try {
-                  const newInstallments = await getStudentInstallments(student.studentProfile.id, filterYear);
-                  installments = Array.isArray(newInstallments) ? newInstallments : [];
-                  console.log(`[Installments] After calculation, found ${installments.length} installments for student ${student.studentProfile.id}`);
-                } catch (fetchErr: any) {
-                  // Silently handle 404 - expected in some cases
-                  if (fetchErr.response?.status !== 404) {
-                    console.error(`[Installments] Error fetching after calculation:`, fetchErr);
-                  }
-                  // Keep existing installments array
+                // If we didn't have it before, or just to ensure we have latest, re-fetch if in current view
+                if (!currentMonthInst && (filterYear === currentYear || !filterYear)) {
+                     const newInstallments = await getStudentInstallments(student.studentProfile.id, filterYear);
+                     installments = Array.isArray(newInstallments) ? newInstallments : [];
                 }
               } catch (calcErr: any) {
-                // Log the full error for debugging
-                console.error(`[Installments] Calculation failed for student ${student.studentProfile.id}:`, {
-                  error: calcErr,
-                  message: calcErr?.message,
-                  response: calcErr?.response?.data,
-                  status: calcErr?.response?.status,
-                  stack: calcErr?.stack,
-                });
-                // Don't throw - continue with existing installments if any
+                console.error(`Calculation failed for student ${student.studentProfile.id}:`, calcErr);
               }
             }
 
-            // Fetch outstanding balance and current month
-            const [outstanding, currentMonth] = await Promise.all([
-              getStudentOutstandingBalance(student.studentProfile.id).catch((err: any) => {
-                // Silently handle 404 - expected when student doesn't exist or has no outstanding balance
-                if (err.response?.status === 404) {
-                  return { totalOutstanding: '0', count: 0 };
-                }
-                // Log other errors but still return default
-                console.error(`Error fetching outstanding balance for student ${student.studentProfile?.id}:`, err);
-                return { totalOutstanding: '0', count: 0 };
-              }),
-              Promise.resolve().then(() => {
-                const now = new Date();
-                return installments.find(
-                  (i: StudentInstallment) =>
-                    i.month === now.getMonth() + 1 && i.year === now.getFullYear(),
-                );
-              }),
-            ]);
+            // Find current month installment for display logic
+            const now = new Date();
+            const currentMonthInst = installments.find(
+              (i: StudentInstallment) =>
+                i.month === now.getMonth() + 1 && i.year === now.getFullYear(),
+            );
 
             // Calculate monthly payment after discount
-            // If there's a current month installment, calculate the discount ratio and apply it
-            // Otherwise, use the base totalMonthlyCost
             let monthlyPaymentAfterDiscount = totalMonthlyCost;
-            
-            if (currentMonth) {
-              const installmentTotal = normalizeAmount(currentMonth.totalAmount);
-              const installmentDiscount = normalizeAmount(currentMonth.discountAmount);
+            if (currentMonthInst) {
+              const installmentTotal = normalizeAmount(currentMonthInst.totalAmount);
+              const installmentDiscount = normalizeAmount(currentMonthInst.discountAmount);
               
-              // If the installment total matches the monthly cost (no outstanding from previous months),
-              // use the net total directly
               if (Math.abs(installmentTotal - totalMonthlyCost) < 0.01) {
                 monthlyPaymentAfterDiscount = calculateNetTotal(
                   installmentTotal,
                   installmentDiscount,
                 );
               } else if (installmentDiscount > 0 && installmentTotal > 0) {
-                // Calculate discount percentage and apply to monthly cost
                 const discountPercentage = (installmentDiscount / installmentTotal) * 100;
                 monthlyPaymentAfterDiscount = totalMonthlyCost * (1 - discountPercentage / 100);
                 if (monthlyPaymentAfterDiscount < 0) monthlyPaymentAfterDiscount = 0;
@@ -370,13 +295,14 @@ export default function InstallmentsPage() {
               ...student,
               installments,
               outstanding,
-              currentMonth,
+              currentMonth: currentMonthInst,
               subjects,
               totalMonthlyCost,
               monthlyPaymentAfterDiscount,
               subjectBreakdown,
             };
           } catch (err) {
+            console.error(err);
             return student;
           }
         }),
@@ -403,47 +329,18 @@ export default function InstallmentsPage() {
       router.push('/login');
       return;
     }
-    fetchData();
-  }, [router]);
+    
+    // Debounce search to prevent too many API calls
+    const timer = setTimeout(() => {
+      fetchData();
+    }, 500);
 
-  const filteredStudents = students.filter((student) => {
-    const matchesSearch =
-      student.firstName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      student.lastName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      student.email.toLowerCase().includes(searchTerm.toLowerCase());
+    return () => clearTimeout(timer);
+  }, [router, page, searchTerm, filterStatus, filterMonth, filterYear]);
 
-    if (!matchesSearch) return false;
+  // Use students directly as they are now paginated from backend
+  const paginatedStudents = students;
 
-    if (filterStatus !== 'all' && student.installments) {
-      const hasMatchingStatus = student.installments.some(
-        (i) => i.status.toLowerCase() === filterStatus.toLowerCase(),
-      );
-      if (!hasMatchingStatus) return false;
-    }
-
-    if (filterMonth && student.installments) {
-      const hasMatchingMonth = student.installments.some((i) => i.month === filterMonth);
-      if (!hasMatchingMonth) return false;
-    }
-
-    return true;
-  });
-
-  // Calculate pagination directly (no useEffect to avoid timing issues)
-  const totalCount = filteredStudents.length;
-  const totalPagesCount = totalCount > 0 ? Math.ceil(totalCount / limit) : 0;
-  
-  // Reset to page 1 if current page exceeds total pages
-  useEffect(() => {
-    if (page > totalPagesCount && totalPagesCount > 0) {
-      setPage(1);
-    }
-  }, [totalPagesCount, page]);
-
-  // Apply pagination to filtered students
-  const startIndex = (page - 1) * limit;
-  const endIndex = startIndex + limit;
-  const paginatedStudents = filteredStudents.slice(startIndex, endIndex);
 
 
   const handleRecordPayment = async (student: StudentWithInstallments, installment?: StudentInstallment) => {
@@ -599,7 +496,10 @@ export default function InstallmentsPage() {
                 type="text"
                 placeholder={t.installments?.searchPlaceholder || 'Search by name or email...'}
                 value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
+                onChange={(e) => {
+                  setSearchTerm(e.target.value);
+                  setPage(1);
+                }}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg"
               />
             </div>
@@ -609,7 +509,10 @@ export default function InstallmentsPage() {
               </label>
               <select
                 value={filterMonth}
-                onChange={(e) => setFilterMonth(e.target.value ? parseInt(e.target.value) : '')}
+                onChange={(e) => {
+                  setFilterMonth(e.target.value ? parseInt(e.target.value) : '');
+                  setPage(1);
+                }}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg"
               >
                 <option value="">{t.installments?.allMonths || 'All Months'}</option>
@@ -628,7 +531,7 @@ export default function InstallmentsPage() {
                 value={filterYear}
                 onChange={(e) => {
                   setFilterYear(parseInt(e.target.value));
-                  fetchData();
+                  setPage(1); // Reset to first page on filter change
                 }}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg"
               >
@@ -648,7 +551,10 @@ export default function InstallmentsPage() {
               </label>
               <select
                 value={filterStatus}
-                onChange={(e) => setFilterStatus(e.target.value)}
+                onChange={(e) => {
+                  setFilterStatus(e.target.value);
+                  setPage(1);
+                }}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg"
               >
                 <option value="all">{t.installments?.allStatuses || 'All Statuses'}</option>
@@ -946,11 +852,11 @@ export default function InstallmentsPage() {
         </div>
 
         {/* Pagination */}
-        {totalPagesCount > 1 && (
+        {totalPages > 1 && (
           <Pagination
             currentPage={page}
-            totalPages={totalPagesCount}
-            total={totalCount}
+            totalPages={totalPages}
+            total={totalItems}
             limit={limit}
             onPageChange={(newPage) => {
               setPage(newPage);

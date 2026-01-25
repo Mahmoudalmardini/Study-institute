@@ -201,6 +201,26 @@ export async function getStudentSubjects(studentId: string) {
 }
 
 // Installments API
+export async function getInstallmentsOverview(params: {
+  page?: number;
+  limit?: number;
+  search?: string;
+  status?: string;
+  month?: number;
+  year?: number;
+}) {
+  // Filter out undefined or empty values
+  const cleanParams: Record<string, any> = {};
+  if (params.page) cleanParams.page = params.page;
+  if (params.limit) cleanParams.limit = params.limit;
+  if (params.search) cleanParams.search = params.search;
+  if (params.status && params.status !== 'all') cleanParams.status = params.status;
+  if (params.month) cleanParams.month = params.month;
+  if (params.year) cleanParams.year = params.year;
+
+  return apiClient.get('/installments/overview', { params: cleanParams });
+}
+
 export async function getStudentInstallments(studentId: string, year?: number) {
   const params = year ? { year } : undefined;
   return apiClient.get(`/installments/student/${studentId}`, { params });

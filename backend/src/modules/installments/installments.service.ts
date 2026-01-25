@@ -8,11 +8,98 @@ import { CreateDiscountDto } from './dto/create-discount.dto';
 import { CreatePaymentDto } from './dto/create-payment.dto';
 import { UpdateInstallmentDto } from './dto/update-installment.dto';
 import { CalculateInstallmentDto } from './dto/calculate-installment.dto';
+import { GetInstallmentsFilterDto } from './dto/get-installments-filter.dto';
 import { Prisma } from '@prisma/client';
 
 @Injectable()
 export class InstallmentsService {
   constructor(private readonly prisma: PrismaService) {}
+
+  async findAll(filters: GetInstallmentsFilterDto) {
+    const { page = 1, limit = 20, search, status, month, year } = filters;
+    const skip = (page - 1) * limit;
+
+    const where: Prisma.StudentWhereInput = {};
+
+    if (search) {
+      where.user = {
+        OR: [
+          { firstName: { contains: search, mode: 'insensitive' } },
+          { lastName: { contains: search, mode: 'insensitive' } },
+          { email: { contains: search, mode: 'insensitive' } },
+        ],
+      };
+    }
+
+    // Filter students who have matching installments
+    if (status || month || year) {
+      where.installments = {
+        some: {
+          ...(status && { status }),
+          ...(month && { month }),
+          ...(year && { year }),
+        },
+      };
+    }
+
+    const [total, students] = await Promise.all([
+      this.prisma.student.count({ where }),
+      this.prisma.student.findMany({
+        where,
+        take: limit,
+        skip,
+        include: {
+          user: {
+            select: {
+              id: true,
+              email: true,
+              firstName: true,
+              lastName: true,
+            },
+          },
+          // Include installments relevant to the filter or recent ones
+          installments: {
+            where: year ? { year } : undefined,
+            orderBy: [
+              { year: 'desc' },
+              { month: 'desc' },
+            ],
+          },
+        },
+      }),
+    ]);
+
+    // Transform to match frontend expectation roughly
+    const mappedStudents = await Promise.all(
+      students.map(async (student) => {
+        // Get outstanding balance
+        const outstanding = await this.getOutstandingBalance(student.id);
+        
+        return {
+          id: student.user.id, // User ID as expected by frontend 'Student' interface
+          email: student.user.email,
+          firstName: student.user.firstName,
+          lastName: student.user.lastName,
+          studentProfile: {
+            id: student.id, // Student ID
+          },
+          installments: student.installments,
+          outstanding,
+        };
+      })
+    );
+
+    return {
+      data: mappedStudents,
+      meta: {
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit),
+      },
+    };
+  }
+
 
   /**
    * Calculate monthly installment for a student based on enrolled subjects
