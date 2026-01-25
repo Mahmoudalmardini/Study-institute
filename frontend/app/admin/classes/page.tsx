@@ -158,8 +158,10 @@ export default function ClassesPage() {
 
   const fetchAllSubjects = async () => {
     try {
-      const data = await apiClient.get('/subjects');
-      setAllSubjects(data || []);
+      const response = await apiClient.get('/subjects?limit=1000');
+      // Handle paginated response - extract the data array
+      const subjectsData = response?.data || (Array.isArray(response) ? response : []);
+      setAllSubjects(Array.isArray(subjectsData) ? subjectsData : []);
     } catch (error) {
       console.error('Error fetching subjects:', error);
       setAllSubjects([]);
