@@ -13,15 +13,32 @@ export default function AdminDashboard() {
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
-    const token = localStorage.getItem('accessToken');
-    if (!token) {
-      router.push('/login');
-      return;
-    }
+    const fetchUserProfile = async () => {
+      const token = localStorage.getItem('accessToken');
+      if (!token) {
+        router.push('/login');
+        return;
+      }
 
-    // TODO: Fetch user data from API
-    setUser({ name: 'Administrator', role: 'ADMIN' });
-    setMounted(true);
+      try {
+        // Fetch actual user profile to validate token
+        const userProfile: any = await apiClient.get('/users/profile');
+        setUser({
+          name: `${userProfile.firstName} ${userProfile.lastName}`,
+          role: userProfile.role,
+        });
+        setMounted(true);
+      } catch (error: any) {
+        console.error('Error fetching user profile:', error);
+        if (error.response?.status === 401) {
+          localStorage.removeItem('accessToken');
+          localStorage.removeItem('refreshToken');
+          router.push('/login');
+        }
+      }
+    };
+
+    fetchUserProfile();
   }, [router]);
 
   const handleLogout = () => {
