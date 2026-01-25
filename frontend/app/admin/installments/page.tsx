@@ -94,7 +94,7 @@ export default function InstallmentsPage() {
   const [selectedInstallmentOutstanding, setSelectedInstallmentOutstanding] = useState<number>(0);
   const [selectedStudentTotalOutstanding, setSelectedStudentTotalOutstanding] = useState<number>(0);
   const [page, setPage] = useState(1);
-  const [limit] = useState(15);
+  const [limit] = useState(5);
   const [totalItems, setTotalItems] = useState(0);
   const [totalPages, setTotalPages] = useState(0);
 
