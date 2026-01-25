@@ -74,10 +74,10 @@ export default function AdminHomeworkReviewPage() {
       // Handle both array response and wrapped object response
       if (Array.isArray(data)) {
         setSubmissions(data);
-      } else if (data && Array.isArray(data.data)) {
-        setSubmissions(data.data);
-      } else if (data && data.submissions && Array.isArray(data.submissions)) {
-        setSubmissions(data.submissions);
+      } else if (data && Array.isArray((data as any).data)) {
+        setSubmissions((data as any).data);
+      } else if (data && (data as any).submissions && Array.isArray((data as any).submissions)) {
+        setSubmissions((data as any).submissions);
       } else {
         console.error('Unexpected response format:', data);
         setSubmissions([]);
@@ -111,6 +111,34 @@ export default function AdminHomeworkReviewPage() {
       setLoading(false);
     }
   };
+
+  // useEffect to fetch user profile and pending submissions on mount
+  useEffect(() => {
+    const fetchUserAndSubmissions = async () => {
+      try {
+        // Fetch user profile
+        const userProfile: any = await apiClient.get('/users/profile');
+        setUser({
+          name: `${userProfile.firstName} ${userProfile.lastName}`,
+          role: userProfile.role,
+        });
+        
+        // Fetch pending submissions
+        await fetchPendingSubmissions();
+      } catch (err: any) {
+        console.error('Error loading page data:', err);
+        if (err.response?.status === 401) {
+          localStorage.clear();
+          router.push('/login');
+        } else {
+          setError(err.response?.data?.message || err.message || 'Failed to load page');
+          setLoading(false);
+        }
+      }
+    };
+
+    fetchUserAndSubmissions();
+  }, []);
 
   const openReviewModal = (submission: PendingSubmission) => {
     setSelectedSubmission(submission);
