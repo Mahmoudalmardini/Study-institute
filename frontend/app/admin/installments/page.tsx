@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useI18n } from '@/lib/i18n-context';
 import SettingsMenu from '@/components/SettingsMenu';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
+import Pagination from '@/components/ui/Pagination';
 import apiClient, {
   getStudentInstallments,
   getStudentOutstandingBalance,
@@ -91,6 +92,8 @@ export default function InstallmentsPage() {
   });
   const [selectedInstallmentOutstanding, setSelectedInstallmentOutstanding] = useState<number>(0);
   const [selectedStudentTotalOutstanding, setSelectedStudentTotalOutstanding] = useState<number>(0);
+  const [page, setPage] = useState(1);
+  const [limit] = useState(15);
 
   const isAmountDiscount = discountForm.type === 'AMOUNT';
   const parsedDiscountAmount = parseFloat(discountForm.amount || 'NaN');
@@ -167,7 +170,7 @@ export default function InstallmentsPage() {
 
       // Fetch installments and subjects for each student
       const studentsWithInstallments = await Promise.all(
-        studentsWithProfiles.map(async (student) => {
+        studentsWithProfiles.map(async (student: Student) => {
           if (!student.studentProfile?.id) return student;
 
           try {
@@ -327,7 +330,7 @@ export default function InstallmentsPage() {
                   return { totalOutstanding: '0', count: 0 };
                 }
                 // Log other errors but still return default
-                console.error(`Error fetching outstanding balance for student ${student.studentProfile.id}:`, err);
+                console.error(`Error fetching outstanding balance for student ${student.studentProfile?.id}:`, err);
                 return { totalOutstanding: '0', count: 0 };
               }),
               Promise.resolve().then(() => {
@@ -425,6 +428,23 @@ export default function InstallmentsPage() {
 
     return true;
   });
+
+  // Calculate pagination directly (no useEffect to avoid timing issues)
+  const totalCount = filteredStudents.length;
+  const totalPagesCount = totalCount > 0 ? Math.ceil(totalCount / limit) : 0;
+  
+  // Reset to page 1 if current page exceeds total pages
+  useEffect(() => {
+    if (page > totalPagesCount && totalPagesCount > 0) {
+      setPage(1);
+    }
+  }, [totalPagesCount, page]);
+
+  // Apply pagination to filtered students
+  const startIndex = (page - 1) * limit;
+  const endIndex = startIndex + limit;
+  const paginatedStudents = filteredStudents.slice(startIndex, endIndex);
+
 
   const handleRecordPayment = async (student: StudentWithInstallments, installment?: StudentInstallment) => {
     setSelectedStudent(student);
@@ -682,14 +702,14 @@ export default function InstallmentsPage() {
 
         {/* Students List */}
         <div className="space-y-4">
-          {filteredStudents.length === 0 ? (
+          {paginatedStudents.length === 0 ? (
             <div className="bg-white rounded-xl shadow-lg p-12 text-center">
               <p className="text-gray-500">
                 {searchTerm ? 'No students match your search' : 'No students found'}
               </p>
             </div>
           ) : (
-            filteredStudents.map((student) => (
+            paginatedStudents.map((student) => (
               <div
                 key={student.id}
                 className="bg-white rounded-xl shadow-lg p-4 sm:p-6 border border-gray-200"
@@ -737,7 +757,7 @@ export default function InstallmentsPage() {
                         {student.monthlyPaymentAfterDiscount !== undefined && 
                          student.monthlyPaymentAfterDiscount !== null &&
                          student.monthlyPaymentAfterDiscount < (student.totalMonthlyCost || 0) && 
-                         student.totalMonthlyCost > 0 && (
+                         (student.totalMonthlyCost || 0) > 0 && (
                           <p className="text-xs text-gray-500 mt-1 break-words">
                             <span className="line-through">{formatCurrency(student.totalMonthlyCost)}</span>
                             {' '}
@@ -924,6 +944,20 @@ export default function InstallmentsPage() {
             ))
           )}
         </div>
+
+        {/* Pagination */}
+        {totalPagesCount > 1 && (
+          <Pagination
+            currentPage={page}
+            totalPages={totalPagesCount}
+            total={totalCount}
+            limit={limit}
+            onPageChange={(newPage) => {
+              setPage(newPage);
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }}
+          />
+        )}
       </main>
 
       {/* Payment Form Modal */}
