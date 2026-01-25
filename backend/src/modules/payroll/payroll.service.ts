@@ -93,7 +93,7 @@ export class PayrollService {
     try {
       // First check if payroll tables exist by trying a simple query
       try {
-        await this.prisma.$queryRaw`SELECT 1 FROM teacher_salaries LIMIT 1`;
+        await this.prisma.$queryRawUnsafe('SELECT 1 FROM teacher_salaries LIMIT 1');
       } catch (tableError: any) {
         console.error('Table check error:', {
           message: tableError.message,
@@ -404,7 +404,7 @@ export class PayrollService {
     try {
       // First check if payroll tables exist
       try {
-        await this.prisma.$queryRaw`SELECT 1 FROM hour_requests LIMIT 1`;
+        await this.prisma.$queryRawUnsafe('SELECT 1 FROM hour_requests LIMIT 1');
       } catch (tableError: any) {
         console.error('Hour requests table check error:', {
           message: tableError.message,
