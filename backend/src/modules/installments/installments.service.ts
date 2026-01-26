@@ -32,10 +32,11 @@ export class InstallmentsService {
     }
 
     // Filter students who have matching installments
-    if (status || month || year) {
+    const hasStatusFilter = status && status !== 'all';
+    if (hasStatusFilter || month || year) {
       where.installments = {
         some: {
-          ...(status && { status }),
+          ...(hasStatusFilter && { status }),
           ...(month && { month }),
           ...(year && { year }),
         },

@@ -1,7 +1,6 @@
-import { IsOptional, IsString, IsInt, Min, IsEnum } from 'class-validator';
+import { IsOptional, IsString, IsInt, Min, IsIn } from 'class-validator';
 import { Type } from 'class-transformer';
 import { PaginationQueryDto } from '../../../common/dto/pagination-query.dto';
-import { InstallmentStatus } from '@prisma/client';
 
 export class GetInstallmentsFilterDto extends PaginationQueryDto {
   @IsOptional()
@@ -9,8 +8,9 @@ export class GetInstallmentsFilterDto extends PaginationQueryDto {
   search?: string;
 
   @IsOptional()
-  @IsEnum(InstallmentStatus)
-  status?: InstallmentStatus;
+  @IsString()
+  @IsIn(['all', 'PENDING', 'PARTIAL', 'PAID', 'OVERDUE'])
+  status?: string;
 
   @IsOptional()
   @Type(() => Number)
