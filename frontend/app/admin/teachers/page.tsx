@@ -169,18 +169,36 @@ export default function TeachersPage() {
   const fetchSubjects = async () => {
     try {
       const response = await apiClient.get('/subjects');
-      setSubjects((response as any) || []);
+      // Handle different response structures
+      if (Array.isArray(response)) {
+        setSubjects(response);
+      } else if (response && Array.isArray(response.data)) {
+        setSubjects(response.data);
+      } else {
+        console.warn('Subjects response is not an array:', response);
+        setSubjects([]);
+      }
     } catch (err) {
       console.error('Error fetching subjects:', err);
+      setSubjects([]); // Ensure subjects is always an array even on error
     }
   };
 
   const fetchClasses = async () => {
     try {
       const response = await apiClient.get('/classes');
-      setClasses((response as any) || []);
+      // Handle different response structures
+      if (Array.isArray(response)) {
+        setClasses(response);
+      } else if (response && Array.isArray(response.data)) {
+        setClasses(response.data);
+      } else {
+        console.warn('Classes response is not an array:', response);
+        setClasses([]);
+      }
     } catch (err) {
       console.error('Error fetching classes:', err);
+      setClasses([]); // Ensure classes is always an array even on error
     }
   };
 
