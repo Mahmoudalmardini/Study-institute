@@ -119,9 +119,9 @@ WORKDIR /app
 # Expose ports
 EXPOSE 3000 3001
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=5s --start-period=60s --retries=3 \
-    CMD node -e "require('http').get('http://localhost:3000/api/health', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"
+# Health check - check frontend health endpoint
+HEALTHCHECK --interval=30s --timeout=10s --start-period=120s --retries=5 \
+    CMD node -e "require('http').get('http://localhost:3000/health', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"
 
 # Use dumb-init for proper signal handling
 ENTRYPOINT ["dumb-init", "--"]
