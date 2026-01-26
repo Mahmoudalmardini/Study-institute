@@ -9,7 +9,7 @@ import { CreatePaymentDto } from './dto/create-payment.dto';
 import { UpdateInstallmentDto } from './dto/update-installment.dto';
 import { CalculateInstallmentDto } from './dto/calculate-installment.dto';
 import { GetInstallmentsFilterDto } from './dto/get-installments-filter.dto';
-import { Prisma } from '@prisma/client';
+import { Prisma, InstallmentStatus } from '@prisma/client';
 
 @Injectable()
 export class InstallmentsService {
@@ -36,7 +36,7 @@ export class InstallmentsService {
     if (hasStatusFilter || month || year) {
       where.installments = {
         some: {
-          ...(hasStatusFilter && { status }),
+          ...(hasStatusFilter && { status: status as InstallmentStatus }),
           ...(month && { month }),
           ...(year && { year }),
         },
