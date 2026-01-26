@@ -35,7 +35,7 @@ export class UsersController {
 
   @Get()
   @Roles(Role.ADMIN, Role.SUPERVISOR)
-  @UseInterceptors(CacheInterceptor)
+  // @UseInterceptors(CacheInterceptor) // Temporarily disabled for debugging
   findAll(
     @Query('role') role?: string,
     @Query('page', new DefaultValuePipe(1), ParseIntPipe) page: number = 1,

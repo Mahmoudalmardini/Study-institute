@@ -38,7 +38,7 @@ export class StudentsController {
 
   @Get()
   @Roles(Role.ADMIN, Role.SUPERVISOR, Role.TEACHER)
-  @UseInterceptors(CacheInterceptor)
+  // @UseInterceptors(CacheInterceptor) // Temporarily disabled for debugging
   findAll(
     @Query('classId') classId?: string,
     @Query('assignedSubjectsOnly') assignedSubjectsOnly?: string,
