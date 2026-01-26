@@ -160,13 +160,33 @@ export default function InstallmentsPage() {
         year: filterYear,
       });
 
-      const { data: studentsData, meta } = response as any;
+      // Handle different response structures
+      let studentsData: any[] = [];
+      let meta: any = {};
       
-      setTotalItems(meta.total);
-      setTotalPages(meta.totalPages);
+      if (response) {
+        if (response.data && Array.isArray(response.data)) {
+          // Standard paginated response: { data: [...], meta: {...} }
+          studentsData = response.data;
+          meta = response.meta || {};
+        } else if (Array.isArray(response)) {
+          // Direct array response (shouldn't happen but handle it)
+          studentsData = response;
+          meta = { total: response.length, page, limit, totalPages: 1 };
+        } else if (response.data && Array.isArray(response.data.data)) {
+          // Nested response structure
+          studentsData = response.data.data;
+          meta = response.data.meta || {};
+        }
+      }
+      
+      console.log('Installments overview response:', { studentsData, meta, response });
+      
+      setTotalItems(meta.total || studentsData.length);
+      setTotalPages(meta.totalPages || Math.ceil((meta.total || studentsData.length) / limit));
 
       // Fetch installments and subjects for each student
-      const studentsWithInstallments = await Promise.all(
+      const studentsWithInstallments = await Promise.allSettled(
         studentsData.map(async (student: StudentWithInstallments) => {
           if (!student.studentProfile?.id) return student;
 
@@ -238,7 +258,7 @@ export default function InstallmentsPage() {
             // Note: student.outstanding is also already included from backend
             let outstanding = student.outstanding;
 
-            // Always calculate/update installment for current month if student has subjects with installments
+            // Only calculate/update installment for current month if it doesn't exist and student has subjects
             if (totalMonthlyCost > 0) {
               const now = new Date();
               const currentMonth = now.getMonth() + 1;
@@ -248,21 +268,25 @@ export default function InstallmentsPage() {
                   i.month === currentMonth && i.year === currentYear,
               );
 
-              // Always calculate to ensure installments are up-to-date
-              try {
-                await calculateInstallment(
-                  student.studentProfile.id,
-                  currentMonth,
-                  currentYear,
-                );
-                
-                // If we didn't have it before, or just to ensure we have latest, re-fetch if in current view
-                if (!currentMonthInst && (filterYear === currentYear || !filterYear)) {
-                     const newInstallments = await getStudentInstallments(student.studentProfile.id, filterYear);
-                     installments = Array.isArray(newInstallments) ? newInstallments : [];
+              // Only calculate if installment doesn't exist for current month
+              // This prevents unnecessary API calls and rate limiting
+              if (!currentMonthInst) {
+                try {
+                  await calculateInstallment(
+                    student.studentProfile.id,
+                    currentMonth,
+                    currentYear,
+                  );
+                  
+                  // Re-fetch installments to get the newly created one
+                  if (filterYear === currentYear || !filterYear) {
+                    const newInstallments = await getStudentInstallments(student.studentProfile.id, filterYear);
+                    installments = Array.isArray(newInstallments) ? newInstallments : installments;
+                  }
+                } catch (calcErr: any) {
+                  console.error(`Calculation failed for student ${student.studentProfile.id}:`, calcErr);
+                  // Continue with existing installments if calculation fails
                 }
-              } catch (calcErr: any) {
-                console.error(`Calculation failed for student ${student.studentProfile.id}:`, calcErr);
               }
             }
 
@@ -302,13 +326,36 @@ export default function InstallmentsPage() {
               subjectBreakdown,
             };
           } catch (err) {
-            console.error(err);
-            return student;
+            console.error(`Error processing student ${student.id}:`, err);
+            // Return student with minimal data if processing fails
+            return {
+              ...student,
+              installments: student.installments || [],
+              outstanding: student.outstanding || { totalOutstanding: 0 },
+              subjects: [],
+              totalMonthlyCost: 0,
+              monthlyPaymentAfterDiscount: 0,
+              subjectBreakdown: [],
+            };
           }
         }),
       );
 
-      setStudents(studentsWithInstallments);
+      // Handle Promise.allSettled results - extract successful results and log failures
+      const successfulStudents = studentsWithInstallments
+        .map((result, index) => {
+          if (result.status === 'fulfilled') {
+            return result.value;
+          } else {
+            console.error(`Failed to process student at index ${index}:`, result.reason);
+            // Return the original student data if processing failed
+            return studentsData[index] || null;
+          }
+        })
+        .filter((student): student is StudentWithInstallments => student !== null);
+
+      console.log(`Processed ${successfulStudents.length} out of ${studentsData.length} students`);
+      setStudents(successfulStudents);
     } catch (err: any) {
       console.error('Error fetching data:', err);
       if (err.response?.status === 401) {
