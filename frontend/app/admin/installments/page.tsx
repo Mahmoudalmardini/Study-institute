@@ -656,8 +656,8 @@ export default function InstallmentsPage() {
               >
                 <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 mb-4">
                   <div className="flex items-center gap-3 sm:gap-4 min-w-0 flex-1">
-                    <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gradient-to-br from-emerald-500 to-green-600 rounded-full flex items-center justify-center flex-shrink-0">
-                      <span className="text-white font-semibold text-base sm:text-lg">
+                    <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gradient-to-br from-gray-800 to-gray-950 ring-2 ring-gold-400/60 rounded-full flex items-center justify-center flex-shrink-0">
+                      <span className="text-gold-300 font-semibold text-base sm:text-lg">
                         {student.firstName[0]}
                         {student.lastName[0]}
                       </span>

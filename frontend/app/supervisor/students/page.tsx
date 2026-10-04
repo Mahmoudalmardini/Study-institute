@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useI18n } from '@/lib/i18n-context';
+import { fmt, dateLocale } from '@/lib/utils';
 import SettingsMenu from '@/components/SettingsMenu';
 import { Logo } from '@/components/Logo';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
@@ -27,7 +28,7 @@ interface Student {
 
 export default function SupervisorStudentsPage() {
   const router = useRouter();
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const [students, setStudents] = useState<Student[]>([]);
   const [allClasses, setAllClasses] = useState<Class[]>([]);
   const [allSubjects, setAllSubjects] = useState<Subject[]>([]);
@@ -230,19 +231,19 @@ export default function SupervisorStudentsPage() {
             } else {
               // If we still can't find it, show error
               console.error('Profile exists but cannot be retrieved');
-              setError('Student profile exists but could not be retrieved. Please refresh the page.');
+              setError(t.tables.profileExistsRefresh);
               setModalLoading(false);
               return;
             }
           } catch (fetchErr) {
             console.error('Error fetching existing profile:', fetchErr);
-            setError('Unable to retrieve student profile. Please try again.');
+            setError(t.tables.cannotRetrieveProfile);
             setModalLoading(false);
             return;
           }
         } else {
           console.error('Error creating student profile:', createErr);
-          setError('Unable to create student profile. Please try again.');
+          setError(t.tables.cannotCreateProfile);
           setModalLoading(false);
           return;
         }
@@ -351,7 +352,7 @@ export default function SupervisorStudentsPage() {
       
     } catch (err: any) {
       console.error('Save error:', err);
-      setError(err.message || t.students?.errorSaving || 'Error saving changes');
+      setError(err.message || t.students?.errorSaving || t.tables.errorSavingChanges);
     } finally {
       setSaving(false);
     }
@@ -439,7 +440,7 @@ export default function SupervisorStudentsPage() {
               <button
                 onClick={() => router.push('/supervisor')}
                 className="w-10 h-10 bg-white/20 rounded-lg flex items-center justify-center backdrop-blur-sm hover:bg-white/30 transition-colors flex-shrink-0"
-                aria-label="Back to supervisor dashboard"
+                aria-label={t.tables.backToSupervisor}
               >
                 <svg className="w-6 h-6 text-white rtl:rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
@@ -447,7 +448,7 @@ export default function SupervisorStudentsPage() {
               </button>
               <Logo />
               <h1 className="text-lg sm:text-xl font-bold text-white truncate">
-                Students
+                {t.tables.students}
               </h1>
             </div>
             <div className="flex items-center gap-2 sm:gap-4 flex-shrink-0">
@@ -466,7 +467,7 @@ export default function SupervisorStudentsPage() {
             </svg>
             <input
               type="text"
-              placeholder={t.users?.searchPlaceholder || 'Search students...'}
+              placeholder={t.tables.searchStudents}
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
@@ -491,31 +492,31 @@ export default function SupervisorStudentsPage() {
               <span className="text-sm text-gray-600">
                 {t.users?.totalUsers || 'Total students'}: {filteredStudents.length}
               </span>
-              <span className="text-xs text-gray-500">Click on a student to manage classes & subjects</span>
+              <span className="text-xs text-gray-500">{t.tables.clickStudentHint}</span>
             </div>
 
             {/* Desktop Table View */}
-            <div className="hidden md:block bg-white shadow-md rounded-xl overflow-hidden">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gradient-to-r from-blue-500 to-cyan-600">
+            <div className="hidden md:block bg-white shadow-md rounded-2xl overflow-hidden ring-1 ring-gold-200/70">
+              <table className="data-table min-w-full">
+                <thead>
                   <tr>
                     <th className="px-6 py-4 text-left text-xs font-medium text-white uppercase tracking-wider">
-                      {t.users?.name || 'Name'}
+                      {t.users?.name || t.tables.name}
                     </th>
                     <th className="px-6 py-4 text-left text-xs font-medium text-white uppercase tracking-wider">
-                      {t.users?.email || 'Email'}
+                      {t.users?.email || t.tables.email}
                     </th>
                     <th className="px-6 py-4 text-left text-xs font-medium text-white uppercase tracking-wider">
                       {t.students?.class || 'Class'}
                     </th>
                     <th className="px-6 py-4 text-left text-xs font-medium text-white uppercase tracking-wider">
-                      {t.students?.subjects || 'Subjects'}
+                      {t.students?.subjects || t.tables.subjects}
                     </th>
                     <th className="px-6 py-4 text-left text-xs font-medium text-white uppercase tracking-wider">
-                      {t.users?.status || 'Status'}
+                      {t.users?.status || t.tables.status}
                     </th>
                     <th className="px-6 py-4 text-left text-xs font-medium text-white uppercase tracking-wider">
-                      {t.users?.actions || 'Actions'}
+                      {t.users?.actions || t.tables.actions}
                     </th>
                   </tr>
                 </thead>
@@ -524,12 +525,12 @@ export default function SupervisorStudentsPage() {
                     <tr key={student.id} className="hover:bg-gray-50 cursor-pointer" onClick={() => openStudentModal(student)}>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="flex items-center">
-                          <div className="flex-shrink-0 h-10 w-10 bg-gradient-to-br from-emerald-500 to-green-600 rounded-full flex items-center justify-center">
-                            <span className="text-white font-semibold">
+                          <div className="flex-shrink-0 h-10 w-10 bg-gradient-to-br from-gray-800 to-gray-950 ring-2 ring-gold-400/60 rounded-full flex items-center justify-center">
+                            <span className="text-gold-300 font-semibold">
                               {student.firstName[0]}{student.lastName[0]}
                             </span>
                           </div>
-                          <div className="ml-4">
+                          <div className="ms-4">
                             <div className="text-sm font-medium text-gray-900">
                               {student.firstName} {student.lastName}
                             </div>
@@ -546,7 +547,7 @@ export default function SupervisorStudentsPage() {
                               {student.class.name}
                             </span>
                           ) : (
-                            <span className="text-gray-400 text-xs">No class assigned</span>
+                            <span className="text-gray-400 text-xs">{t.tables.noClassAssigned}</span>
                           )}
                         </div>
                       </td>
@@ -562,7 +563,7 @@ export default function SupervisorStudentsPage() {
                               </span>
                             ))
                           ) : (
-                            <span className="text-gray-400 text-xs">No subjects</span>
+                            <span className="text-gray-400 text-xs">{t.tables.noSubjects}</span>
                           )}
                         </div>
                       </td>
@@ -574,7 +575,7 @@ export default function SupervisorStudentsPage() {
                               : 'bg-red-100 text-red-800'
                           }`}
                         >
-                          {student.isActive ? t.users?.active || 'Active' : t.users?.inactive || 'Inactive'}
+                          {student.isActive ? t.users?.active || t.tables.active : t.users?.inactive || 'Inactive'}
                         </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm">
@@ -585,7 +586,7 @@ export default function SupervisorStudentsPage() {
                           }}
                           className="text-blue-600 hover:text-blue-900 font-medium"
                         >
-                          Manage Classes & Subjects
+                          {t.tables.manageClassesSubjects}
                         </button>
                       </td>
                     </tr>
@@ -599,13 +600,13 @@ export default function SupervisorStudentsPage() {
               {filteredStudents.map((student) => (
                 <div 
                   key={student.id} 
-                  className="bg-white rounded-xl shadow-md p-4 border-l-4 border-blue-500 cursor-pointer hover:shadow-lg transition-shadow"
+                  className="bg-white rounded-xl shadow-md p-4 border-s-4 border-gold-500 cursor-pointer hover:shadow-lg transition-shadow"
                   onClick={() => openStudentModal(student)}
                 >
                   <div className="flex items-start justify-between mb-3">
                     <div className="flex items-center gap-3">
-                      <div className="flex-shrink-0 h-12 w-12 bg-gradient-to-br from-emerald-500 to-green-600 rounded-full flex items-center justify-center">
-                        <span className="text-white font-semibold text-lg">
+                      <div className="flex-shrink-0 h-12 w-12 bg-gradient-to-br from-gray-800 to-gray-950 ring-2 ring-gold-400/60 rounded-full flex items-center justify-center">
+                        <span className="text-gold-300 font-semibold text-lg">
                           {student.firstName[0]}{student.lastName[0]}
                         </span>
                       </div>
@@ -623,12 +624,12 @@ export default function SupervisorStudentsPage() {
                           : 'bg-red-100 text-red-800'
                       }`}
                     >
-                      {student.isActive ? t.users?.active || 'Active' : t.users?.inactive || 'Inactive'}
+                      {student.isActive ? t.users?.active || t.tables.active : t.users?.inactive || 'Inactive'}
                     </span>
                   </div>
                   <div className="mb-3">
                     <div className="text-sm text-gray-500 mb-2">
-                      Joined: {new Date(student.createdAt).toLocaleDateString('en-US', { 
+                      {t.tables.joined} {new Date(student.createdAt).toLocaleDateString(dateLocale(locale), { 
                         year: 'numeric', 
                         month: 'short', 
                         day: 'numeric' 
@@ -637,19 +638,19 @@ export default function SupervisorStudentsPage() {
                     
                     {/* Class Display */}
                     <div className="mb-2">
-                      <span className="text-xs font-medium text-gray-600">Class: </span>
+                      <span className="text-xs font-medium text-gray-600">{t.tables.classLabel}</span>
                       {student.class ? (
                         <span className="px-2 py-1 bg-blue-100 text-blue-800 rounded-full text-xs font-medium">
                           {student.class.name}
                         </span>
                       ) : (
-                        <span className="text-gray-400 text-xs">No class assigned</span>
+                        <span className="text-gray-400 text-xs">{t.tables.noClassAssigned}</span>
                       )}
                     </div>
                     
                     {/* Subjects Display */}
                     <div className="mb-2">
-                      <span className="text-xs font-medium text-gray-600">Subjects: </span>
+                      <span className="text-xs font-medium text-gray-600">{t.tables.subjectsLabel}</span>
                       <div className="flex flex-wrap gap-1 mt-1">
                         {student.subjects && student.subjects.length > 0 ? (
                           student.subjects.map((subject: any) => (
@@ -661,7 +662,7 @@ export default function SupervisorStudentsPage() {
                             </span>
                           ))
                         ) : (
-                          <span className="text-gray-400 text-xs">No subjects</span>
+                          <span className="text-gray-400 text-xs">{t.tables.noSubjects}</span>
                         )}
                       </div>
                     </div>
@@ -674,7 +675,7 @@ export default function SupervisorStudentsPage() {
                     }}
                     className="w-full py-2 text-center text-blue-600 hover:text-blue-900 font-medium text-sm border border-blue-200 rounded-lg hover:bg-blue-50"
                   >
-                    Manage Classes & Subjects
+                    {t.tables.manageClassesSubjects}
                   </button>
                 </div>
               ))}
@@ -713,13 +714,13 @@ export default function SupervisorStudentsPage() {
       {showModal && selectedStudent && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50 overflow-hidden">
           <div className="bg-white rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] flex flex-col">
-            <div className="sticky top-0 bg-gradient-to-r from-blue-500 to-cyan-600 px-6 py-4 rounded-t-2xl">
+            <div className="sticky top-0 z-10 gradient-primary px-6 py-4 rounded-t-2xl">
               <div className="flex items-center justify-between">
-                <h2 className="text-2xl font-bold text-white">Manage Classes & Subjects</h2>
+                <h2 className="text-2xl font-bold text-gold-200">{t.tables.manageClassesSubjects}</h2>
                 <button
                   onClick={() => setShowModal(false)}
                   className="text-white hover:bg-white/20 rounded-lg p-2 transition-colors"
-                  aria-label="Close modal"
+                  aria-label={t.tables.closeModal}
                 >
                   <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -731,10 +732,10 @@ export default function SupervisorStudentsPage() {
             <div className="p-6 space-y-6 overflow-y-auto flex-1">
               {/* Student Info */}
               <div className="bg-gray-50 rounded-lg p-4">
-                <h3 className="text-sm font-medium text-gray-700 mb-2">Student</h3>
+                <h3 className="text-sm font-medium text-gray-700 mb-2">{t.tables.student}</h3>
                 <div className="flex items-center gap-3">
-                  <div className="h-12 w-12 bg-gradient-to-br from-emerald-500 to-green-600 rounded-full flex items-center justify-center">
-                    <span className="text-white font-semibold text-lg">
+                  <div className="h-12 w-12 bg-gradient-to-br from-gray-800 to-gray-950 ring-2 ring-gold-400/60 rounded-full flex items-center justify-center">
+                    <span className="text-gold-300 font-semibold text-lg">
                       {selectedStudent.firstName[0]}{selectedStudent.lastName[0]}
                     </span>
                   </div>
@@ -771,7 +772,7 @@ export default function SupervisorStudentsPage() {
                       <svg className="w-5 h-5 text-blue-600" fill="currentColor" viewBox="0 0 20 20">
                         <path d="M10.394 2.08a1 1 0 00-.788 0l-7 3a1 1 0 000 1.84L5.25 8.051a.999.999 0 01.356-.257l4-1.714a1 1 0 11.788 1.838L7.667 9.088l1.94.831a1 1 0 00.787 0l7-3a1 1 0 000-1.838l-7-3z" />
                       </svg>
-                      Class (Select One)
+                      {t.tables.classSelectOne}
                     </label>
                     <select
                       id="class-select"
@@ -781,7 +782,7 @@ export default function SupervisorStudentsPage() {
                         setSelectedClassId(newClassId);
                         // Clear selected subjects when class changes to force reselection
                         setSelectedSubjectIds([]);
-                        setSuccess('Class changed. Please reselect subjects for the new class.');
+                        setSuccess(t.tables.classChangedReselect);
                         
                         // Fetch subjects for the selected class
                         if (newClassId) {
@@ -799,15 +800,15 @@ export default function SupervisorStudentsPage() {
                       className="w-full px-4 py-3 text-base border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
                       required
                     >
-                      <option value="">-- Select a Class --</option>
+                      <option value="">{t.tables.selectAClassOption}</option>
                       {allClasses.map((classItem) => (
                         <option key={classItem.id} value={classItem.id}>
-                          {classItem.name} {classItem.grade ? `- Grade ${classItem.grade}` : ''}
+                          {classItem.name} {classItem.grade ? `- ${t.tables.gradeWord} ${classItem.grade}` : ''}
                         </option>
                       ))}
                     </select>
                     {allClasses.length === 0 && (
-                      <p className="text-sm text-gray-500 italic mt-2">No classes available</p>
+                      <p className="text-sm text-gray-500 italic mt-2">{t.tables.noClassesAvailable}</p>
                     )}
                   </div>
 
@@ -818,15 +819,15 @@ export default function SupervisorStudentsPage() {
                         <svg className="w-5 h-5 text-indigo-600" fill="currentColor" viewBox="0 0 20 20">
                           <path d="M9 4.804A7.968 7.968 0 005.5 4c-1.255 0-2.443.29-3.5.804v10A7.969 7.969 0 015.5 14c1.669 0 3.218.51 4.5 1.385A7.962 7.962 0 0114.5 14c1.255 0 2.443.29 3.5.804v-10A7.968 7.968 0 0014.5 4c-1.255 0-2.443.29-3.5.804V12a1 1 0 11-2 0V4.804z" />
                         </svg>
-                        Subjects ({selectedSubjectIds.length} selected)
-                        <span className="text-xs text-red-600 font-normal">(Minimum 1 required)</span>
+                        {fmt(t.tables.subjectsSelectedCount, { count: selectedSubjectIds.length })}
+                        <span className="text-xs text-red-600 font-normal">{t.tables.minimumOneRequired}</span>
                       </h3>
                       {!selectedClassId && (
                         <p className="text-sm text-amber-600 bg-amber-50 p-2 rounded-lg mt-2">
                           <svg className="w-4 h-4 inline mr-1" fill="currentColor" viewBox="0 0 20 20">
                             <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
                           </svg>
-                          Please select a class first to see available subjects
+                          {t.tables.selectClassFirstForSubjects}
                         </p>
                       )}
                       {selectedClassId && selectedSubjectIds.length === 0 && (
@@ -834,7 +835,7 @@ export default function SupervisorStudentsPage() {
                           <svg className="w-4 h-4 inline mr-1" fill="currentColor" viewBox="0 0 20 20">
                             <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
                           </svg>
-                          Please select subjects for the chosen class
+                          {t.tables.selectSubjectsForClass}
                         </p>
                       )}
                     </div>
@@ -844,7 +845,7 @@ export default function SupervisorStudentsPage() {
                           <svg className="w-4 h-4 inline mr-1" fill="currentColor" viewBox="0 0 20 20">
                             <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
                           </svg>
-                          Showing subjects for: {allClasses.find(c => c.id === selectedClassId)?.name || 'Selected Class'}
+                          {t.tables.showingSubjectsFor} {allClasses.find(c => c.id === selectedClassId)?.name || t.tables.selectedClass}
                         </p>
                       </div>
                     )}
@@ -865,7 +866,7 @@ export default function SupervisorStudentsPage() {
                               <div className="flex-1">
                                 <p className="font-semibold text-gray-900">{subject.name}</p>
                                 {subject.class && (
-                                  <p className="text-xs text-gray-600 mt-1">Class: {subject.class.name}</p>
+                                  <p className="text-xs text-gray-600 mt-1">{t.tables.classLabel} {subject.class.name}</p>
                                 )}
                               </div>
                               {selectedSubjectIds.includes(subject.id) && (
@@ -880,16 +881,16 @@ export default function SupervisorStudentsPage() {
 
                       {/* Monthly Installment Preview */}
                       {selectedClassId && selectedSubjectIds.length > 0 && (
-                        <div className="mt-4 p-4 bg-gradient-to-r from-emerald-50 to-teal-50 border-2 border-emerald-200 rounded-lg">
+                        <div className="mt-4 p-4 bg-gradient-to-r from-gold-50 to-bronze-50 border-2 border-gold-200 rounded-lg">
                           <div className="flex items-center justify-between">
                             <div className="flex items-center gap-2">
-                              <svg className="w-5 h-5 text-emerald-600" fill="currentColor" viewBox="0 0 20 20">
+                              <svg className="w-5 h-5 text-gold-700" fill="currentColor" viewBox="0 0 20 20">
                                 <path d="M8.433 7.418c.155-.103.346-.196.567-.267v1.698a2.305 2.305 0 01-.567-.267C8.07 8.34 8 8.114 8 8c0-.114.07-.34.433-.582zM11 12.849v-1.698c.22.071.412.164.567.267.364.243.433.468.433.582 0 .114-.07.34-.433.582a2.305 2.305 0 01-.567.267z" />
                                 <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-13a1 1 0 10-2 0v.092a4.535 4.535 0 00-1.676.662C6.602 6.234 6 7.009 6 8c0 .99.602 1.765 1.324 2.246.48.32 1.054.545 1.676.662v1.941c-.391-.127-.68-.317-.843-.504a1 1 0 10-1.51 1.31c.562.649 1.413 1.076 2.353 1.253V15a1 1 0 102 0v-.092a4.535 4.535 0 001.676-.662C13.398 13.766 14 12.991 14 12c0-.99-.602-1.765-1.324-2.246A4.535 4.535 0 0011 9.092V7.151c.391.127.68.317.843.504a1 1 0 101.511-1.31c-.563-.649-1.413-1.076-2.354-1.253V5z" clipRule="evenodd" />
                               </svg>
-                              <span className="font-semibold text-gray-900">Estimated Monthly Installment:</span>
+                              <span className="font-semibold text-gray-900">{t.tables.estimatedMonthlyInstallment}</span>
                             </div>
-                            <span className="text-2xl font-bold text-emerald-600">
+                            <span className="text-2xl font-bold text-gold-700">
                               ${(() => {
                                 const total = selectedSubjectIds.reduce((sum, subjectId) => {
                                   const subject = availableSubjects.find(s => s.id === subjectId);
@@ -906,7 +907,7 @@ export default function SupervisorStudentsPage() {
                             </span>
                           </div>
                           <p className="text-xs text-gray-600 mt-2">
-                            This is the total monthly installment based on selected subjects. The actual amount will be calculated automatically when subjects are enrolled.
+                            {t.tables.installmentNote}
                           </p>
                         </div>
                       )}
@@ -918,10 +919,10 @@ export default function SupervisorStudentsPage() {
                             <svg className="w-5 h-5 text-purple-600" fill="currentColor" viewBox="0 0 20 20">
                               <path d="M9 6a3 3 0 11-6 0 3 3 0 016 0zM17 6a3 3 0 11-6 0 3 3 0 016 0zM12.93 17c.046-.327.07-.66.07-1a6.97 6.97 0 00-1.5-4.33A5 5 0 0119 16v1h-6.07zM6 11a5 5 0 015 5v1H1v-1a5 5 0 015-5z" />
                             </svg>
-                            Assign Teachers (Optional)
+                            {t.tables.assignTeachersOptional}
                           </h4>
                           <p className="text-sm text-gray-600 mb-4">
-                            If multiple teachers teach the same subject, select which teacher will teach this student. If not selected, the student will need to choose when submitting homework.
+                            {t.tables.multiTeacherNoteSupervisor}
                           </p>
                           <div className="space-y-3">
                             {selectedSubjectIds.map((subjectId) => {
@@ -934,13 +935,13 @@ export default function SupervisorStudentsPage() {
                                 <div key={subjectId} className="bg-gray-50 rounded-lg p-4 border border-gray-200">
                                   <div className="flex items-start justify-between mb-2">
                                     <div className="flex-1">
-                                      <p className="font-semibold text-gray-900">{subject?.name || 'Unknown Subject'}</p>
+                                      <p className="font-semibold text-gray-900">{subject?.name || t.tables.unknownSubject}</p>
                                     </div>
                                   </div>
                                   {isLoading ? (
                                     <div className="flex items-center gap-2 text-sm text-gray-600">
                                       <LoadingSpinner size="sm" />
-                                      Loading teachers...
+                                      {t.tables.loadingTeachers}
                                     </div>
                                   ) : teachers.length > 0 ? (
                                     <select
@@ -953,7 +954,7 @@ export default function SupervisorStudentsPage() {
                                       }}
                                       className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white"
                                     >
-                                      <option value="">-- No teacher assigned (student will choose) --</option>
+                                      <option value="">{t.tables.noTeacherStudentChoosesOption}</option>
                                       {teachers.map((teacherAssignment: any) => {
                                         const teacher = teacherAssignment.teacher || teacherAssignment;
                                         return (
@@ -964,7 +965,7 @@ export default function SupervisorStudentsPage() {
                                       })}
                                     </select>
                                   ) : (
-                                    <p className="text-sm text-gray-500 italic">No teachers available for this subject</p>
+                                    <p className="text-sm text-gray-500 italic">{t.tables.noTeachersForSubject}</p>
                                   )}
                                 </div>
                               );
@@ -988,7 +989,7 @@ export default function SupervisorStudentsPage() {
                       onClick={() => setShowModal(false)}
                       className="px-6 py-3 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 font-medium transition-colors"
                     >
-                      Cancel
+                      {t.tables.cancel}
                     </button>
                     <button
                       onClick={handleSaveChanges}
@@ -998,14 +999,14 @@ export default function SupervisorStudentsPage() {
                       {saving ? (
                         <>
                           <LoadingSpinner size="sm" />
-                          Saving...
+                          {t.tables.saving}
                         </>
                       ) : (
                         <>
                           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                           </svg>
-                          Save Changes
+                          {t.tables.saveChanges}
                         </>
                       )}
                     </button>

@@ -1,6 +1,8 @@
 'use client';
 
 import { Button } from './button';
+import { useI18n } from '@/lib/i18n-context';
+import { fmt } from '@/lib/utils';
 
 interface PaginationProps {
   currentPage: number;
@@ -17,6 +19,7 @@ export default function Pagination({
   limit,
   onPageChange,
 }: PaginationProps) {
+  const { t } = useI18n();
   const getPageNumbers = () => {
     const pages: (number | string)[] = [];
     const maxVisible = 5;
@@ -60,8 +63,8 @@ export default function Pagination({
 
   return (
     <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mt-6">
-      <div className="text-sm text-gray-600 dark:text-gray-400">
-        Showing {startItem} to {endItem} of {total} results
+      <div className="text-sm text-gray-600">
+        {fmt(t.common.pagination.showing, { start: startItem, end: endItem, total })}
       </div>
 
       <div className="flex items-center gap-2">
@@ -71,7 +74,7 @@ export default function Pagination({
           onClick={() => onPageChange(currentPage - 1)}
           disabled={currentPage === 1}
         >
-          Previous
+          {t.common.pagination.previous}
         </Button>
 
         <div className="flex gap-1">
@@ -108,7 +111,7 @@ export default function Pagination({
           onClick={() => onPageChange(currentPage + 1)}
           disabled={currentPage === totalPages || totalPages === 0}
         >
-          Next
+          {t.common.pagination.next}
         </Button>
       </div>
     </div>

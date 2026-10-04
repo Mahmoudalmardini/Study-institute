@@ -131,14 +131,14 @@ export default function StudentPointsPage() {
             {/* Summary Cards */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6 mb-6 sm:mb-8">
               {/* Total Points Card */}
-              <Card className={`p-6 bg-gradient-to-br from-blue-500 to-cyan-500 text-white shadow-lg hover-lift ${mounted ? 'animate-slide-up stagger-1' : 'opacity-0'}`}>
+              <Card className={`p-6 gradient-gold border-gold-600/40 text-gray-900 shadow-lg hover-lift ${mounted ? 'animate-slide-up stagger-1' : 'opacity-0'}`}>
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-blue-100 text-sm font-medium mb-1">{t.points.totalPoints}</p>
+                    <p className="text-gray-800 text-sm font-semibold mb-1">{t.points.totalPoints}</p>
                     <p className="text-4xl sm:text-5xl font-bold">{summary?.total || 0}</p>
                   </div>
-                  <div className="w-16 h-16 bg-white/20 rounded-full flex items-center justify-center backdrop-blur-sm">
-                    <svg className="w-8 h-8 text-white" fill="currentColor" viewBox="0 0 20 20">
+                  <div className="w-16 h-16 bg-gray-950/15 rounded-full flex items-center justify-center">
+                    <svg className="w-8 h-8 text-gray-900" fill="currentColor" viewBox="0 0 20 20">
                       <path d="M2 11a1 1 0 011-1h2a1 1 0 011 1v5a1 1 0 01-1 1H3a1 1 0 01-1-1v-5zM8 7a1 1 0 011-1h2a1 1 0 011 1v9a1 1 0 01-1 1H9a1 1 0 01-1-1V7zM14 4a1 1 0 011-1h2a1 1 0 011 1v12a1 1 0 01-1 1h-2a1 1 0 01-1-1V4z" />
                     </svg>
                   </div>
@@ -146,14 +146,14 @@ export default function StudentPointsPage() {
               </Card>
 
               {/* Daily Points Card */}
-              <Card className={`p-6 bg-gradient-to-br from-purple-500 to-pink-500 text-white shadow-lg hover-lift ${mounted ? 'animate-slide-up stagger-2' : 'opacity-0'}`}>
+              <Card className={`p-6 gradient-primary border-gold-500/30 text-white shadow-lg hover-lift ${mounted ? 'animate-slide-up stagger-2' : 'opacity-0'}`}>
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-purple-100 text-sm font-medium mb-1">{t.points.todayPoints}</p>
-                    <p className="text-4xl sm:text-5xl font-bold">{summary?.daily || 0}</p>
+                    <p className="text-gold-200 text-sm font-medium mb-1">{t.points.todayPoints}</p>
+                    <p className="text-4xl sm:text-5xl font-bold text-gold-300">{summary?.daily || 0}</p>
                   </div>
-                  <div className="w-16 h-16 bg-white/20 rounded-full flex items-center justify-center backdrop-blur-sm">
-                    <svg className="w-8 h-8 text-white" fill="currentColor" viewBox="0 0 20 20">
+                  <div className="w-16 h-16 bg-gold-500/10 ring-1 ring-gold-500/40 rounded-full flex items-center justify-center">
+                    <svg className="w-8 h-8 text-gold-300" fill="currentColor" viewBox="0 0 20 20">
                       <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clipRule="evenodd" />
                     </svg>
                   </div>
