@@ -185,6 +185,15 @@ export class StudentsService {
     };
   }
 
+  // Lightweight existence check for internal guards; same error as findOne()
+  private async assertExists(id: string) {
+    const found = await this.prisma.student.findUnique({ where: { id }, select: { id: true, classId: true } });
+    if (!found) {
+      throw new NotFoundException('Student not found');
+    }
+    return found;
+  }
+
   async findOne(id: string) {
     const student = await this.prisma.student.findUnique({
       where: { id },
@@ -401,7 +410,7 @@ export class StudentsService {
     subjects: Array<{ subjectId: string; teacherId?: string }>,
     enrolledBy: string,
   ) {
-    const student = await this.findOne(studentId); // Validate student exists
+    const student = await this.assertExists(studentId); // Validate student exists
 
     // Validate minimum 1 subject
     if (!subjects || subjects.length === 0) {
@@ -441,17 +450,21 @@ export class StudentsService {
         );
       }
 
-      // Validate that teachers are assigned to the corresponding subjects
+      // Validate that teachers are assigned to the corresponding subjects (one query for all pairs)
+      const pairs = subjects
+        .filter((s) => s.teacherId)
+        .map((s) => ({ teacherId: s.teacherId!, subjectId: s.subjectId }));
+      const assigned = new Set(
+        (
+          await this.prisma.teacherSubject.findMany({
+            where: { OR: pairs },
+            select: { teacherId: true, subjectId: true },
+          })
+        ).map((ts) => `${ts.teacherId}|${ts.subjectId}`),
+      );
       for (const subj of subjects) {
         if (subj.teacherId) {
-          const teacherSubject = await this.prisma.teacherSubject.findFirst({
-            where: {
-              teacherId: subj.teacherId,
-              subjectId: subj.subjectId,
-            },
-          });
-
-          if (!teacherSubject) {
+          if (!assigned.has(`${subj.teacherId}|${subj.subjectId}`)) {
             const subject = subjectRecords.find(s => s.id === subj.subjectId);
             throw new ConflictException(
               `Teacher is not assigned to teach subject: ${subject?.name || subj.subjectId}`,
@@ -632,7 +645,7 @@ export class StudentsService {
     classIds: string[],
     assignedBy: string,
   ) {
-    await this.findOne(studentId); // Validate student exists
+    await this.assertExists(studentId); // Validate student exists
 
     // Validate all classes exist
     const classes = await this.prisma.class.findMany({
@@ -684,7 +697,7 @@ export class StudentsService {
   }
 
   async getStudentClasses(studentId: string) {
-    await this.findOne(studentId); // Validate student exists
+    await this.assertExists(studentId); // Validate student exists
 
     return this.prisma.studentClass.findMany({
       where: { studentId },
@@ -699,7 +712,7 @@ export class StudentsService {
   }
 
   async removeStudentClass(studentId: string, classId: string) {
-    await this.findOne(studentId); // Validate student exists
+    await this.assertExists(studentId); // Validate student exists
 
     const assignment = await this.prisma.studentClass.findUnique({
       where: {

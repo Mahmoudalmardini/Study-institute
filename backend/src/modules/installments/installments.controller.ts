@@ -9,7 +9,6 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { InstallmentsService } from './installments.service';
-import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
@@ -21,7 +20,7 @@ import { CalculateInstallmentDto } from './dto/calculate-installment.dto';
 import { GetInstallmentsFilterDto } from './dto/get-installments-filter.dto';
 
 @Controller('installments')
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(RolesGuard)
 export class InstallmentsController {
   constructor(private readonly installmentsService: InstallmentsService) {}
 

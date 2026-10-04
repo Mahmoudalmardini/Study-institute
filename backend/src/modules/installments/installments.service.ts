@@ -70,25 +70,48 @@ export class InstallmentsService {
       }),
     ]);
 
-    // Transform to match frontend expectation roughly
-    const mappedStudents = await Promise.all(
-      students.map(async (student) => {
-        // Get outstanding balance
-        const outstanding = await this.getOutstandingBalance(student.id);
-        
-        return {
-          id: student.user.id, // User ID as expected by frontend 'Student' interface
-          email: student.user.email,
-          firstName: student.user.firstName,
-          lastName: student.user.lastName,
-          studentProfile: {
-            id: student.id, // Student ID
+    // One query for every student's outstanding installments instead of two per student;
+    // the per-student result matches getOutstandingBalance()
+    const outstandingRows = students.length
+      ? await this.prisma.studentInstallment.findMany({
+          where: {
+            studentId: { in: students.map((s) => s.id) },
+            outstandingAmount: { gt: 0 },
           },
-          installments: student.installments,
-          outstanding,
-        };
-      })
-    );
+          orderBy: [{ year: 'asc' }, { month: 'asc' }],
+        })
+      : [];
+    const outstandingByStudent = new Map<string, typeof outstandingRows>();
+    for (const row of outstandingRows) {
+      const rows = outstandingByStudent.get(row.studentId) ?? [];
+      rows.push(row);
+      outstandingByStudent.set(row.studentId, rows);
+    }
+
+    // Transform to match frontend expectation roughly
+    const mappedStudents = students.map((student) => {
+      const installments = outstandingByStudent.get(student.id) ?? [];
+      let totalOutstanding = new Prisma.Decimal(0);
+      for (const installment of installments) {
+        totalOutstanding = totalOutstanding.add(installment.outstandingAmount);
+      }
+
+      return {
+        id: student.user.id, // User ID as expected by frontend 'Student' interface
+        email: student.user.email,
+        firstName: student.user.firstName,
+        lastName: student.user.lastName,
+        studentProfile: {
+          id: student.id, // Student ID
+        },
+        installments: student.installments,
+        outstanding: {
+          totalOutstanding: totalOutstanding.toString(),
+          installments,
+          count: installments.length,
+        },
+      };
+    });
 
     return {
       data: mappedStudents,

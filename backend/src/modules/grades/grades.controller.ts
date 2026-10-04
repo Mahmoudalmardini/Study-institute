@@ -8,11 +8,9 @@ import {
   Delete,
   Query,
   UseGuards,
-  UseInterceptors,
   ParseIntPipe,
   DefaultValuePipe,
 } from '@nestjs/common';
-import { CacheInterceptor } from '@nestjs/cache-manager';
 import { GradesService } from './grades.service';
 import { CreateGradeDto } from './dto/create-grade.dto';
 import { UpdateGradeDto } from './dto/update-grade.dto';
@@ -38,7 +36,6 @@ export class GradesController {
 
   @Get()
   @Roles(Role.ADMIN, Role.SUPERVISOR, Role.TEACHER)
-  @UseInterceptors(CacheInterceptor)
   findAll(
     @Query('studentId') studentId?: string,
     @Query('academicYear') academicYear?: string,

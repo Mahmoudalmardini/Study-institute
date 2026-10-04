@@ -18,6 +18,16 @@ import { Decimal } from '@prisma/client/runtime/library';
 export class PayrollService {
   constructor(private prisma: PrismaService) {}
 
+  // Prisma P2021 = table does not exist; surface the same guidance the old per-request probe gave
+  private rethrowIfPayrollTablesMissing(error: any): void {
+    if (error?.code === 'P2021') {
+      throw new BadRequestException(
+        'Payroll tables do not exist. Please run database migrations: npx prisma migrate deploy. ' +
+          'See RAILWAY_MIGRATION_FIX.md for detailed instructions.',
+      );
+    }
+  }
+
   // Check if payroll tables exist in database
   async checkPayrollTables() {
     const tables = ['teacher_salaries', 'hour_requests', 'monthly_payroll_records'];
@@ -25,10 +35,8 @@ export class PayrollService {
 
     for (const table of tables) {
       try {
-        await this.prisma.$queryRaw`SELECT 1 FROM ${table} LIMIT 1`.catch(e => {
-          // Use template literal correctly
-          return this.prisma.$queryRawUnsafe(`SELECT 1 FROM ${table} LIMIT 1`);
-        });
+        // Table names come from the constant list above, never from input
+        await this.prisma.$queryRawUnsafe(`SELECT 1 FROM ${table} LIMIT 1`);
         results[table] = { exists: true };
       } catch (error: any) {
         results[table] = {
@@ -91,28 +99,6 @@ export class PayrollService {
   // Get all teachers with their current salaries (Admin/Supervisor)
   async getAllSalaries(search?: string) {
     try {
-      // First check if payroll tables exist by trying a simple query
-      try {
-        await this.prisma.$queryRawUnsafe('SELECT 1 FROM teacher_salaries LIMIT 1');
-      } catch (tableError: any) {
-        console.error('Table check error:', {
-          message: tableError.message,
-          code: tableError.code,
-          name: tableError.name,
-        });
-        
-        if (tableError.message?.includes('does not exist') || 
-            tableError.message?.includes('relation') || 
-            tableError.code === '42P01' ||
-            tableError.message?.includes('teacher_salaries')) {
-          throw new BadRequestException(
-            'Payroll tables do not exist. Please run database migrations: npx prisma migrate deploy. ' +
-            'See RAILWAY_MIGRATION_FIX.md for detailed instructions.',
-          );
-        }
-        // If it's a different error, continue - might just be empty table
-      }
-
       const teachers = await this.prisma.teacher.findMany({
         where: search
           ? {
@@ -134,47 +120,31 @@ export class PayrollService {
               lastName: true,
             },
           },
+          // Most recent salary (regardless of effective date), including future-dated ones
+          salaries: {
+            orderBy: { effectiveFrom: 'desc' },
+            take: 1,
+          },
         },
       });
 
-      const teachersWithSalaries = await Promise.all(
-        teachers.map(async (teacher) => {
-          try {
-            // Get the most recent salary (regardless of effective date) for display
-            // This shows all salaries including ones that will be effective in the future
-            const salary = await this.prisma.teacherSalary.findFirst({
-              where: {
-                teacherId: teacher.id,
-              },
-              orderBy: {
-                effectiveFrom: 'desc',
-              },
-            });
-
-            return {
-              ...teacher,
-              currentSalary: salary
-                ? {
-                    id: salary.id,
-                    monthlySalary: salary.monthlySalary,
-                    hourlyWage: salary.hourlyWage,
-                    effectiveFrom: salary.effectiveFrom,
-                  }
-                : null,
-            };
-          } catch (error) {
-            console.error(`Error fetching salary for teacher ${teacher.id}:`, error);
-            return {
-              ...teacher,
-              currentSalary: null,
-            };
-          }
-        }),
-      );
-
-      return teachersWithSalaries;
+      return teachers.map(({ salaries, ...teacher }) => {
+        const salary = salaries[0];
+        return {
+          ...teacher,
+          currentSalary: salary
+            ? {
+                id: salary.id,
+                monthlySalary: salary.monthlySalary,
+                hourlyWage: salary.hourlyWage,
+                effectiveFrom: salary.effectiveFrom,
+              }
+            : null,
+        };
+      });
     } catch (error) {
       console.error('Error in getAllSalaries:', error);
+      this.rethrowIfPayrollTablesMissing(error);
       throw error;
     }
   }
@@ -402,27 +372,6 @@ export class PayrollService {
   // Get all pending hour requests (Admin)
   async getPendingHourRequests() {
     try {
-      // First check if payroll tables exist
-      try {
-        await this.prisma.$queryRawUnsafe('SELECT 1 FROM hour_requests LIMIT 1');
-      } catch (tableError: any) {
-        console.error('Hour requests table check error:', {
-          message: tableError.message,
-          code: tableError.code,
-          name: tableError.name,
-        });
-        
-        if (tableError.message?.includes('does not exist') || 
-            tableError.message?.includes('relation') || 
-            tableError.code === '42P01' ||
-            tableError.message?.includes('hour_requests')) {
-          throw new BadRequestException(
-            'Payroll tables do not exist. Please run database migrations: npx prisma migrate deploy. ' +
-            'See RAILWAY_MIGRATION_FIX.md for detailed instructions.',
-          );
-        }
-      }
-
       const requests = await this.prisma.hourRequest.findMany({
         where: {
           status: HourRequestStatus.PENDING,
@@ -449,6 +398,7 @@ export class PayrollService {
       return requests;
     } catch (error) {
       console.error('Error in getPendingHourRequests:', error);
+      this.rethrowIfPayrollTablesMissing(error);
       throw error;
     }
   }

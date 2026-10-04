@@ -14,7 +14,6 @@ import {
   DefaultValuePipe,
 } from '@nestjs/common';
 import { FilesInterceptor } from '@nestjs/platform-express';
-import { CacheInterceptor } from '@nestjs/cache-manager';
 import { HomeworkService } from './homework.service';
 import { CreateHomeworkDto } from './dto/create-homework.dto';
 import { UpdateHomeworkDto } from './dto/update-homework.dto';
@@ -25,13 +24,12 @@ import { TeacherEvaluateSubmissionDto } from './dto/teacher-evaluate-submission.
 import { AdminReviewSubmissionDto } from './dto/admin-review-submission.dto';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { RolesGuard } from '../../common/guards/roles.guard';
-import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { Role } from '@prisma/client';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import type { CurrentUserData } from '../../common/decorators/current-user.decorator';
 
 @Controller('homework')
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(RolesGuard)
 export class HomeworkController {
   constructor(private readonly homeworkService: HomeworkService) {}
 
@@ -46,7 +44,6 @@ export class HomeworkController {
 
   @Get()
   @Roles(Role.ADMIN, Role.SUPERVISOR, Role.TEACHER, Role.STUDENT)
-  @UseInterceptors(CacheInterceptor)
   findAll(
     @CurrentUser() user: CurrentUserData,
     @Query('classId') classId?: string,

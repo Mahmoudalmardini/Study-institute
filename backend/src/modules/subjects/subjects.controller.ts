@@ -8,24 +8,21 @@ import {
   Delete,
   Query,
   UseGuards,
-  UseInterceptors,
   ParseIntPipe,
   DefaultValuePipe,
 } from '@nestjs/common';
-import { CacheInterceptor } from '@nestjs/cache-manager';
 import { SubjectsService } from './subjects.service';
 import { CreateSubjectDto } from './dto/create-subject.dto';
 import { UpdateSubjectDto } from './dto/update-subject.dto';
 import { AssignTeacherDto } from './dto/assign-teacher.dto';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { RolesGuard } from '../../common/guards/roles.guard';
-import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import type { CurrentUserData } from '../../common/decorators/current-user.decorator';
 import { Role } from '@prisma/client';
 
 @Controller('subjects')
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(RolesGuard)
 export class SubjectsController {
   constructor(private readonly subjectsService: SubjectsService) {}
 
@@ -37,7 +34,6 @@ export class SubjectsController {
 
   @Get()
   @Roles(Role.ADMIN, Role.SUPERVISOR, Role.TEACHER, Role.STUDENT)
-  // @UseInterceptors(CacheInterceptor) // Temporarily disabled for debugging
   findAll(
     @Query('classId') classId?: string,
     @Query('page', new DefaultValuePipe(1), ParseIntPipe) page: number = 1,

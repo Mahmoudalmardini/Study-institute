@@ -1,21 +1,18 @@
-import { Controller, Get, Param, Query, UseGuards, UseInterceptors, ParseIntPipe, DefaultValuePipe } from '@nestjs/common';
-import { CacheInterceptor } from '@nestjs/cache-manager';
+import { Controller, Get, Param, Query, UseGuards, ParseIntPipe, DefaultValuePipe } from '@nestjs/common';
 import { TeachersService } from './teachers.service';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { RolesGuard } from '../../common/guards/roles.guard';
-import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import type { CurrentUserData } from '../../common/decorators/current-user.decorator';
 import { Role } from '@prisma/client';
 
 @Controller('teachers')
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(RolesGuard)
 export class TeachersController {
   constructor(private readonly teachersService: TeachersService) {}
 
   @Get()
   @Roles(Role.ADMIN, Role.SUPERVISOR)
-  @UseInterceptors(CacheInterceptor)
   findAll(
     @Query('page', new DefaultValuePipe(1), ParseIntPipe) page: number = 1,
     @Query('limit', new DefaultValuePipe(20), ParseIntPipe) limit: number = 20,

@@ -133,6 +133,15 @@ export class ClassesService {
     };
   }
 
+  // Lightweight existence check for internal guards; same error as findOne()
+  private async assertExists(id: string) {
+    const found = await this.prisma.class.findUnique({ where: { id }, select: { id: true } });
+    if (!found) {
+      throw new NotFoundException(`Class with ID ${id} not found`);
+    }
+    return found;
+  }
+
   async findOne(id: string) {
     const classData = await this.prisma.class.findUnique({
       where: { id },
@@ -180,7 +189,7 @@ export class ClassesService {
   }
 
   async update(id: string, updateClassDto: UpdateClassDto) {
-    await this.findOne(id); // Check if class exists
+    await this.assertExists(id); // Check if class exists
 
     // Validate teacher exists if provided
     if (updateClassDto.teacherId) {
@@ -237,7 +246,7 @@ export class ClassesService {
   }
 
   async remove(id: string) {
-    await this.findOne(id); // Check if class exists
+    await this.assertExists(id); // Check if class exists
 
     // Check if class has students
     const classData = await this.prisma.class.findUnique({
@@ -268,7 +277,7 @@ export class ClassesService {
     assignedBy: string,
   ) {
     // Validate class exists
-    await this.findOne(classId);
+    await this.assertExists(classId);
 
     // Extract subject IDs
     const subjectIds = subjects.map((s) => s.subjectId);
@@ -346,7 +355,7 @@ export class ClassesService {
 
   async unassignSubject(classId: string, subjectId: string) {
     // Validate class exists
-    await this.findOne(classId);
+    await this.assertExists(classId);
 
     // Validate subject exists
     const subject = await this.prisma.subject.findUnique({
@@ -386,7 +395,7 @@ export class ClassesService {
 
   async getClassSubjects(classId: string) {
     // Validate class exists
-    await this.findOne(classId);
+    await this.assertExists(classId);
 
     // Return all subjects assigned to this class via junction table
     const classSubjects = await this.prisma.classSubject.findMany({
@@ -416,7 +425,7 @@ export class ClassesService {
     monthlyInstallment: number | null,
   ) {
     // Validate class exists
-    await this.findOne(classId);
+    await this.assertExists(classId);
 
     // Validate subject exists
     const subject = await this.prisma.subject.findUnique({
