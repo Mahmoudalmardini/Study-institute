@@ -369,7 +369,7 @@ export default function UsersPage() {
               <button
                 onClick={() => router.push('/admin')}
                 className="w-10 h-10 bg-white/10 hover:bg-white/20 rounded-lg flex items-center justify-center text-gold-300 flex-shrink-0"
-                aria-label={t.tables.back}
+                aria-label={t.common.back}
               >
                 <span className="rtl:rotate-180 inline-block">←</span>
               </button>
@@ -445,19 +445,19 @@ export default function UsersPage() {
                   <table className="data-table min-w-full">
                     <thead>
                       <tr>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        <th className="px-6 py-3 text-xs">
                           {t.users.firstName}
                         </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        <th className="px-6 py-3 text-xs">
                           {t.users.lastName}
                         </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        <th className="px-6 py-3 text-xs">
                           {t.users.username}
                         </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        <th className="px-6 py-3 text-xs">
                           {t.users.role}
                         </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        <th className="px-6 py-3 text-xs">
                           {t.users.actions}
                         </th>
                       </tr>

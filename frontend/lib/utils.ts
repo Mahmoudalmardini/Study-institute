@@ -5,6 +5,13 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
+// List endpoints return either a bare array or a paginated { data, meta } envelope
+export function asList<T = any>(res: unknown): T[] {
+  if (Array.isArray(res)) return res as T[]
+  const data = (res as { data?: unknown } | null)?.data
+  return Array.isArray(data) ? (data as T[]) : []
+}
+
 export function fmt(template: string, vars: Record<string, string | number>): string {
   return template.replace(/\{(\w+)\}/g, (match, key) => (key in vars ? String(vars[key]) : match))
 }

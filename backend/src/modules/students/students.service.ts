@@ -95,16 +95,20 @@ export class StudentsService {
 
   async findAll(
     classId?: string,
-    options?: { assignedSubjectsOnly?: boolean; includeSubjects?: boolean },
+    options?: { assignedSubjectsOnly?: boolean; includeSubjects?: boolean; userIds?: string[] },
     page: number = 1,
     limit: number = 20,
   ): Promise<PaginationResponse<any>> {
-    const { assignedSubjectsOnly, includeSubjects } = options || {};
+    const { assignedSubjectsOnly, includeSubjects, userIds } = options || {};
 
     const where: Prisma.StudentWhereInput = {};
 
     if (classId) {
       where.classId = classId;
+    }
+
+    if (userIds?.length) {
+      where.userId = { in: userIds };
     }
 
     if (assignedSubjectsOnly) {

@@ -7,6 +7,7 @@ import SettingsMenu from '@/components/SettingsMenu';
 import { Logo } from '@/components/Logo';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import apiClient from '@/lib/api-client';
+import { asList } from '@/lib/utils';
 
 interface Subject {
   id: string;
@@ -86,8 +87,8 @@ export default function SubjectsPage() {
 
   const fetchSubjects = async () => {
     try {
-      const data = await apiClient.get('/subjects');
-      setSubjects(data || []);
+      const data = await apiClient.get('/subjects?page=1&limit=1000');
+      setSubjects(asList(data));
     } catch (error) {
       console.error('Error fetching subjects:', error);
       setSubjects([]);

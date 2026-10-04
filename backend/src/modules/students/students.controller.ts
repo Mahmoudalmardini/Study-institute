@@ -45,6 +45,7 @@ export class StudentsController {
     @Query('includeSubjects') includeSubjects?: string,
     @Query('page', new DefaultValuePipe(1), ParseIntPipe) page: number = 1,
     @Query('limit', new DefaultValuePipe(20), ParseIntPipe) limit: number = 20,
+    @Query('userIds') userIds?: string,
   ) {
     return this.studentsService.findAll(
       classId,
@@ -57,6 +58,9 @@ export class StudentsController {
           typeof includeSubjects === 'string'
             ? includeSubjects === 'true'
             : undefined,
+        userIds: userIds
+          ? userIds.split(',').map((id) => id.trim()).filter(Boolean)
+          : undefined,
       },
       page,
       limit,

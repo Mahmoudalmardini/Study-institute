@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useI18n } from '@/lib/i18n-context';
-import { fmt, dateLocale } from '@/lib/utils';
+import { fmt, dateLocale, asList } from '@/lib/utils';
 import SettingsMenu from '@/components/SettingsMenu';
 import { Logo } from '@/components/Logo';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
@@ -93,8 +93,8 @@ export default function TeachersPage() {
         return;
       }
 
-      const response = await apiClient.get('/teachers');
-      setTeachers((response as any) || []);
+      const response = await apiClient.get('/teachers?page=1&limit=1000');
+      setTeachers(asList(response));
     } catch (err) {
       console.error('Error fetching teachers:', err);
       setError(t.tables.errorLoadingTeachers);
@@ -105,8 +105,8 @@ export default function TeachersPage() {
 
   const fetchSubjects = async () => {
     try {
-      const response = await apiClient.get('/subjects');
-      setSubjects((response as any) || []);
+      const response = await apiClient.get('/subjects?page=1&limit=1000');
+      setSubjects(asList(response));
     } catch (err) {
       console.error('Error fetching subjects:', err);
     }
@@ -114,8 +114,8 @@ export default function TeachersPage() {
 
   const fetchClasses = async () => {
     try {
-      const response = await apiClient.get('/classes');
-      setClasses((response as any) || []);
+      const response = await apiClient.get('/classes?page=1&limit=1000');
+      setClasses(asList(response));
     } catch (err) {
       console.error('Error fetching classes:', err);
     }
@@ -243,7 +243,7 @@ export default function TeachersPage() {
 
           if (isAlreadyAssigned) {
             const subjectName = availableSubjectsForClass.find(s => s.id === subjectId)?.name || t.tables.subject;
-            results.failed.push(`${subjectName} (already assigned)`);
+            results.failed.push(fmt(t.tables.alreadyAssignedSuffix, { subject: subjectName }));
             continue;
           }
 
@@ -330,8 +330,8 @@ export default function TeachersPage() {
       await fetchTeachers();
 
       // Update the selected teacher with fresh data
-      const updatedTeachersResponse = await apiClient.get('/teachers');
-      const updatedTeacher = ((updatedTeachersResponse as any) || []).find(
+      const updatedTeachersResponse = await apiClient.get('/teachers?page=1&limit=1000');
+      const updatedTeacher = asList<Teacher>(updatedTeachersResponse).find(
         (t: Teacher) => t.id === selectedTeacher.id
       );
       if (updatedTeacher) {
@@ -357,8 +357,8 @@ export default function TeachersPage() {
 
       // Refresh data to sync UI with backend
       await fetchTeachers();
-      const updatedTeachersResponse = await apiClient.get('/teachers');
-      const updatedTeacher = ((updatedTeachersResponse as any) || []).find(
+      const updatedTeachersResponse = await apiClient.get('/teachers?page=1&limit=1000');
+      const updatedTeacher = asList<Teacher>(updatedTeachersResponse).find(
         (t: Teacher) => t.id === selectedTeacher.id
       );
       if (updatedTeacher) {
@@ -385,8 +385,8 @@ export default function TeachersPage() {
       await fetchTeachers();
 
       // Update the selected teacher with fresh data
-      const updatedTeachersResponse = await apiClient.get('/teachers');
-      const updatedTeacher = ((updatedTeachersResponse as any) || []).find(
+      const updatedTeachersResponse = await apiClient.get('/teachers?page=1&limit=1000');
+      const updatedTeacher = asList<Teacher>(updatedTeachersResponse).find(
         (t: Teacher) => t.id === selectedTeacher.id
       );
       if (updatedTeacher) {
@@ -411,8 +411,8 @@ export default function TeachersPage() {
 
       // Refresh data to sync UI with backend
       await fetchTeachers();
-      const updatedTeachersResponse = await apiClient.get('/teachers');
-      const updatedTeacher = ((updatedTeachersResponse as any) || []).find(
+      const updatedTeachersResponse = await apiClient.get('/teachers?page=1&limit=1000');
+      const updatedTeacher = asList<Teacher>(updatedTeachersResponse).find(
         (t: Teacher) => t.id === selectedTeacher.id
       );
       if (updatedTeacher) {
@@ -440,8 +440,8 @@ export default function TeachersPage() {
       await fetchTeachers();
       
       // Update the selected teacher with fresh data
-      const updatedTeachersResponse = await apiClient.get('/teachers');
-      const updatedTeacher = ((updatedTeachersResponse as any) || []).find(
+      const updatedTeachersResponse = await apiClient.get('/teachers?page=1&limit=1000');
+      const updatedTeacher = asList<Teacher>(updatedTeachersResponse).find(
         (t: Teacher) => t.id === selectedTeacher.id
       );
       if (updatedTeacher) {
@@ -455,8 +455,8 @@ export default function TeachersPage() {
       
       // Refresh data to sync UI with backend
       await fetchTeachers();
-      const updatedTeachersResponse = await apiClient.get('/teachers');
-      const updatedTeacher = ((updatedTeachersResponse as any) || []).find(
+      const updatedTeachersResponse = await apiClient.get('/teachers?page=1&limit=1000');
+      const updatedTeacher = asList<Teacher>(updatedTeachersResponse).find(
         (t: Teacher) => t.id === selectedTeacher.id
       );
       if (updatedTeacher) {
@@ -498,8 +498,8 @@ export default function TeachersPage() {
       await fetchTeachers();
 
       // Update the selected teacher with fresh data
-      const updatedTeachersResponse = await apiClient.get('/teachers');
-      const updatedTeacher = ((updatedTeachersResponse as any) || []).find(
+      const updatedTeachersResponse = await apiClient.get('/teachers?page=1&limit=1000');
+      const updatedTeacher = asList<Teacher>(updatedTeachersResponse).find(
         (t: Teacher) => t.id === selectedTeacher.id
       );
       if (updatedTeacher) {
@@ -544,9 +544,9 @@ export default function TeachersPage() {
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center gap-3 min-w-0 flex-1">
               <button
-                onClick={() => router.push('/admin')}
+                onClick={() => router.push('/supervisor')}
                 className="w-10 h-10 bg-white/20 rounded-lg flex items-center justify-center backdrop-blur-sm hover:bg-white/30 transition-colors flex-shrink-0"
-                aria-label={t.tables.backToAdmin}
+                aria-label={t.tables.backToSupervisor}
               >
                 <svg className="w-6 h-6 text-white rtl:rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
@@ -632,26 +632,26 @@ export default function TeachersPage() {
               <table className="data-table min-w-full">
                 <thead>
                   <tr>
-                    <th className="px-6 py-4 text-left text-xs font-medium text-white uppercase tracking-wider">
-                      {t.tables.name}
+                    <th className="px-6 py-4 text-xs">
+                      {t.users.name}
                     </th>
-                    <th className="px-6 py-4 text-left text-xs font-medium text-white uppercase tracking-wider">
-                      {t.tables.email}
+                    <th className="px-6 py-4 text-xs">
+                      {t.users.email}
                     </th>
-                    <th className="px-6 py-4 text-left text-xs font-medium text-white uppercase tracking-wider">
+                    <th className="px-6 py-4 text-xs">
                       {t.tables.subjects}
                     </th>
-                    <th className="px-6 py-4 text-left text-xs font-medium text-white uppercase tracking-wider">
-                      {t.tables.status}
+                    <th className="px-6 py-4 text-xs">
+                      {t.users.status}
                     </th>
-                    <th className="px-6 py-4 text-center text-xs font-medium text-white uppercase tracking-wider">
-                      {t.tables.actions}
+                    <th className="px-6 py-4 text-center text-xs">
+                      {t.users.actions}
                     </th>
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
                   {filteredTeachers.map((teacher) => (
-                    <tr key={teacher.id} className="hover:bg-gray-50">
+                    <tr key={teacher.id}>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="flex items-center">
                           <div className="flex-shrink-0 h-10 w-10 bg-gradient-to-br from-gray-800 to-gray-950 ring-2 ring-gold-400/60 rounded-full flex items-center justify-center">
@@ -694,7 +694,7 @@ export default function TeachersPage() {
                               : 'bg-red-100 text-red-800'
                           }`}
                         >
-                          {teacher.isActive ? t.users?.active || t.tables.active : t.users?.inactive || 'Inactive'}
+                          {teacher.isActive ? t.users.active : t.users.inactive}
                         </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-center">
@@ -750,7 +750,7 @@ export default function TeachersPage() {
                           : 'bg-red-100 text-red-800'
                       }`}
                     >
-                      {teacher.isActive ? t.users?.active || t.tables.active : t.users?.inactive || 'Inactive'}
+                      {teacher.isActive ? t.users.active : t.users.inactive}
                     </span>
                   </div>
                   
@@ -990,7 +990,7 @@ export default function TeachersPage() {
                       {t.tables.availableSubjects}
                       {selectedSubjectIds.length > 0 && (
                         <span className="ml-2 text-sm font-normal text-purple-600">
-                          ({selectedSubjectIds.length} selected)
+                          {fmt(t.tables.selectedCount, { count: selectedSubjectIds.length })}
                         </span>
                       )}
                     </h4>
@@ -1179,7 +1179,7 @@ export default function TeachersPage() {
                   }}
                   className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
                 >
-                  {t.tables.cancel}
+                  {t.common.cancel}
                 </button>
               </div>
             </div>
@@ -1278,7 +1278,7 @@ export default function TeachersPage() {
                   }}
                   className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
                 >
-                  {t.tables.cancel}
+                  {t.common.cancel}
                 </button>
               </div>
             </div>
@@ -1401,7 +1401,7 @@ export default function TeachersPage() {
                   onClick={() => setShowAssignmentModal(false)}
                   className="px-6 py-3 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
                 >
-                  {t.tables.cancel}
+                  {t.common.cancel}
                 </button>
                 <button
                   onClick={handleConfirmAssignment}

@@ -20,34 +20,70 @@ export const apiClient = axios.create({
   },
 });
 
-// Simple in-flight GET request de-duplication + short-lived cache to avoid hammering server (prevents 429)
-const inflight = new Map<string, Promise<any>>();
-const cache = new Map<string, { expires: number; data: any }>();
-const GET_CACHE_TTL_MS = 5000; // 5s cache to absorb double-invocations and hot reloads
 
-function buildKey(config: any) {
+// Short-lived GET cache to absorb double-invocations (prevents 429). Keyed per token so users never share entries.
+const cache = new Map<string, { expires: number; data: any }>();
+const GET_CACHE_TTL_MS = 5000;
+const CACHE_MAX_ENTRIES = 200;
+
+function buildKey(config: any, token: string | null) {
   const url = config?.url || '';
   const params = config?.params ? JSON.stringify(config.params) : '';
-  return `${config.method || 'get'}:${url}?${params}`;
+  return `${token ?? ''}|${(config.method || 'get').toLowerCase()}:${url}?${params}`;
+}
+
+function remember(key: string, data: any) {
+  if (cache.size >= CACHE_MAX_ENTRIES) {
+    const now = Date.now();
+    for (const [k, v] of cache) if (v.expires <= now) cache.delete(k);
+    if (cache.size >= CACHE_MAX_ENTRIES) cache.clear();
+  }
+  cache.set(key, { expires: Date.now() + GET_CACHE_TTL_MS, data });
+}
+
+export function clearApiCache() {
+  cache.clear();
+}
+
+// Refresh tokens are single-use, so concurrent 401s must share one refresh call
+let refreshPromise: Promise<string> | null = null;
+
+function refreshAccessToken(refreshToken: string): Promise<string> {
+  if (!refreshPromise) {
+    refreshPromise = axios
+      .post(`${API_URL}/auth/refresh`, { refreshToken })
+      .then((response) => {
+        const payload = response.data?.data ?? response.data;
+        localStorage.setItem('accessToken', payload.accessToken);
+        localStorage.setItem('refreshToken', payload.refreshToken);
+        cache.clear();
+        return payload.accessToken as string;
+      })
+      .finally(() => {
+        refreshPromise = null;
+      });
+  }
+  return refreshPromise;
 }
 
 // Request interceptor to add auth token
 apiClient.interceptors.request.use(
   (config) => {
+    let token: string | null = null;
     if (typeof window !== 'undefined') {
-      const token = localStorage.getItem('accessToken');
+      token = localStorage.getItem('accessToken');
       if (token) {
         config.headers.Authorization = `Bearer ${token}`;
       }
     }
 
-    // De-duplicate GETs
     if ((config.method || 'get').toLowerCase() === 'get') {
-      const key = buildKey(config);
-      // Serve from cache when fresh
+      const key = buildKey(config, token);
+      (config as any).__cacheKey = key;
       const cached = cache.get(key);
       if (cached && cached.expires > Date.now()) {
-        // Use a custom adapter to short-circuit the request with cached response
+        (config as any).__fromCache = true;
+        // Short-circuit the request with the cached (already unwrapped) response
         config.adapter = async () => ({
           data: cached.data,
           status: 200,
@@ -56,14 +92,7 @@ apiClient.interceptors.request.use(
           config,
           request: undefined,
         });
-        return config;
       }
-      if (inflight.has(key)) {
-        // @ts-expect-error reuse
-        return inflight.get(key);
-      }
-      const promise = Promise.resolve(config);
-      inflight.set(key, promise);
     }
     return config;
   },
@@ -72,74 +101,57 @@ apiClient.interceptors.request.use(
   }
 );
 
-// Response interceptor to handle token refresh
+// Response interceptor: unwrap the API envelope, maintain the cache, refresh expired tokens
 apiClient.interceptors.response.use(
   (response) => {
-    // If it's a paginated response (has data AND meta), return the whole body
-    if (response.data && response.data.data && response.data.meta) {
-      const data = response.data;
-      // Clear inflight cache logic (duplicated below but needed here to return early)
-      try {
-        const key = buildKey(response.config);
-        inflight.delete(key);
-        if ((response.config.method || 'get').toLowerCase() === 'get') {
-          cache.set(key, { expires: Date.now() + GET_CACHE_TTL_MS, data });
-        }
-      } catch {}
-      return data;
+    const config = response.config as any;
+    if (config.__fromCache) {
+      return response.data;
     }
 
-    // Return the data directly for non-paginated responses
-    const data = response.data?.data || response.data;
-    // Clear inflight cache for this response
-    try {
-      const key = buildKey(response.config);
-      inflight.delete(key);
-      if ((response.config.method || 'get').toLowerCase() === 'get') {
-        cache.set(key, { expires: Date.now() + GET_CACHE_TTL_MS, data });
-      }
-    } catch {}
+    // Paginated responses (data AND meta) are returned whole; everything else is unwrapped
+    const body = response.data;
+    const data = body && body.data && body.meta ? body : body?.data || body;
+
+    if ((config.method || 'get').toLowerCase() === 'get') {
+      if (config.__cacheKey) remember(config.__cacheKey, data);
+    } else {
+      // Any write can change what a cached GET would return
+      cache.clear();
+    }
     return data;
   },
   async (error) => {
     const originalRequest = error.config;
 
     // If error is 401 and we haven't tried to refresh yet
-    if (error.response?.status === 401 && !originalRequest._retry) {
+    if (error.response?.status === 401 && originalRequest && !originalRequest._retry) {
       originalRequest._retry = true;
 
-      try {
-        const refreshToken = localStorage.getItem('refreshToken');
-        if (refreshToken) {
-          const response = await axios.post(`${API_URL}/auth/refresh`, {
-            refreshToken,
-          });
-
-          const { accessToken, refreshToken: newRefreshToken } = response.data;
-
-          localStorage.setItem('accessToken', accessToken);
-          localStorage.setItem('refreshToken', newRefreshToken);
-
+      const refreshToken = typeof window !== 'undefined' ? localStorage.getItem('refreshToken') : null;
+      if (refreshToken) {
+        try {
+          const accessToken = await refreshAccessToken(refreshToken);
           originalRequest.headers.Authorization = `Bearer ${accessToken}`;
           return apiClient(originalRequest);
+        } catch (refreshError) {
+          // Refresh failed, redirect to login
+          if (typeof window !== 'undefined') {
+            localStorage.removeItem('accessToken');
+            localStorage.removeItem('refreshToken');
+            localStorage.removeItem('user');
+            cache.clear();
+            window.location.href = '/login';
+          }
+          return Promise.reject(refreshError);
         }
-      } catch (refreshError) {
-        // Refresh failed, redirect to login
-        if (typeof window !== 'undefined') {
-          localStorage.removeItem('accessToken');
-          localStorage.removeItem('refreshToken');
-          localStorage.removeItem('user');
-          window.location.href = '/login';
-        }
-        return Promise.reject(refreshError);
       }
     }
 
     // Handle 429 rate limit with exponential backoff and limited retries
     // Only retry GET requests, not POST/PUT/DELETE (state-changing operations)
-    if (error.response?.status === 429) {
+    if (error.response?.status === 429 && originalRequest) {
       const method = (originalRequest.method || 'get').toLowerCase();
-      // Only retry GET requests to avoid duplicate state changes
       if (method === 'get') {
         originalRequest.__retryCount = originalRequest.__retryCount || 0;
         if (originalRequest.__retryCount < 3) {
@@ -149,18 +161,12 @@ apiClient.interceptors.response.use(
           return apiClient(originalRequest);
         }
       }
-      // For POST/PUT/DELETE, don't retry - just reject immediately
     }
-
-    // Clear inflight on error
-    try {
-      const key = buildKey(originalRequest);
-      inflight.delete(key);
-    } catch {}
 
     return Promise.reject(error);
   }
 );
+
 
 export default apiClient;
 
