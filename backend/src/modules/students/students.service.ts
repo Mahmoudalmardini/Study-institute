@@ -334,26 +334,18 @@ export class StudentsService {
           throw new NotFoundException('Class not found');
         }
       }
+    }
 
-      // Also update/create StudentClass junction table record
-      if (dto.classId) {
-        // Remove old class assignments
-        await this.prisma.studentClass.deleteMany({
+    // Junction rows and the student row change together or not at all
+    return this.prisma.$transaction(async (tx) => {
+      if (dto.classId !== undefined) {
+        // Remove old class assignments (null classId means remove all)
+        await tx.studentClass.deleteMany({
           where: { studentId: id },
         });
 
-        // Create new class assignment
-        const existing = await this.prisma.studentClass.findUnique({
-          where: {
-            studentId_classId: {
-              studentId: id,
-              classId: dto.classId,
-            },
-          },
-        });
-
-        if (!existing) {
-          await this.prisma.studentClass.create({
+        if (dto.classId) {
+          await tx.studentClass.create({
             data: {
               studentId: id,
               classId: dto.classId,
@@ -361,32 +353,25 @@ export class StudentsService {
             },
           });
         }
-      } else {
-        // If classId is null, remove all class assignments
-        await this.prisma.studentClass.deleteMany({
-          where: { studentId: id },
-        });
       }
-    }
 
-    const updatedStudent = await this.prisma.student.update({
-      where: { id },
-      data: dto,
-      include: {
-        user: {
-          select: {
-            id: true,
-            email: true,
-            firstName: true,
-            lastName: true,
-            phone: true,
+      return tx.student.update({
+        where: { id },
+        data: dto,
+        include: {
+          user: {
+            select: {
+              id: true,
+              email: true,
+              firstName: true,
+              lastName: true,
+              phone: true,
+            },
           },
+          class: true,
         },
-        class: true,
-      },
+      });
     });
-
-    return updatedStudent;
   }
 
   async remove(id: string) {
@@ -516,37 +501,25 @@ export class StudentsService {
       );
     }
 
-    // Remove existing enrollments not in the new list
-    await this.prisma.studentSubject.deleteMany({
-      where: {
-        studentId,
-        subjectId: { notIn: subjectIds },
-      },
-    });
+    // Replace enrollments atomically so a failure can't leave them half-updated
+    const enrollments = await this.prisma.$transaction(async (tx) => {
+      await tx.studentSubject.deleteMany({
+        where: {
+          studentId,
+          subjectId: { notIn: subjectIds },
+        },
+      });
 
-    // Create or update enrollments
-    const enrollments = await Promise.all(
-      subjects.map(async ({ subjectId, teacherId }) => {
-        const existing = await this.prisma.studentSubject.findUnique({
-          where: {
-            studentId_subjectId: {
+      return Promise.all(
+        subjects.map(({ subjectId, teacherId }) =>
+          tx.studentSubject.upsert({
+            where: { studentId_subjectId: { studentId, subjectId } },
+            update: { teacherId: teacherId || null },
+            create: {
               studentId,
               subjectId,
-            },
-          },
-        });
-
-        if (existing) {
-          // Update existing enrollment with teacher if provided
-          return this.prisma.studentSubject.update({
-            where: {
-              studentId_subjectId: {
-                studentId,
-                subjectId,
-              },
-            },
-            data: {
               teacherId: teacherId || null,
+              enrolledBy,
             },
             include: {
               subject: true,
@@ -563,34 +536,10 @@ export class StudentsService {
                 },
               },
             },
-          });
-        }
-
-        return this.prisma.studentSubject.create({
-          data: {
-            studentId,
-            subjectId,
-            teacherId: teacherId || null,
-            enrolledBy,
-          },
-          include: {
-            subject: true,
-            teacher: {
-              include: {
-                user: {
-                  select: {
-                    id: true,
-                    firstName: true,
-                    lastName: true,
-                    email: true,
-                  },
-                },
-              },
-            },
-          },
-        });
-      }),
-    );
+          }),
+        ),
+      );
+    });
 
     // Automatically create installments for enrolled subjects
     // Calculate for the enrollment month and current month if different

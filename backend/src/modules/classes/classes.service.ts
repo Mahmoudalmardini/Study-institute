@@ -291,52 +291,15 @@ export class ClassesService {
       throw new NotFoundException('One or more subjects not found');
     }
 
-    // Create or update class-subject relationships using junction table
-    const assignments = await Promise.all(
-      subjects.map(async ({ subjectId, monthlyInstallment }) => {
-        // Check if assignment already exists
-        const existing = await this.prisma.classSubject.findUnique({
-          where: {
-            classId_subjectId: {
-              classId,
-              subjectId,
-            },
-          },
-        });
-
-        if (existing) {
-          // Update existing assignment with new installment
-          return this.prisma.classSubject.update({
-            where: {
-              classId_subjectId: {
-                classId,
-                subjectId,
-              },
-            },
-            data: {
-              monthlyInstallment: monthlyInstallment,
-            },
-            include: {
-              subject: true,
-              class: true,
-            },
-          });
-        }
-
-        // Create new assignment
-        return this.prisma.classSubject.create({
-          data: {
-            classId,
-            subjectId,
-            assignedBy,
-            monthlyInstallment: monthlyInstallment,
-          },
-          include: {
-            subject: true,
-            class: true,
-          },
-        });
-      }),
+    // Create or update class-subject relationships atomically
+    await this.prisma.$transaction(
+      subjects.map(({ subjectId, monthlyInstallment }) =>
+        this.prisma.classSubject.upsert({
+          where: { classId_subjectId: { classId, subjectId } },
+          update: { monthlyInstallment },
+          create: { classId, subjectId, assignedBy, monthlyInstallment },
+        }),
+      ),
     );
 
     // Return subjects with class information

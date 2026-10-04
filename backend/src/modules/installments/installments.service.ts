@@ -298,56 +298,62 @@ export class InstallmentsService {
 
     // Calculate final amounts
     const finalAmount = totalAmount.minus(discountAmount);
-    const currentInstallment = await this.getOrCreateInstallment(
-      studentId,
-      month,
-      year,
-    );
-
-    const paidAmount = currentInstallment.paidAmount || new Prisma.Decimal(0);
-    const outstandingAmount = finalAmount.minus(paidAmount);
-
-    // Determine status
-    let status: 'PENDING' | 'PARTIAL' | 'PAID' | 'OVERDUE' = 'PENDING';
-    if (paidAmount.gte(finalAmount)) {
-      status = 'PAID';
-    } else if (paidAmount.gt(0)) {
-      status = 'PARTIAL';
-    } else {
-      const now = new Date();
-      const currentMonth = now.getMonth() + 1;
-      const currentYear = now.getFullYear();
-      if (year < currentYear || (year === currentYear && month < currentMonth)) {
-        status = 'OVERDUE';
-      }
-    }
-
-    // Update or create installment
-    // Always create/update installment even if totalAmount is 0 (student might have subjects without installments yet)
-    const installment = await this.prisma.studentInstallment.upsert({
-      where: {
-        studentId_month_year: {
-          studentId,
-          month,
-          year,
-        },
-      },
-      update: {
-        totalAmount,
-        discountAmount,
-        outstandingAmount: outstandingAmount.gte(0) ? outstandingAmount : new Prisma.Decimal(0),
-        status,
-      },
-      create: {
+    // Lock this month's row (if it exists) so a concurrent payment can't change
+    // paidAmount between the read below and the upsert
+    const installment = await this.prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT id FROM student_installments WHERE "studentId" = ${studentId} AND month = ${month} AND year = ${year} FOR UPDATE`;
+      const currentInstallment = await this.getOrCreateInstallment(
         studentId,
         month,
         year,
-        totalAmount,
-        paidAmount: paidAmount || new Prisma.Decimal(0),
-        discountAmount,
-        outstandingAmount: outstandingAmount.gte(0) ? outstandingAmount : new Prisma.Decimal(0),
-        status,
-      },
+        tx,
+      );
+
+      const paidAmount = currentInstallment.paidAmount || new Prisma.Decimal(0);
+      const outstandingAmount = finalAmount.minus(paidAmount);
+
+      // Determine status
+      let status: 'PENDING' | 'PARTIAL' | 'PAID' | 'OVERDUE' = 'PENDING';
+      if (paidAmount.gte(finalAmount)) {
+        status = 'PAID';
+      } else if (paidAmount.gt(0)) {
+        status = 'PARTIAL';
+      } else {
+        const now = new Date();
+        const currentMonth = now.getMonth() + 1;
+        const currentYear = now.getFullYear();
+        if (year < currentYear || (year === currentYear && month < currentMonth)) {
+          status = 'OVERDUE';
+        }
+      }
+
+      // Update or create installment
+      // Always create/update installment even if totalAmount is 0 (student might have subjects without installments yet)
+      return tx.studentInstallment.upsert({
+        where: {
+          studentId_month_year: {
+            studentId,
+            month,
+            year,
+          },
+        },
+        update: {
+          totalAmount,
+          discountAmount,
+          outstandingAmount: outstandingAmount.gte(0) ? outstandingAmount : new Prisma.Decimal(0),
+          status,
+        },
+        create: {
+          studentId,
+          month,
+          year,
+          totalAmount,
+          paidAmount: paidAmount || new Prisma.Decimal(0),
+          discountAmount,
+          outstandingAmount: outstandingAmount.gte(0) ? outstandingAmount : new Prisma.Decimal(0),
+          status,
+        },
+      });
     });
 
     return {
@@ -366,8 +372,9 @@ export class InstallmentsService {
     studentId: string,
     month: number,
     year: number,
+    client: Prisma.TransactionClient = this.prisma,
   ) {
-    const existing = await this.prisma.studentInstallment.findUnique({
+    const existing = await client.studentInstallment.findUnique({
       where: {
         studentId_month_year: {
           studentId,
@@ -588,72 +595,77 @@ export class InstallmentsService {
     createPaymentDto: CreatePaymentDto,
     recordedBy: string,
   ) {
-    const student = await this.prisma.student.findUnique({
-      where: { id: createPaymentDto.studentId },
+    // One transaction with the installment row locked, so concurrent payments
+    // read the latest paidAmount instead of overwriting each other's increment
+    return this.prisma.$transaction(async (tx) => {
+      const student = await tx.student.findUnique({
+        where: { id: createPaymentDto.studentId },
+      });
+
+      if (!student) {
+        throw new NotFoundException(
+          `Student with ID ${createPaymentDto.studentId} not found`,
+        );
+      }
+
+      await tx.$queryRaw`SELECT id FROM student_installments WHERE id = ${createPaymentDto.installmentId} FOR UPDATE`;
+      const installment = await tx.studentInstallment.findUnique({
+        where: { id: createPaymentDto.installmentId },
+      });
+
+      if (!installment) {
+        throw new NotFoundException(
+          `Installment with ID ${createPaymentDto.installmentId} not found`,
+        );
+      }
+
+      if (installment.studentId !== createPaymentDto.studentId) {
+        throw new BadRequestException(
+          'Installment does not belong to the specified student',
+        );
+      }
+
+      // Create payment record
+      const payment = await tx.paymentRecord.create({
+        data: {
+          studentId: createPaymentDto.studentId,
+          installmentId: createPaymentDto.installmentId,
+          amount: createPaymentDto.amount,
+          paymentDate: new Date(createPaymentDto.paymentDate),
+          paymentMethod: createPaymentDto.paymentMethod,
+          notes: createPaymentDto.notes,
+          recordedBy,
+        },
+      });
+
+      // Update installment
+      const newPaidAmount = installment.paidAmount.add(createPaymentDto.amount);
+      const finalAmount = installment.totalAmount.minus(installment.discountAmount);
+      const outstandingAmount = finalAmount.minus(newPaidAmount);
+
+      let status: 'PENDING' | 'PARTIAL' | 'PAID' | 'OVERDUE' = installment.status;
+      // If paid amount is greater than or equal to final amount (including overpayment), mark as PAID
+      if (newPaidAmount.gte(finalAmount)) {
+        status = 'PAID';
+      } else if (newPaidAmount.gt(0)) {
+        status = 'PARTIAL';
+      }
+
+      const updatedInstallment = await tx.studentInstallment.update({
+        where: { id: createPaymentDto.installmentId },
+        data: {
+          paidAmount: newPaidAmount,
+          // Allow negative outstanding amounts (overpayment)
+          outstandingAmount,
+          status,
+        },
+      });
+
+      return {
+        payment,
+        installment: updatedInstallment,
+      };
     });
-
-    if (!student) {
-      throw new NotFoundException(
-        `Student with ID ${createPaymentDto.studentId} not found`,
-      );
-    }
-
-    const installment = await this.prisma.studentInstallment.findUnique({
-      where: { id: createPaymentDto.installmentId },
-    });
-
-    if (!installment) {
-      throw new NotFoundException(
-        `Installment with ID ${createPaymentDto.installmentId} not found`,
-      );
-    }
-
-    if (installment.studentId !== createPaymentDto.studentId) {
-      throw new BadRequestException(
-        'Installment does not belong to the specified student',
-      );
-    }
-
-    // Create payment record
-    const payment = await this.prisma.paymentRecord.create({
-      data: {
-        studentId: createPaymentDto.studentId,
-        installmentId: createPaymentDto.installmentId,
-        amount: createPaymentDto.amount,
-        paymentDate: new Date(createPaymentDto.paymentDate),
-        paymentMethod: createPaymentDto.paymentMethod,
-        notes: createPaymentDto.notes,
-        recordedBy,
-      },
-    });
-
-    // Update installment
-    const newPaidAmount = installment.paidAmount.add(createPaymentDto.amount);
-    const finalAmount = installment.totalAmount.minus(installment.discountAmount);
-    const outstandingAmount = finalAmount.minus(newPaidAmount);
-
-    let status: 'PENDING' | 'PARTIAL' | 'PAID' | 'OVERDUE' = installment.status;
-    // If paid amount is greater than or equal to final amount (including overpayment), mark as PAID
-    if (newPaidAmount.gte(finalAmount)) {
-      status = 'PAID';
-    } else if (newPaidAmount.gt(0)) {
-      status = 'PARTIAL';
-    }
-
-    const updatedInstallment = await this.prisma.studentInstallment.update({
-      where: { id: createPaymentDto.installmentId },
-      data: {
-        paidAmount: newPaidAmount,
-        // Allow negative outstanding amounts (overpayment)
-        outstandingAmount,
-        status,
-      },
-    });
-
-    return {
-      payment,
-      installment: updatedInstallment,
-    };
   }
 
   /**

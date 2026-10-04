@@ -491,61 +491,47 @@ export class PayrollService {
 
     const totalHoursDecimal = hours.toNumber() + minutes.toNumber() / 60;
 
-    // Get or create monthly payroll record
-    let payrollRecord = await this.prisma.monthlyPayrollRecord.findUnique({
-      where: {
-        teacherId_month_year: {
+    const salary = await this.getCurrentEffectiveSalary(teacherId, month, year);
+    const key = { teacherId_month_year: { teacherId, month, year } };
+
+    // Ensure the month's record exists, then lock it, so concurrent approvals add
+    // their hours one after another instead of overwriting each other's total.
+    // A freshly created (zeroed) record ends up identical to the old create path.
+    return this.prisma.$transaction(async (tx) => {
+      await tx.monthlyPayrollRecord.upsert({
+        where: key,
+        create: {
           teacherId,
           month,
           year,
+          monthlySalary: new Decimal(0),
+          hourlyWage: new Decimal(0),
+          totalHours: new Decimal(0),
+          totalEntitlement: new Decimal(0),
         },
-      },
-    });
-
-    const currentSalary = await this.getCurrentEffectiveSalary(teacherId, month, year);
-
-    if (!payrollRecord) {
-      payrollRecord = await this.prisma.monthlyPayrollRecord.create({
-        data: {
-          teacherId,
-          month,
-          year,
-          monthlySalary: currentSalary.monthlySalary || new Decimal(0),
-          hourlyWage: currentSalary.hourlyWage || new Decimal(0),
-          totalHours: new Decimal(totalHoursDecimal),
-          totalEntitlement: this.calculateEntitlement(
-            currentSalary.monthlySalary || new Decimal(0),
-            new Decimal(totalHoursDecimal),
-            currentSalary.hourlyWage || new Decimal(0),
-          ),
-        },
+        update: {},
       });
-    } else {
-      // Update existing record - also update salary values if they've changed
+      await tx.$queryRaw`SELECT id FROM monthly_payroll_records WHERE "teacherId" = ${teacherId} AND month = ${month} AND year = ${year} FOR UPDATE`;
+      const payrollRecord = await tx.monthlyPayrollRecord.findUniqueOrThrow({ where: key });
+
+      // Also update salary values if they've changed
       const newTotalHours = payrollRecord.totalHours.toNumber() + totalHoursDecimal;
-      const updatedSalary = await this.getCurrentEffectiveSalary(teacherId, month, year);
-      payrollRecord = await this.prisma.monthlyPayrollRecord.update({
-        where: {
-          teacherId_month_year: {
-            teacherId,
-            month,
-            year,
-          },
-        },
+      const monthlySalary = salary.monthlySalary || payrollRecord.monthlySalary;
+      const hourlyWage = salary.hourlyWage || payrollRecord.hourlyWage;
+      return tx.monthlyPayrollRecord.update({
+        where: key,
         data: {
-          monthlySalary: updatedSalary.monthlySalary || payrollRecord.monthlySalary,
-          hourlyWage: updatedSalary.hourlyWage || payrollRecord.hourlyWage,
+          monthlySalary,
+          hourlyWage,
           totalHours: new Decimal(newTotalHours),
           totalEntitlement: this.calculateEntitlement(
-            updatedSalary.monthlySalary || payrollRecord.monthlySalary,
+            monthlySalary,
             new Decimal(newTotalHours),
-            updatedSalary.hourlyWage || payrollRecord.hourlyWage,
+            hourlyWage,
           ),
         },
       });
-    }
-
-    return payrollRecord;
+    });
   }
 
   // Helper: Get current effective salary for a specific month/year
