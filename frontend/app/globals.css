@@ -1,47 +1,135 @@
 @import "tailwindcss";
 
-:root {
-  /* Educational Theme Colors */
-  --background: 0 0% 100%;
-  --foreground: 222.2 84% 4.9%;
-  --primary: 239 84% 67%;  /* Soft Indigo Blue - Trust, Knowledge */
-  --primary-foreground: 0 0% 100%;
-  --secondary: 173 80% 40%;  /* Warm Teal - Growth, Learning */
-  --secondary-foreground: 0 0% 100%;
-  --accent: 258 90% 66%;  /* Gentle Purple - Creativity */
-  --accent-foreground: 0 0% 100%;
-  --success: 158 64% 52%;  /* Soft Green - Achievement */
-  --destructive: 0 84.2% 60.2%;
-  --destructive-foreground: 210 40% 98%;
-  --muted: 210 40% 96.1%;
-  --muted-foreground: 215.4 16.3% 46.9%;
-  --border: 214.3 31.8% 91.4%;
-  --input: 214.3 31.8% 91.4%;
-  --ring: 239 84% 67%;
-  --radius: 0.5rem;
-  
-  /* Educational Gradients */
-  --gradient-primary: linear-gradient(135deg, #4F46E5 0%, #7C3AED 100%);
-  --gradient-secondary: linear-gradient(135deg, #14B8A6 0%, #06B6D4 100%);
-  --gradient-bg: linear-gradient(180deg, #F8FAFC 0%, #F1F5F9 100%);
-}
+@theme {
+  --font-sans: var(--font-cairo), system-ui, -apple-system, sans-serif;
 
-.dark {
-  --background: 222.2 84% 4.9%;
-  --foreground: 210 40% 98%;
-  --primary: 239 84% 67%;
-  --primary-foreground: 222.2 47.4% 11.2%;
-  --secondary: 173 80% 40%;
-  --secondary-foreground: 210 40% 98%;
-  --accent: 258 90% 66%;
-  --accent-foreground: 210 40% 98%;
-  --muted: 217.2 32.6% 17.5%;
-  --muted-foreground: 215 20.2% 65.1%;
-  --destructive: 0 62.8% 30.6%;
-  --destructive-foreground: 210 40% 98%;
-  --border: 217.2 32.6% 17.5%;
-  --input: 217.2 32.6% 17.5%;
-  --ring: 239 84% 67%;
+  --color-gold-50: #FDF9EC;
+  --color-gold-100: #FAF0CE;
+  --color-gold-200: #F4DF9B;
+  --color-gold-300: #EDC95F;
+  --color-gold-400: #E3B233;
+  --color-gold-500: #D4A017;
+  --color-gold-600: #B5850F;
+  --color-gold-700: #8F6710;
+  --color-gold-800: #745313;
+  --color-gold-900: #614614;
+  --color-gold-950: #382607;
+
+  --color-bronze-50: #FBF6F1;
+  --color-bronze-100: #F5E9DC;
+  --color-bronze-200: #EAD1B6;
+  --color-bronze-300: #DAB387;
+  --color-bronze-400: #C8905A;
+  --color-bronze-500: #B0743D;
+  --color-bronze-600: #935C30;
+  --color-bronze-700: #76492A;
+  --color-bronze-800: #5F3C26;
+  --color-bronze-900: #4F3322;
+  --color-bronze-950: #2C1B11;
+
+  --color-gray-50: #FAF9F6;
+  --color-gray-100: #F4F2EC;
+  --color-gray-200: #E7E3D9;
+  --color-gray-300: #D2CDBF;
+  --color-gray-400: #A39D8D;
+  --color-gray-500: #736D5E;
+  --color-gray-600: #534E42;
+  --color-gray-700: #3C382F;
+  --color-gray-800: #27241E;
+  --color-gray-900: #171510;
+  --color-gray-950: #0B0A07;
+
+  /* Legacy accents → brand ramps; gold shifted one step darker from 500 to keep AA with text-white */
+  --color-indigo-50: #FDF9EC;
+  --color-indigo-100: #FAF0CE;
+  --color-indigo-200: #F4DF9B;
+  --color-indigo-300: #EDC95F;
+  --color-indigo-400: #E3B233;
+  --color-indigo-500: #B5850F;
+  --color-indigo-600: #8F6710;
+  --color-indigo-700: #745313;
+  --color-indigo-800: #614614;
+  --color-indigo-900: #382607;
+  --color-indigo-950: #382607;
+
+  --color-blue-50: #FDF9EC;
+  --color-blue-100: #FAF0CE;
+  --color-blue-200: #F4DF9B;
+  --color-blue-300: #EDC95F;
+  --color-blue-400: #E3B233;
+  --color-blue-500: #B5850F;
+  --color-blue-600: #8F6710;
+  --color-blue-700: #745313;
+  --color-blue-800: #614614;
+  --color-blue-900: #382607;
+  --color-blue-950: #382607;
+
+  --color-teal-50: #FDF9EC;
+  --color-teal-100: #FAF0CE;
+  --color-teal-200: #F4DF9B;
+  --color-teal-300: #EDC95F;
+  --color-teal-400: #E3B233;
+  --color-teal-500: #B5850F;
+  --color-teal-600: #8F6710;
+  --color-teal-700: #745313;
+  --color-teal-800: #614614;
+  --color-teal-900: #382607;
+  --color-teal-950: #382607;
+
+  --color-cyan-50: #FDF9EC;
+  --color-cyan-100: #FAF0CE;
+  --color-cyan-200: #F4DF9B;
+  --color-cyan-300: #EDC95F;
+  --color-cyan-400: #E3B233;
+  --color-cyan-500: #B5850F;
+  --color-cyan-600: #8F6710;
+  --color-cyan-700: #745313;
+  --color-cyan-800: #614614;
+  --color-cyan-900: #382607;
+  --color-cyan-950: #382607;
+
+  --color-purple-50: #FBF6F1;
+  --color-purple-100: #F5E9DC;
+  --color-purple-200: #EAD1B6;
+  --color-purple-300: #DAB387;
+  --color-purple-400: #C8905A;
+  --color-purple-500: #B0743D;
+  --color-purple-600: #935C30;
+  --color-purple-700: #76492A;
+  --color-purple-800: #5F3C26;
+  --color-purple-900: #4F3322;
+  --color-purple-950: #2C1B11;
+
+  --color-violet-50: #FBF6F1;
+  --color-violet-100: #F5E9DC;
+  --color-violet-200: #EAD1B6;
+  --color-violet-300: #DAB387;
+  --color-violet-400: #C8905A;
+  --color-violet-500: #B0743D;
+  --color-violet-600: #935C30;
+  --color-violet-700: #76492A;
+  --color-violet-800: #5F3C26;
+  --color-violet-900: #4F3322;
+  --color-violet-950: #2C1B11;
+
+  --color-background: #FBFAF6;
+  --color-foreground: #171510;
+  --color-card: #FFFFFF;
+  --color-card-foreground: #171510;
+  --color-primary: #D4A017;
+  --color-primary-foreground: #171510;
+  --color-secondary: #27241E;
+  --color-secondary-foreground: #F4F2EC;
+  --color-accent: #FAF0CE;
+  --color-accent-foreground: #171510;
+  --color-muted: #F4F2EC;
+  --color-muted-foreground: #736D5E;
+  --color-destructive: #DC2626;
+  --color-destructive-foreground: #FFFFFF;
+  --color-border: #E7E3D9;
+  --color-input: #D2CDBF;
+  --color-ring: #D4A017;
+  --radius: 0.5rem;
 }
 
 /* Keyframe Animations */
@@ -190,21 +278,38 @@
   animation-delay: 0.6s;
 }
 
-/* Educational Gradients */
+.stagger-7 {
+  animation-delay: 0.7s;
+}
+
+.stagger-8 {
+  animation-delay: 0.8s;
+}
+
+/* Brand surfaces: black chrome carries white text; gold fills carry near-black text */
 .gradient-primary {
-  background: linear-gradient(135deg, #4F46E5 0%, #7C3AED 100%);
+  background: linear-gradient(135deg, #121009 0%, #2A251A 55%, #121009 100%);
+  box-shadow: inset 0 -2px 0 0 #D4A017;
 }
 
 .gradient-secondary {
-  background: linear-gradient(135deg, #14B8A6 0%, #06B6D4 100%);
-}
-
-.gradient-success {
-  background: linear-gradient(135deg, #10B981 0%, #34D399 100%);
+  background: linear-gradient(135deg, #121009 0%, #2A251A 55%, #121009 100%);
+  box-shadow: inset 0 -2px 0 0 #B0743D;
 }
 
 .gradient-bg {
-  background: linear-gradient(180deg, #F8FAFC 0%, #F1F5F9 100%);
+  background: linear-gradient(180deg, #FBFAF6 0%, #F3F0E7 100%);
+}
+
+.gradient-gold {
+  background: linear-gradient(135deg, #E3B233 0%, #D4A017 45%, #B5850F 100%);
+}
+
+.text-gold-gradient {
+  background: linear-gradient(180deg, #FFE48A 0%, #E3B233 45%, #B5850F 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
 }
 
 /* Hover Effects */
@@ -214,11 +319,11 @@
 
 .hover-lift:hover {
   transform: translateY(-4px);
-  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+  box-shadow: 0 10px 25px -5px rgba(23, 21, 16, 0.12), 0 10px 10px -5px rgba(23, 21, 16, 0.05);
 }
 
 .hover-glow:hover {
-  box-shadow: 0 0 20px rgba(79, 70, 229, 0.4);
+  box-shadow: 0 0 20px rgba(212, 160, 23, 0.45);
 }
 
 /* Smooth Transitions */
@@ -240,7 +345,7 @@
 }
 
 body {
-  font-family: system-ui, -apple-system, sans-serif;
-  background-color: hsl(var(--background));
-  color: hsl(var(--foreground));
+  font-family: var(--font-sans);
+  background-color: #FBFAF6;
+  color: #171510;
 }

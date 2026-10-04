@@ -557,7 +557,7 @@ export default function StudentHomeworkPage() {
   return (
     <div className="min-h-screen gradient-bg">
       {/* Enhanced Header */}
-      <nav className="bg-gradient-to-r from-purple-600 to-indigo-600 shadow-lg sticky top-0 z-40">
+      <nav className="gradient-primary shadow-lg sticky top-0 z-40">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center min-w-0 flex-1 gap-3">

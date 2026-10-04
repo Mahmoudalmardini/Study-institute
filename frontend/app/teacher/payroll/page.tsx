@@ -150,7 +150,7 @@ export default function TeacherPayrollPage() {
                 onClick={() => router.push('/teacher')}
                 className="text-white hover:bg-white/20 rounded-lg p-2 transition-colors"
               >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-5 h-5 rtl:rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
                 </svg>
               </button>

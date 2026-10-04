@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useI18n } from '@/lib/i18n-context';
 import SettingsMenu from '@/components/SettingsMenu';
+import { Logo } from '@/components/Logo';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
 
 export default function SupervisorDashboard() {
@@ -58,11 +59,7 @@ export default function SupervisorDashboard() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center min-w-0 flex-1 gap-3">
-              <div className="w-10 h-10 bg-white/20 rounded-lg flex items-center justify-center backdrop-blur-sm flex-shrink-0">
-                <svg className="w-6 h-6 text-white" fill="currentColor" viewBox="0 0 20 20">
-                  <path d="M10.394 2.08a1 1 0 00-.788 0l-7 3a1 1 0 000 1.84L5.25 8.051a.999.999 0 01.356-.257l4-1.714a1 1 0 11.788 1.838L7.667 9.088l1.94.831a1 1 0 00.787 0l7-3a1 1 0 000-1.838l-7-3z" />
-                </svg>
-              </div>
+              <Logo />
               <h1 className="text-lg sm:text-xl font-bold text-white truncate">
                 <span className="hidden sm:inline">{t.common.appName} - </span>
                 {t.supervisor.roleLabel || 'Supervisor'}
@@ -103,11 +100,11 @@ export default function SupervisorDashboard() {
             {/* Students Card - Clickable */}
             <button
               onClick={() => router.push('/supervisor/students')}
-              className={`bg-white overflow-hidden rounded-xl hover-lift p-6 sm:p-7 border-2 border-emerald-100 hover:border-emerald-300 text-start group ${mounted ? 'animate-slide-up stagger-1' : 'opacity-0'}`}
+              className={`bg-white overflow-hidden rounded-xl hover-lift p-6 sm:p-7 border-2 border-gold-100 hover:border-gold-300 text-start group ${mounted ? 'animate-slide-up stagger-1' : 'opacity-0'}`}
             >
               <div className="flex items-start justify-between">
                 <div className="flex-1">
-                  <div className="w-12 h-12 gradient-success rounded-lg flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+                  <div className="w-12 h-12 bg-gradient-to-br from-bronze-500 to-gold-700 rounded-lg flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
                     <svg className="w-7 h-7 text-white" fill="currentColor" viewBox="0 0 20 20">
                       <path d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" />
                     </svg>
@@ -119,7 +116,7 @@ export default function SupervisorDashboard() {
                     {t.supervisor.cards.students.description}
                   </p>
                 </div>
-                <svg className="w-6 h-6 text-emerald-500 flex-shrink-0 ms-2 rtl:rotate-180 group-hover:translate-x-1 rtl:group-hover:-translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-6 h-6 text-gold-500 flex-shrink-0 ms-2 rtl:rotate-180 group-hover:translate-x-1 rtl:group-hover:-translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                 </svg>
               </div>
@@ -157,7 +154,7 @@ export default function SupervisorDashboard() {
             >
               <div className="flex items-start justify-between">
                 <div className="flex-1">
-                  <div className="w-12 h-12 bg-gradient-to-br from-teal-500 to-green-600 rounded-lg flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+                  <div className="w-12 h-12 bg-gradient-to-br from-teal-500 to-gold-600 rounded-lg flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
                     <svg className="w-7 h-7 text-white" fill="currentColor" viewBox="0 0 20 20">
                       <path d="M9 4.804A7.968 7.968 0 005.5 4c-1.255 0-2.443.29-3.5.804v10A7.969 7.969 0 015.5 14c1.669 0 3.218.51 4.5 1.385A7.962 7.962 0 0114.5 14c1.255 0 2.443.29 3.5.804v-10A7.968 7.968 0 0014.5 4c-1.255 0-2.443.29-3.5.804V12a1 1 0 11-2 0V4.804z" />
                     </svg>
@@ -202,8 +199,8 @@ export default function SupervisorDashboard() {
             </button>
 
             {/* Evaluations Card */}
-            <div className={`bg-white overflow-hidden rounded-xl hover-lift p-6 sm:p-7 border-2 border-amber-100 hover:border-amber-300 group ${mounted ? 'animate-slide-up stagger-3' : 'opacity-0'}`}>
-              <div className="w-12 h-12 bg-gradient-to-br from-amber-500 to-orange-500 rounded-lg flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+            <div className={`bg-white overflow-hidden rounded-xl hover-lift p-6 sm:p-7 border-2 border-gold-100 hover:border-gold-300 group ${mounted ? 'animate-slide-up stagger-3' : 'opacity-0'}`}>
+              <div className="w-12 h-12 bg-gradient-to-br from-gold-500 to-bronze-500 rounded-lg flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
                 <svg className="w-7 h-7 text-white" fill="currentColor" viewBox="0 0 20 20">
                   <path d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z" />
                   <path fillRule="evenodd" d="M4 5a2 2 0 012-2 3 3 0 003 3h2a3 3 0 003-3 2 2 0 012 2v11a2 2 0 01-2 2H6a2 2 0 01-2-2V5zm9.707 5.707a1 1 0 00-1.414-1.414L9 12.586l-1.293-1.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />

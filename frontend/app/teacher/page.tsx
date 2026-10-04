@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useI18n } from '@/lib/i18n-context';
 import SettingsMenu from '@/components/SettingsMenu';
+import { Logo } from '@/components/Logo';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
 interface User {
   name: string;
@@ -64,13 +65,9 @@ export default function TeacherDashboard() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center min-w-0 flex-1 gap-3">
-              <div className="w-10 h-10 bg-white/20 rounded-lg flex items-center justify-center backdrop-blur-sm flex-shrink-0">
-                <svg className="w-6 h-6 text-white" fill="currentColor" viewBox="0 0 20 20">
-                  <path d="M9 4.804A7.968 7.968 0 005.5 4c-1.255 0-2.443.29-3.5.804v10A7.969 7.969 0 015.5 14c1.669 0 3.218.51 4.5 1.385A7.962 7.962 0 0114.5 14c1.255 0 2.443.29 3.5.804v-10A7.968 7.968 0 0014.5 4c-1.255 0-2.443.29-3.5.804V12a1 1 0 11-2 0V4.804z" />
-                </svg>
-              </div>
+              <Logo />
               <h1 className="text-lg sm:text-xl font-bold text-white truncate">
-                <span className="hidden sm:inline">{t?.common?.appName || 'Study Institute'} - </span>
+                <span className="hidden sm:inline">{t.common.appName} - </span>
                 {t?.teacher?.title || 'Teacher Dashboard'}
               </h1>
             </div>
@@ -109,11 +106,11 @@ export default function TeacherDashboard() {
             {/* Homework Card - Clickable */}
             <button
               onClick={() => router.push('/teacher/homework')}
-              className={`bg-white overflow-hidden rounded-xl hover-lift p-6 sm:p-7 border-2 border-orange-100 hover:border-orange-300 group text-start ${mounted ? 'animate-slide-up stagger-1' : 'opacity-0'}`}
+              className={`bg-white overflow-hidden rounded-xl hover-lift p-6 sm:p-7 border-2 border-bronze-100 hover:border-bronze-300 group text-start ${mounted ? 'animate-slide-up stagger-1' : 'opacity-0'}`}
             >
               <div className="flex items-start justify-between">
                 <div className="flex-1">
-                  <div className="w-12 h-12 bg-gradient-to-br from-orange-500 to-amber-500 rounded-lg flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+                  <div className="w-12 h-12 bg-gradient-to-br from-bronze-500 to-gold-500 rounded-lg flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
                     <svg className="w-7 h-7 text-white" fill="currentColor" viewBox="0 0 20 20">
                       <path d="M9 4.804A7.968 7.968 0 005.5 4c-1.255 0-2.443.29-3.5.804v10A7.969 7.969 0 015.5 14c1.669 0 3.218.51 4.5 1.385A7.962 7.962 0 0114.5 14c1.255 0 2.443.29 3.5.804v-10A7.968 7.968 0 0014.5 4c-1.255 0-2.443.29-3.5.804V12a1 1 0 11-2 0V4.804z" />
                     </svg>
@@ -121,7 +118,7 @@ export default function TeacherDashboard() {
                   <h3 className="text-xl font-bold text-gray-900 mb-2">{t?.teacher?.homework || 'Homework'}</h3>
                   <p className="text-sm text-gray-600">{t?.teacher?.homeworkDesc || 'Create and grade homework'}</p>
                 </div>
-                <svg className="w-6 h-6 text-orange-500 flex-shrink-0 ms-2 rtl:rotate-180 group-hover:translate-x-1 rtl:group-hover:-translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-6 h-6 text-bronze-500 flex-shrink-0 ms-2 rtl:rotate-180 group-hover:translate-x-1 rtl:group-hover:-translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                 </svg>
               </div>
@@ -130,11 +127,11 @@ export default function TeacherDashboard() {
             {/* Students Card - Clickable */}
             <button
               onClick={() => router.push('/teacher/students')}
-              className={`bg-white overflow-hidden rounded-xl hover-lift p-6 sm:p-7 border-2 border-emerald-100 hover:border-emerald-300 group text-start ${mounted ? 'animate-slide-up stagger-2' : 'opacity-0'}`}
+              className={`bg-white overflow-hidden rounded-xl hover-lift p-6 sm:p-7 border-2 border-gold-100 hover:border-gold-300 group text-start ${mounted ? 'animate-slide-up stagger-2' : 'opacity-0'}`}
             >
               <div className="flex items-start justify-between">
                 <div className="flex-1">
-                  <div className="w-12 h-12 gradient-success rounded-lg flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+                  <div className="w-12 h-12 bg-gradient-to-br from-bronze-500 to-gold-700 rounded-lg flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
                     <svg className="w-7 h-7 text-white" fill="currentColor" viewBox="0 0 20 20">
                       <path d="M9 6a3 3 0 11-6 0 3 3 0 016 0zM17 6a3 3 0 11-6 0 3 3 0 016 0zM12.93 17c.046-.327.07-.66.07-1a6.97 6.97 0 00-1.5-4.33A5 5 0 0119 16v1h-6.07zM6 11a5 5 0 015 5v1H1v-1a5 5 0 015-5z" />
                     </svg>
@@ -142,7 +139,7 @@ export default function TeacherDashboard() {
                   <h3 className="text-xl font-bold text-gray-900 mb-2">{t?.teacher?.students || 'Students'}</h3>
                   <p className="text-sm text-gray-600">{t?.teacher?.studentsDesc || 'View student list'}</p>
                 </div>
-                <svg className="w-6 h-6 text-emerald-500 flex-shrink-0 ms-2 rtl:rotate-180 group-hover:translate-x-1 rtl:group-hover:-translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-6 h-6 text-gold-500 flex-shrink-0 ms-2 rtl:rotate-180 group-hover:translate-x-1 rtl:group-hover:-translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                 </svg>
               </div>
@@ -172,11 +169,11 @@ export default function TeacherDashboard() {
             {/* Payroll Card - Clickable */}
             <button
               onClick={() => router.push('/teacher/payroll')}
-              className={`bg-white overflow-hidden rounded-xl hover-lift p-6 sm:p-7 border-2 border-yellow-100 hover:border-yellow-300 group text-start ${mounted ? 'animate-slide-up stagger-4' : 'opacity-0'}`}
+              className={`bg-white overflow-hidden rounded-xl hover-lift p-6 sm:p-7 border-2 border-gold-100 hover:border-gold-300 group text-start ${mounted ? 'animate-slide-up stagger-4' : 'opacity-0'}`}
             >
               <div className="flex items-start justify-between">
                 <div className="flex-1">
-                  <div className="w-12 h-12 bg-gradient-to-br from-yellow-500 to-orange-500 rounded-lg flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+                  <div className="w-12 h-12 bg-gradient-to-br from-gold-500 to-bronze-500 rounded-lg flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
                     <svg className="w-7 h-7 text-white" fill="currentColor" viewBox="0 0 20 20">
                       <path d="M4 4a2 2 0 00-2 2v1h16V6a2 2 0 00-2-2H4z" />
                       <path fillRule="evenodd" d="M18 9H2v5a2 2 0 002 2h12a2 2 0 002-2V9zM4 13a1 1 0 011-1h1a1 1 0 110 2H5a1 1 0 01-1-1zm5-1a1 1 0 100 2h1a1 1 0 100-2H9z" clipRule="evenodd" />
@@ -185,7 +182,7 @@ export default function TeacherDashboard() {
                   <h3 className="text-xl font-bold text-gray-900 mb-2">{t?.teacher?.payroll || 'Payroll'}</h3>
                   <p className="text-sm text-gray-600">{t?.teacher?.payrollDesc || 'Submit hours and view payroll'}</p>
                 </div>
-                <svg className="w-6 h-6 text-yellow-500 flex-shrink-0 ms-2 rtl:rotate-180 group-hover:translate-x-1 rtl:group-hover:-translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-6 h-6 text-gold-500 flex-shrink-0 ms-2 rtl:rotate-180 group-hover:translate-x-1 rtl:group-hover:-translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                 </svg>
               </div>

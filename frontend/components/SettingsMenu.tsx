@@ -39,7 +39,7 @@ export default function SettingsMenu({ onLogout }: SettingsMenuProps) {
       {/* Settings Button - Enhanced for light header */}
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="flex items-center gap-2 px-3 sm:px-4 py-2 text-sm font-medium bg-white/20 text-white border border-white/30 rounded-lg hover:bg-white/30 focus:outline-none focus:ring-2 focus:ring-white/50 backdrop-blur-sm transition-all duration-300 hover:scale-105"
+        className="flex items-center gap-2 px-3 sm:px-4 py-2 text-sm font-medium bg-white/10 text-gold-100 border border-gold-500/40 rounded-lg hover:bg-gold-500/15 hover:border-gold-400/70 focus:outline-none focus:ring-2 focus:ring-gold-400/60 backdrop-blur-sm transition-all duration-300 hover:scale-105"
         aria-label={t.common.settings}
       >
         <svg
@@ -67,7 +67,7 @@ export default function SettingsMenu({ onLogout }: SettingsMenuProps) {
       {/* Dropdown Menu with Animation */}
       {isOpen && (
         <div 
-          className="absolute z-[9999] mt-2 rounded-xl bg-white shadow-2xl ring-1 ring-black ring-opacity-5 focus:outline-none animate-scale-in"
+          className="absolute z-[9999] mt-2 rounded-xl bg-white shadow-2xl ring-1 ring-gold-500/20 focus:outline-none animate-scale-in"
           style={{
             ...(isRTL ? { left: '0' } : { right: '0' }),
             width: 'min(14rem, calc(100vw - 2rem))', // 14rem = w-56, but never wider than viewport minus padding
@@ -83,9 +83,9 @@ export default function SettingsMenu({ onLogout }: SettingsMenuProps) {
             
             <button
               onClick={() => handleLanguageChange('en')}
-              className={`block w-full text-left px-4 py-3 text-sm transition-all duration-200 ${
+              className={`block w-full text-start px-4 py-3 text-sm transition-all duration-200 ${
                 locale === 'en' 
-                  ? 'bg-indigo-50 text-indigo-700 font-semibold' 
+                  ? 'bg-gold-50 text-gold-800 font-semibold' 
                   : 'text-gray-700 hover:bg-gray-50'
               }`}
             >
@@ -95,7 +95,7 @@ export default function SettingsMenu({ onLogout }: SettingsMenuProps) {
                   <span>{t.common.english}</span>
                 </div>
                 {locale === 'en' && (
-                  <svg className="w-5 h-5 text-indigo-600" fill="currentColor" viewBox="0 0 20 20">
+                  <svg className="w-5 h-5 text-gold-600" fill="currentColor" viewBox="0 0 20 20">
                     <path
                       fillRule="evenodd"
                       d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
@@ -108,9 +108,9 @@ export default function SettingsMenu({ onLogout }: SettingsMenuProps) {
 
             <button
               onClick={() => handleLanguageChange('ar')}
-              className={`block w-full text-left px-4 py-3 text-sm transition-all duration-200 ${
+              className={`block w-full text-start px-4 py-3 text-sm transition-all duration-200 ${
                 locale === 'ar' 
-                  ? 'bg-indigo-50 text-indigo-700 font-semibold' 
+                  ? 'bg-gold-50 text-gold-800 font-semibold' 
                   : 'text-gray-700 hover:bg-gray-50'
               }`}
             >
@@ -120,7 +120,7 @@ export default function SettingsMenu({ onLogout }: SettingsMenuProps) {
                   <span>{t.common.arabic}</span>
                 </div>
                 {locale === 'ar' && (
-                  <svg className="w-5 h-5 text-indigo-600" fill="currentColor" viewBox="0 0 20 20">
+                  <svg className="w-5 h-5 text-gold-600" fill="currentColor" viewBox="0 0 20 20">
                     <path
                       fillRule="evenodd"
                       d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
@@ -139,7 +139,7 @@ export default function SettingsMenu({ onLogout }: SettingsMenuProps) {
                 setIsOpen(false);
                 onLogout();
               }}
-              className="block w-full text-left px-4 py-3 text-sm text-red-600 hover:bg-red-50 font-medium transition-all duration-200"
+              className="block w-full text-start px-4 py-3 text-sm text-red-600 hover:bg-red-50 font-medium transition-all duration-200"
             >
               <div className="flex items-center gap-2 rtl:gap-reverse">
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">

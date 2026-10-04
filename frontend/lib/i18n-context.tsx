@@ -22,7 +22,7 @@ const translations: Record<Locale, Translations> = {
 };
 
 export function I18nProvider({ children }: { children: React.ReactNode }) {
-  const [locale, setLocaleState] = useState<Locale>('en');
+  const [locale, setLocaleState] = useState<Locale>('ar');
 
   useEffect(() => {
     // Load saved language from localStorage
