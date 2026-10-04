@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { useI18n } from '@/lib/i18n-context';
 import { fmt, dateLocale } from '@/lib/utils';
@@ -390,12 +390,12 @@ export default function SupervisorStudentsPage() {
     }
   };
 
-  const filteredStudents = students.filter((student) => {
+  const filteredStudents = useMemo(() => students.filter((student) => {
     const fullName = `${student.firstName} ${student.lastName}`.toLowerCase();
     const email = student.email.toLowerCase();
     const search = searchTerm.toLowerCase();
     return fullName.includes(search) || email.includes(search);
-  });
+  }), [students, searchTerm]);
 
   // Fetch subjects for selected class
   useEffect(() => {

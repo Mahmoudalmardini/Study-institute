@@ -133,8 +133,7 @@ export default function ClassesPage() {
           role: userProfile.role,
         });
         setMounted(true);
-        await fetchClasses(page, limit);
-        await fetchTeachers();
+        await Promise.all([fetchClasses(page, limit), fetchTeachers()]);
       } catch (error: any) {
         console.error('Error fetching user profile:', error);
         if (error.response?.status === 401) {

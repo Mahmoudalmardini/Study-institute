@@ -71,6 +71,7 @@ export default function InstallmentsPage() {
   const [students, setStudents] = useState<StudentWithInstallments[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [filterMonth, setFilterMonth] = useState<number | ''>('');
   const [filterYear, setFilterYear] = useState<number>(new Date().getFullYear());
   const [filterStatus, setFilterStatus] = useState<string>('all');
@@ -155,7 +156,7 @@ export default function InstallmentsPage() {
       const response = await getInstallmentsOverview({
         page,
         limit,
-        search: searchTerm,
+        search: debouncedSearch,
         status: filterStatus,
         month: filterMonth === '' ? undefined : Number(filterMonth),
         year: filterYear,
@@ -371,20 +372,20 @@ export default function InstallmentsPage() {
     }
   };
 
+  // Only typing is debounced; page and filter changes fetch immediately
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(searchTerm), 500);
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
+
   useEffect(() => {
     const token = localStorage.getItem('accessToken');
     if (!token) {
       router.push('/login');
       return;
     }
-    
-    // Debounce search to prevent too many API calls
-    const timer = setTimeout(() => {
-      fetchData();
-    }, 500);
-
-    return () => clearTimeout(timer);
-  }, [router, page, searchTerm, filterStatus, filterMonth, filterYear]);
+    fetchData();
+  }, [router, page, debouncedSearch, filterStatus, filterMonth, filterYear]);
 
   // Use students directly as they are now paginated from backend
   const paginatedStudents = students;

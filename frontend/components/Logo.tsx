@@ -14,7 +14,7 @@ export function Logo({ size = 40, variant = 'chip', className }: LogoProps) {
 
   const img = (extra?: string) => (
     // eslint-disable-next-line @next/next/no-img-element -- images are unoptimized in next.config; <img> keeps it simple
-    <img src="/logo.jpg" alt={t.common.appName} width={size} height={size} className={cn('h-full w-full object-contain', extra)} />
+    <img src="/logo.webp" alt={t.common.appName} width={size} height={size} className={cn('h-full w-full object-contain', extra)} />
   );
 
   // The JPG has a solid black background; lighten blending drops it out on dark surfaces.

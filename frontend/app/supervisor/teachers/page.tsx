@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { useI18n } from '@/lib/i18n-context';
 import { fmt, dateLocale, asList } from '@/lib/utils';
@@ -529,12 +529,12 @@ export default function TeachersPage() {
     }
   };
 
-  const filteredTeachers = teachers.filter((teacher) => {
+  const filteredTeachers = useMemo(() => teachers.filter((teacher) => {
     const fullName = `${(teacher as any).user.firstName} ${(teacher as any).user.lastName}`.toLowerCase();
     const email = (teacher as any).user.email.toLowerCase();
     const search = searchTerm.toLowerCase();
     return fullName.includes(search) || email.includes(search);
-  });
+  }), [teachers, searchTerm]);
 
   return (
     <div className="min-h-screen gradient-bg">

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { useI18n } from '@/lib/i18n-context';
 import { fmt, dateLocale } from '@/lib/utils';
@@ -164,13 +164,18 @@ export default function TeachersPage() {
       return;
     }
     fetchTeachers();
+  }, [router, page, fetchTeachers]);
+
+  // Subject and class lists do not depend on the teacher page, so load them once
+  useEffect(() => {
+    if (!localStorage.getItem('accessToken')) return;
     fetchSubjects();
     fetchClasses();
-  }, [router, page, fetchTeachers]);
+  }, []);
 
   const fetchSubjects = async () => {
     try {
-      const response = await apiClient.get('/subjects');
+      const response = await apiClient.get('/subjects?page=1&limit=1000');
       // Handle different response structures
       if (Array.isArray(response)) {
         setSubjects(response);
@@ -188,7 +193,7 @@ export default function TeachersPage() {
 
   const fetchClasses = async () => {
     try {
-      const response = await apiClient.get('/classes');
+      const response = await apiClient.get('/classes?page=1&limit=1000');
       // Handle different response structures
       if (Array.isArray(response)) {
         setClasses(response);
@@ -793,12 +798,12 @@ export default function TeachersPage() {
     }
   };
 
-  const filteredTeachers = teachers.filter((teacher) => {
+  const filteredTeachers = useMemo(() => teachers.filter((teacher) => {
     const fullName = `${teacher.user.firstName} ${teacher.user.lastName}`.toLowerCase();
     const email = teacher.user.email.toLowerCase();
     const search = searchTerm.toLowerCase();
     return fullName.includes(search) || email.includes(search);
-  });
+  }), [teachers, searchTerm]);
 
   return (
     <div className="min-h-screen gradient-bg">

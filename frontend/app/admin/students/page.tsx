@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { useI18n } from '@/lib/i18n-context';
 import { fmt, dateLocale } from '@/lib/utils';
@@ -253,13 +253,13 @@ export default function StudentsPage() {
     // Fetch student's class and subjects if they have a profile
     if (studentProfile) {
       try {
-        // Fetch full student details
-        const studentData = await apiClient.get(`/students/${studentProfile.id}`);
+        const [studentData, studentSubjects] = await Promise.all([
+          apiClient.get(`/students/${studentProfile.id}`),
+          apiClient.get(`/students/${studentProfile.id}/subjects`),
+        ]);
         const fullStudent = studentData.data || studentData;
         setSelectedClassId(fullStudent.classId || '');
-        
-        // Fetch subjects using apiClient
-        const studentSubjects = await apiClient.get(`/students/${studentProfile.id}/subjects`);
+
         const subjectsArray = Array.isArray(studentSubjects) ? studentSubjects : (studentSubjects as any)?.data || [];
         setSelectedSubjectIds(subjectsArray.map((ss: any) => ss.subjectId || ss.subject?.id));
         
@@ -275,13 +275,13 @@ export default function StudentsPage() {
         console.log('Loaded teacher assignments:', teacherAssignments);
         setSubjectTeachers(teacherAssignments);
         
-        // Fetch teachers for all enrolled subjects
-        for (const ss of subjectsArray) {
-          const subjectId = ss.subjectId || ss.subject?.id;
-          if (subjectId) {
-            await fetchTeachersForSubject(subjectId);
-          }
-        }
+        // Fetch teachers for all enrolled subjects (state updates are functional, so parallel is safe)
+        await Promise.all(
+          subjectsArray
+            .map((ss: any) => ss.subjectId || ss.subject?.id)
+            .filter(Boolean)
+            .map((subjectId: string) => fetchTeachersForSubject(subjectId)),
+        );
         
         setSelectedStudent({
           ...student,
@@ -459,12 +459,12 @@ export default function StudentsPage() {
     }
   };
 
-  const filteredStudents = students.filter((student) => {
+  const filteredStudents = useMemo(() => students.filter((student) => {
     const fullName = `${student.firstName} ${student.lastName}`.toLowerCase();
     const email = student.email.toLowerCase();
     const search = searchTerm.toLowerCase();
     return fullName.includes(search) || email.includes(search);
-  });
+  }), [students, searchTerm]);
 
   // Fetch subjects for selected class
   useEffect(() => {
