@@ -56,8 +56,10 @@ export default function SupervisorStudentsPage() {
       router.push('/login');
       return;
     }
-    fetchData(page, limit);
-  }, [router, page, fetchData]);
+    fetchData();
+    // fetchData is a plain function declared below; listing it here threw a TDZ ReferenceError on every render
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [router, page]);
 
   const fetchData = async () => {
     try {
