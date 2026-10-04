@@ -227,7 +227,7 @@ export default function UsersPage() {
       const token = localStorage.getItem('accessToken');
       
       if (!token) {
-        setError('No authentication token found. Please login again.');
+        setError(t.tables.noAuthToken);
         router.push('/login');
         return;
       }
@@ -286,7 +286,7 @@ export default function UsersPage() {
             router.push('/login');
           }, 2000);
         } else if (status === 409) {
-          errorMessage = errorData?.message || 'User with this email already exists.';
+          errorMessage = errorData?.message || t.tables.userEmailExists;
         } else {
           errorMessage = `Error ${status}: ${errorMessage}`;
         }
@@ -369,7 +369,7 @@ export default function UsersPage() {
               <button
                 onClick={() => router.push('/admin')}
                 className="w-10 h-10 bg-white/10 hover:bg-white/20 rounded-lg flex items-center justify-center text-gold-300 flex-shrink-0"
-                aria-label="Back"
+                aria-label={t.tables.back}
               >
                 <span className="rtl:rotate-180 inline-block">←</span>
               </button>
@@ -414,7 +414,7 @@ export default function UsersPage() {
                 value={roleFilter}
                 onChange={(e) => setRoleFilter(e.target.value)}
                 className="px-3 py-2 border border-gray-300 rounded-md min-w-[150px]"
-                aria-label="Filter by role"
+                aria-label={t.tables.filterByRole}
               >
                 <option value="">{t.users.allRoles}</option>
                 <option value="STUDENT">{t.users.student}</option>
@@ -442,8 +442,8 @@ export default function UsersPage() {
               <>
                 {/* Desktop Table View */}
                 <div className="hidden md:block overflow-x-auto">
-                  <table className="min-w-full divide-y divide-gray-200">
-                    <thead className="bg-gray-50">
+                  <table className="data-table min-w-full">
+                    <thead>
                       <tr>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                           {t.users.firstName}
@@ -594,7 +594,7 @@ export default function UsersPage() {
                   type="button"
                   onClick={closeModal}
                   className="text-gray-400 hover:text-gray-500"
-                  aria-label="Close modal"
+                  aria-label={t.tables.closeModal}
                 >
                   <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -685,7 +685,7 @@ export default function UsersPage() {
                       setFormData({ ...formData, role: e.target.value })
                     }
                     className="w-full px-3 py-2 border border-gray-300 rounded-md"
-                    aria-label="Select user role"
+                    aria-label={t.tables.selectUserRole}
                     required
                   >
                     <option value="STUDENT">{t.users.student}</option>

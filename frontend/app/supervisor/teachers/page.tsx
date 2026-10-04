@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useI18n } from '@/lib/i18n-context';
+import { fmt, dateLocale } from '@/lib/utils';
 import SettingsMenu from '@/components/SettingsMenu';
 import { Logo } from '@/components/Logo';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
@@ -45,7 +46,7 @@ interface Class {
 
 export default function TeachersPage() {
   const router = useRouter();
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const [teachers, setTeachers] = useState<Teacher[]>([]);
   const [subjects, setSubjects] = useState<Subject[]>([]);
   const [classes, setClasses] = useState<Class[]>([]);
@@ -96,7 +97,7 @@ export default function TeachersPage() {
       setTeachers((response as any) || []);
     } catch (err) {
       console.error('Error fetching teachers:', err);
-      setError('Error loading teachers');
+      setError(t.tables.errorLoadingTeachers);
     } finally {
       setLoading(false);
     }
@@ -132,19 +133,19 @@ export default function TeachersPage() {
   };
 
   const handleDeleteTeacher = async (teacherId: string) => {
-    if (!confirm('Are you sure you want to delete this teacher? This action cannot be undone.')) {
+    if (!confirm(t.tables.confirmDeleteTeacher)) {
       return;
     }
 
     try {
       setLoading(true);
       await apiClient.delete(`/users/${teacherId}`);
-      setSuccess('Teacher deleted successfully!');
+      setSuccess(t.tables.teacherDeleted);
       await fetchTeachers();
       setTimeout(() => setSuccess(''), 3000);
     } catch (err: any) {
       console.error('Error deleting teacher:', err);
-      setError(err.response?.data?.message || 'Error deleting teacher');
+      setError(err.response?.data?.message || t.tables.errorDeletingTeacher);
     } finally {
       setLoading(false);
     }
@@ -195,12 +196,12 @@ export default function TeachersPage() {
       
       // Verify we got subjects for this class
       if (subjects.length === 0) {
-        const className = classes.find(c => c.id === classId)?.name || 'this class';
-        setError(`No subjects are assigned to ${className}. Please assign subjects to the class first on the Classes page.`);
+        const className = classes.find(c => c.id === classId)?.name || t.tables.thisClass;
+        setError(fmt(t.tables.noSubjectsForNamedClass, { class: className }));
       }
     } catch (error) {
       console.error('Error fetching class subjects:', error);
-      setError('Failed to load subjects for this class. Please try again.');
+      setError(t.tables.failedLoadSubjectsRetry);
       setAvailableSubjectsForClass([]);
     } finally {
       setLoadingClassSubjects(false);
@@ -219,7 +220,7 @@ export default function TeachersPage() {
 
   const handleBulkAssignSubjects = async () => {
     if (!selectedTeacher?.teacher?.id || !selectedClassForSubjects || selectedSubjectIds.length === 0) {
-      setError('Please select a class and at least one subject');
+      setError(t.tables.selectClassAndSubject);
       return;
     }
 
@@ -241,7 +242,7 @@ export default function TeachersPage() {
           );
 
           if (isAlreadyAssigned) {
-            const subjectName = availableSubjectsForClass.find(s => s.id === subjectId)?.name || 'Subject';
+            const subjectName = availableSubjectsForClass.find(s => s.id === subjectId)?.name || t.tables.subject;
             results.failed.push(`${subjectName} (already assigned)`);
             continue;
           }
@@ -250,21 +251,21 @@ export default function TeachersPage() {
             teacherId: selectedTeacher.teacher.id,
           });
 
-          const subjectName = availableSubjectsForClass.find(s => s.id === subjectId)?.name || 'Subject';
+          const subjectName = availableSubjectsForClass.find(s => s.id === subjectId)?.name || t.tables.subject;
           results.success.push(subjectName);
         } catch (err: any) {
-          const subjectName = availableSubjectsForClass.find(s => s.id === subjectId)?.name || 'Subject';
-          const errorMsg = err.response?.data?.message || 'Error assigning subject';
+          const subjectName = availableSubjectsForClass.find(s => s.id === subjectId)?.name || t.tables.subject;
+          const errorMsg = err.response?.data?.message || t.tables.errorAssigningSubject;
           results.failed.push(`${subjectName} (${errorMsg})`);
         }
       }
 
       // Show results
       if (results.success.length > 0) {
-        setSuccess(`${results.success.length} subject(s) assigned successfully: ${results.success.join(', ')}`);
+        setSuccess(fmt(t.tables.subjectsAssignedList, { count: results.success.length, list: results.success.join(', ') }));
       }
       if (results.failed.length > 0) {
-        setError(`Failed to assign ${results.failed.length} subject(s): ${results.failed.join(', ')}`);
+        setError(fmt(t.tables.subjectsFailedList, { count: results.failed.length, list: results.failed.join(', ') }));
       }
 
       // Refresh teachers data
@@ -285,7 +286,7 @@ export default function TeachersPage() {
       }, 5000);
     } catch (err: any) {
       console.error('Error in bulk assignment:', err);
-      setError(err.response?.data?.message || 'Error assigning subjects');
+      setError(err.response?.data?.message || t.tables.errorAssigningSubjects);
     } finally {
       setAssigningSubject(false);
     }
@@ -312,7 +313,7 @@ export default function TeachersPage() {
 
   const handleConfirmAssignment = async () => {
     if (!selectedTeacher || !selectedSubjectId || !selectedClassId) {
-      setError('Please select both a subject and a class');
+      setError(t.tables.selectSubjectAndClassMsg);
       return;
     }
 
@@ -323,7 +324,7 @@ export default function TeachersPage() {
         teacherId: selectedTeacher.id,
         classId: selectedClassId,
       });
-      setSuccess('Subject assigned successfully!');
+      setSuccess(t.tables.subjectAssigned);
 
       // Refresh teachers data
       await fetchTeachers();
@@ -345,11 +346,11 @@ export default function TeachersPage() {
       setTimeout(() => setSuccess(''), 3000);
     } catch (err: any) {
       console.error('Error assigning subject:', err);
-      const errorMessage = err.response?.data?.message || 'Error assigning subject';
+      const errorMessage = err.response?.data?.message || t.tables.errorAssigningSubject;
 
       // Handle specific error cases
       if (err.response?.status === 409) {
-        setError('This subject is already assigned to this teacher');
+        setError(t.tables.alreadyAssignedTeacher);
       } else {
         setError(errorMessage);
       }
@@ -378,7 +379,7 @@ export default function TeachersPage() {
         teacherId: selectedTeacher.teacher.id,
         classId: classId,
       });
-      setSuccess('Subject assigned successfully!');
+      setSuccess(t.tables.subjectAssigned);
 
       // Refresh teachers data
       await fetchTeachers();
@@ -399,11 +400,11 @@ export default function TeachersPage() {
       setTimeout(() => setSuccess(''), 3000);
     } catch (err: any) {
       console.error('Error assigning subject:', err);
-      const errorMessage = err.response?.data?.message || 'Error assigning subject';
+      const errorMessage = err.response?.data?.message || t.tables.errorAssigningSubject;
 
       // Handle specific error cases
       if (err.response?.status === 409) {
-        setError('This subject is already assigned to this teacher');
+        setError(t.tables.alreadyAssignedTeacher);
       } else {
         setError(errorMessage);
       }
@@ -425,14 +426,14 @@ export default function TeachersPage() {
   const handleUnassignSubject = async (subjectId: string) => {
     if (!selectedTeacher?.teacher?.id) return;
     
-    if (!confirm('Are you sure you want to unassign this subject?')) {
+    if (!confirm(t.tables.confirmUnassignSubject)) {
       return;
     }
     
     try {
       setError('');
       const response = await apiClient.delete(`/subjects/${subjectId}/unassign-teacher/${selectedTeacher.teacher.id}`);
-      const message = (response as any)?.message || 'Subject unassigned successfully!';
+      const message = (response as any)?.message || t.tables.subjectUnassigned;
       setSuccess(message);
       
       // Refresh teachers data
@@ -450,7 +451,7 @@ export default function TeachersPage() {
       setTimeout(() => setSuccess(''), 5000);
     } catch (err: any) {
       console.error('Error unassigning subject:', err);
-      setError(err.response?.data?.message || 'Error unassigning subject');
+      setError(err.response?.data?.message || t.tables.errorUnassigningSubject);
       
       // Refresh data to sync UI with backend
       await fetchTeachers();
@@ -512,7 +513,7 @@ export default function TeachersPage() {
       setTimeout(() => setSuccess(''), 3000);
     } catch (err: any) {
       console.error('Error updating assignment:', err);
-      const errorMessage = err.response?.data?.message || 'Error updating assignment';
+      const errorMessage = err.response?.data?.message || t.tables.errorUpdatingAssignment;
       setError(errorMessage);
     } finally {
       setAssigningSubject(false);
@@ -545,7 +546,7 @@ export default function TeachersPage() {
               <button
                 onClick={() => router.push('/admin')}
                 className="w-10 h-10 bg-white/20 rounded-lg flex items-center justify-center backdrop-blur-sm hover:bg-white/30 transition-colors flex-shrink-0"
-                aria-label="Back to admin dashboard"
+                aria-label={t.tables.backToAdmin}
               >
                 <svg className="w-6 h-6 text-white rtl:rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
@@ -572,7 +573,7 @@ export default function TeachersPage() {
             </svg>
             <input
               type="text"
-              placeholder="Search teachers..."
+              placeholder={t.tables.searchTeachers}
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
@@ -584,12 +585,12 @@ export default function TeachersPage() {
         <div className="mb-6 flex justify-end">
           <button
             onClick={handleOpenAssignmentModal}
-            className="bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 transition-colors flex items-center gap-2"
+            className="gradient-gold text-gray-900 font-semibold px-6 py-3 rounded-lg hover-glow transition-colors flex items-center gap-2"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
             </svg>
-            Assign Subject
+            {t.tables.assignSubject}
           </button>
         </div>
 
@@ -623,28 +624,28 @@ export default function TeachersPage() {
         ) : (
           <>
             <div className="mb-4 text-sm text-gray-600">
-              Total teachers: {filteredTeachers.length}
+              {t.tables.totalTeachers} {filteredTeachers.length}
             </div>
 
             {/* Desktop Table View */}
-            <div className="hidden md:block bg-white shadow-md rounded-xl overflow-hidden">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gradient-to-r from-purple-500 to-indigo-600">
+            <div className="hidden md:block bg-white shadow-md rounded-2xl overflow-hidden ring-1 ring-gold-200/70">
+              <table className="data-table min-w-full">
+                <thead>
                   <tr>
                     <th className="px-6 py-4 text-left text-xs font-medium text-white uppercase tracking-wider">
-                      Name
+                      {t.tables.name}
                     </th>
                     <th className="px-6 py-4 text-left text-xs font-medium text-white uppercase tracking-wider">
-                      Email
+                      {t.tables.email}
                     </th>
                     <th className="px-6 py-4 text-left text-xs font-medium text-white uppercase tracking-wider">
-                      Subjects
+                      {t.tables.subjects}
                     </th>
                     <th className="px-6 py-4 text-left text-xs font-medium text-white uppercase tracking-wider">
-                      Status
+                      {t.tables.status}
                     </th>
                     <th className="px-6 py-4 text-center text-xs font-medium text-white uppercase tracking-wider">
-                      Actions
+                      {t.tables.actions}
                     </th>
                   </tr>
                 </thead>
@@ -653,12 +654,12 @@ export default function TeachersPage() {
                     <tr key={teacher.id} className="hover:bg-gray-50">
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="flex items-center">
-                          <div className="flex-shrink-0 h-10 w-10 bg-gradient-to-br from-purple-500 to-indigo-600 rounded-full flex items-center justify-center">
-                            <span className="text-white font-semibold">
+                          <div className="flex-shrink-0 h-10 w-10 bg-gradient-to-br from-gray-800 to-gray-950 ring-2 ring-gold-400/60 rounded-full flex items-center justify-center">
+                            <span className="text-gold-300 font-semibold">
                               {(teacher as any).user.firstName[0]}{(teacher as any).user.lastName[0]}
                             </span>
                           </div>
-                          <div className="ml-4">
+                          <div className="ms-4">
                             <div className="text-sm font-medium text-gray-900">
                               {(teacher as any).user.firstName} {(teacher as any).user.lastName}
                             </div>
@@ -681,7 +682,7 @@ export default function TeachersPage() {
                               </span>
                             ))
                           ) : (
-                            <span className="text-xs text-gray-400 italic">No subjects assigned</span>
+                            <span className="text-xs text-gray-400 italic">{t.tables.noSubjectsAssigned}</span>
                           )}
                         </div>
                       </td>
@@ -693,7 +694,7 @@ export default function TeachersPage() {
                               : 'bg-red-100 text-red-800'
                           }`}
                         >
-                          {teacher.isActive ? t.users?.active || 'Active' : t.users?.inactive || 'Inactive'}
+                          {teacher.isActive ? t.users?.active || t.tables.active : t.users?.inactive || 'Inactive'}
                         </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-center">
@@ -702,19 +703,19 @@ export default function TeachersPage() {
                             onClick={() => handleManageSubjects(teacher)}
                             className="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
                           >
-                            <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <svg className="w-4 h-4 me-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                             </svg>
-                            Edit
+                            {t.tables.edit}
                           </button>
                           <button
                             onClick={() => handleDeleteTeacher(teacher.id)}
                             className="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
                           >
-                            <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <svg className="w-4 h-4 me-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                             </svg>
-                            Delete
+                            {t.tables.delete}
                           </button>
                         </div>
                       </td>
@@ -727,11 +728,11 @@ export default function TeachersPage() {
             {/* Mobile Card View */}
             <div className="md:hidden space-y-4">
               {filteredTeachers.map((teacher) => (
-                <div key={teacher.id} className="bg-white rounded-xl shadow-md p-4 border-l-4 border-purple-500">
+                <div key={teacher.id} className="bg-white rounded-xl shadow-md p-4 border-s-4 border-purple-500">
                   <div className="flex items-start justify-between mb-3">
                     <div className="flex items-center gap-3">
-                      <div className="flex-shrink-0 h-12 w-12 bg-gradient-to-br from-purple-500 to-indigo-600 rounded-full flex items-center justify-center">
-                        <span className="text-white font-semibold text-lg">
+                      <div className="flex-shrink-0 h-12 w-12 bg-gradient-to-br from-gray-800 to-gray-950 ring-2 ring-gold-400/60 rounded-full flex items-center justify-center">
+                        <span className="text-gold-300 font-semibold text-lg">
                           {(teacher as any).user.firstName[0]}{(teacher as any).user.lastName[0]}
                         </span>
                       </div>
@@ -749,13 +750,13 @@ export default function TeachersPage() {
                           : 'bg-red-100 text-red-800'
                       }`}
                     >
-                      {teacher.isActive ? t.users?.active || 'Active' : t.users?.inactive || 'Inactive'}
+                      {teacher.isActive ? t.users?.active || t.tables.active : t.users?.inactive || 'Inactive'}
                     </span>
                   </div>
                   
                   {/* Subjects */}
                   <div className="mb-3">
-                    <div className="text-xs font-semibold text-gray-700 mb-1">Subjects:</div>
+                    <div className="text-xs font-semibold text-gray-700 mb-1">{t.tables.subjectsLabel}</div>
                     <div className="flex flex-wrap gap-1">
                       {teacher.teacher?.subjects && teacher.teacher.subjects.length > 0 ? (
                         teacher.teacher.subjects.map((ts) => (
@@ -767,14 +768,14 @@ export default function TeachersPage() {
                           </span>
                         ))
                       ) : (
-                        <span className="text-xs text-gray-400 italic">No subjects assigned</span>
+                        <span className="text-xs text-gray-400 italic">{t.tables.noSubjectsAssigned}</span>
                       )}
                     </div>
                   </div>
 
                   <div className="flex items-center justify-between">
                     <div className="text-sm text-gray-500">
-                      Joined: {new Date(teacher.createdAt).toLocaleDateString('en-US', { 
+                      {t.tables.joined} {new Date(teacher.createdAt).toLocaleDateString(dateLocale(locale), { 
                         year: 'numeric', 
                         month: 'short', 
                         day: 'numeric' 
@@ -785,19 +786,19 @@ export default function TeachersPage() {
                         onClick={() => handleManageSubjects(teacher)}
                         className="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700"
                       >
-                        <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <svg className="w-3 h-3 me-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                         </svg>
-                        Edit
+                        {t.tables.edit}
                       </button>
                       <button
                         onClick={() => handleDeleteTeacher(teacher.id)}
                         className="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md text-white bg-red-600 hover:bg-red-700"
                       >
-                        <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <svg className="w-3 h-3 me-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                         </svg>
-                        Delete
+                        {t.tables.delete}
                       </button>
                     </div>
                   </div>
@@ -829,7 +830,7 @@ export default function TeachersPage() {
               <div className="flex items-center justify-between mb-6">
                 <div>
                   <h3 className="text-2xl font-bold text-gray-900">
-                    Manage Subjects
+                    {t.tables.manageSubjects}
                   </h3>
                   <p className="text-sm text-gray-600 mt-1">
                     {selectedTeacher.firstName} {selectedTeacher.lastName}
@@ -874,7 +875,7 @@ export default function TeachersPage() {
 
               {/* Assigned Subjects */}
               <div className="mb-6">
-                <h4 className="font-semibold text-gray-900 mb-3">Currently Assigned Subjects</h4>
+                <h4 className="font-semibold text-gray-900 mb-3">{t.tables.currentlyAssignedSubjects}</h4>
                 {selectedTeacher.teacher?.subjects && selectedTeacher.teacher.subjects.length > 0 ? (
                   <div className="space-y-2">
                     {selectedTeacher.teacher.subjects.map((ts) => (
@@ -882,14 +883,14 @@ export default function TeachersPage() {
                         <div className="flex-1">
                           <div className="font-medium text-gray-900">{ts.subject.name}</div>
                           {ts.subject.code && (
-                            <div className="text-xs text-gray-600">Code: {ts.subject.code}</div>
+                            <div className="text-xs text-gray-600">{t.tables.code} {ts.subject.code}</div>
                           )}
                           {ts.subject.class ? (
                             <div className="flex items-center gap-1 text-xs text-gray-600 mt-1">
                               <svg className="w-3 h-3 text-cyan-500" fill="currentColor" viewBox="0 0 20 20">
                                 <path d="M10.394 2.08a1 1 0 00-.788 0l-7 3a1 1 0 000 1.84L5.25 8.051a.999.999 0 01.356-.257l4-1.714a1 1 0 11.788 1.838L7.667 9.088l1.94.831a1 1 0 00.787 0l7-3a1 1 0 000-1.838l-7-3z" />
                               </svg>
-                              <span className="font-medium">Class: {ts.subject.class.name}</span>
+                              <span className="font-medium">{t.tables.classLabel} {ts.subject.class.name}</span>
                               {ts.subject.class.grade && ` - ${ts.subject.class.grade}`}
                             </div>
                           ) : (
@@ -897,7 +898,7 @@ export default function TeachersPage() {
                               <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
                                 <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
                               </svg>
-                              <span className="italic">No class assigned</span>
+                              <span className="italic">{t.tables.noClassAssigned}</span>
                             </div>
                           )}
                         </div>
@@ -905,7 +906,7 @@ export default function TeachersPage() {
                           <button
                             onClick={() => handleEditAssignment(ts)}
                             className="px-3 py-1.5 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 text-sm font-medium transition-colors"
-                            title="Edit assignment"
+                            title={t.tables.editAssignmentTitle}
                           >
                             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
@@ -914,7 +915,7 @@ export default function TeachersPage() {
                           <button
                             onClick={() => handleUnassignSubject(ts.subject.id)}
                             className="px-3 py-1.5 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 text-sm font-medium transition-colors"
-                            title="Delete assignment"
+                            title={t.tables.deleteAssignmentTitle}
                           >
                             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
@@ -925,14 +926,14 @@ export default function TeachersPage() {
                     ))}
                   </div>
                 ) : (
-                  <p className="text-gray-500 text-sm italic">No subjects currently assigned</p>
+                  <p className="text-gray-500 text-sm italic">{t.tables.noSubjectsCurrentlyAssigned}</p>
                 )}
               </div>
 
               {/* Class Selection (Required) */}
               <div className="mb-6">
                 <label htmlFor="class-select" className="block text-sm font-semibold text-gray-900 mb-2">
-                  Select Class (Required) *
+                  {t.tables.selectClassRequired}
                 </label>
                 <select
                   id="class-select"
@@ -941,15 +942,15 @@ export default function TeachersPage() {
                   className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 bg-white"
                   required
                 >
-                  <option value="">-- Select a Class --</option>
+                  <option value="">{t.tables.selectAClassOption}</option>
                   {classes.map((cls) => (
                     <option key={cls.id} value={cls.id}>
-                      {cls.name}{cls.grade ? ` - Grade ${cls.grade}` : ''}
+                      {cls.name}{cls.grade ? ` - ${t.tables.gradeWord} ${cls.grade}` : ''}
                     </option>
                   ))}
                 </select>
                 {classes.length === 0 && (
-                  <p className="text-sm text-gray-500 italic mt-2">No classes available</p>
+                  <p className="text-sm text-gray-500 italic mt-2">{t.tables.noClassesAvailable}</p>
                 )}
               </div>
 
@@ -959,13 +960,13 @@ export default function TeachersPage() {
                   <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                   </svg>
-                  <p className="text-gray-500 text-sm font-medium mt-2">Please select a class first</p>
-                  <p className="text-gray-400 text-xs mt-1">Subjects assigned to the selected class will appear here</p>
+                  <p className="text-gray-500 text-sm font-medium mt-2">{t.tables.selectClassFirst}</p>
+                  <p className="text-gray-400 text-xs mt-1">{t.tables.subjectsWillAppear}</p>
                 </div>
               ) : loadingClassSubjects ? (
                 <div className="text-center py-8">
                   <LoadingSpinner size="md" />
-                  <p className="text-gray-500 text-sm mt-2">Loading subjects...</p>
+                  <p className="text-gray-500 text-sm mt-2">{t.tables.loadingSubjects}</p>
                 </div>
               ) : (
                 <div>
@@ -976,9 +977,9 @@ export default function TeachersPage() {
                         <svg className="w-4 h-4 inline mr-1" fill="currentColor" viewBox="0 0 20 20">
                           <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
                         </svg>
-                        Showing subjects for: {classes.find(c => c.id === selectedClassForSubjects)?.name || 'Selected Class'}
+                        {t.tables.showingSubjectsFor} {classes.find(c => c.id === selectedClassForSubjects)?.name || t.tables.selectedClass}
                         {availableSubjectsForClass.length > 0 && (
-                          <span className="ml-2 text-blue-600">({availableSubjectsForClass.length} subject{availableSubjectsForClass.length !== 1 ? 's' : ''} available)</span>
+                          <span className="ml-2 text-blue-600">{fmt(t.tables.subjectsCount, { count: availableSubjectsForClass.length })}</span>
                         )}
                       </p>
                     </div>
@@ -986,7 +987,7 @@ export default function TeachersPage() {
                   
                   <div className="flex items-center justify-between mb-3">
                     <h4 className="font-semibold text-gray-900">
-                      Available Subjects
+                      {t.tables.availableSubjects}
                       {selectedSubjectIds.length > 0 && (
                         <span className="ml-2 text-sm font-normal text-purple-600">
                           ({selectedSubjectIds.length} selected)
@@ -1001,7 +1002,7 @@ export default function TeachersPage() {
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                         </svg>
                         <p className="text-gray-500 text-sm italic mt-2">
-                          No subjects are assigned to this class. Please assign subjects to the class first on the Classes page.
+                          {t.tables.noSubjectsForClass}
                         </p>
                       </div>
                     ) : (
@@ -1026,7 +1027,7 @@ export default function TeachersPage() {
                           <div className="flex-1">
                             <div className="font-medium text-gray-900">{subject.name}</div>
                             {subject.code && (
-                              <div className="text-xs text-gray-600">Code: {subject.code}</div>
+                              <div className="text-xs text-gray-600">{t.tables.code} {subject.code}</div>
                             )}
                           </div>
                         </div>
@@ -1042,7 +1043,7 @@ export default function TeachersPage() {
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                         </svg>
                         <p className="text-gray-500 text-sm italic mt-2">
-                          All subjects for this class have been assigned to this teacher
+                          {t.tables.allSubjectsAssigned}
                         </p>
                       </div>
                     )}
@@ -1059,14 +1060,14 @@ export default function TeachersPage() {
                         {assigningSubject ? (
                           <>
                             <LoadingSpinner size="sm" />
-                            Assigning...
+                            {t.tables.assigning}
                           </>
                         ) : (
                           <>
                             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                             </svg>
-                            Assign {selectedSubjectIds.length} Subject{selectedSubjectIds.length !== 1 ? 's' : ''}
+                            {fmt(t.tables.assignNSubjects, { count: selectedSubjectIds.length })}
                           </>
                         )}
                       </button>
@@ -1085,7 +1086,7 @@ export default function TeachersPage() {
                   }}
                   className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 font-medium"
                 >
-                  Close
+                  {t.tables.close}
                 </button>
               </div>
             </div>
@@ -1099,7 +1100,7 @@ export default function TeachersPage() {
           <div className="bg-white rounded-xl shadow-2xl max-w-md w-full max-h-[90vh] overflow-y-auto">
             <div className="p-6">
               <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold text-gray-900">Select Class for Subject</h3>
+                <h3 className="text-lg font-semibold text-gray-900">{t.tables.selectClassForSubject}</h3>
                 <button
                   onClick={() => {
                     setShowClassSelection(false);
@@ -1122,10 +1123,10 @@ export default function TeachersPage() {
                       </svg>
                     </div>
                     <div>
-                      <h4 className="font-medium text-blue-900">Subject to Assign</h4>
+                      <h4 className="font-medium text-blue-900">{t.tables.subjectToAssign}</h4>
                       <p className="text-blue-700 text-sm">{selectedSubjectForAssignment.name}</p>
                       {selectedSubjectForAssignment.code && (
-                        <p className="text-blue-600 text-xs">Code: {selectedSubjectForAssignment.code}</p>
+                        <p className="text-blue-600 text-xs">{t.tables.code} {selectedSubjectForAssignment.code}</p>
                       )}
                     </div>
                   </div>
@@ -1134,7 +1135,7 @@ export default function TeachersPage() {
 
               <div className="mb-6">
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Select the class for this subject:
+                  {t.tables.selectClassForThisSubject}
                 </label>
                 <div className="space-y-2 max-h-60 overflow-y-auto">
                   {classes.map((cls) => (
@@ -1148,7 +1149,7 @@ export default function TeachersPage() {
                         <div>
                           <div className="font-medium text-gray-900">{cls.name}</div>
                           {cls.grade && (
-                            <div className="text-sm text-gray-600">Grade: {cls.grade}</div>
+                            <div className="text-sm text-gray-600">{t.tables.gradeLabel} {cls.grade}</div>
                           )}
                         </div>
                         <div className="flex items-center gap-2">
@@ -1164,7 +1165,7 @@ export default function TeachersPage() {
                       <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
                       </svg>
-                      <p className="text-gray-500 text-sm mt-2">No classes available</p>
+                      <p className="text-gray-500 text-sm mt-2">{t.tables.noClassesAvailable}</p>
                     </div>
                   )}
                 </div>
@@ -1178,7 +1179,7 @@ export default function TeachersPage() {
                   }}
                   className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
                 >
-                  Cancel
+                  {t.tables.cancel}
                 </button>
               </div>
             </div>
@@ -1192,7 +1193,7 @@ export default function TeachersPage() {
           <div className="bg-white rounded-xl shadow-2xl max-w-md w-full max-h-[90vh] overflow-y-auto">
             <div className="p-6">
               <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold text-gray-900">Edit Assignment</h3>
+                <h3 className="text-lg font-semibold text-gray-900">{t.tables.editAssignment}</h3>
                 <button
                   onClick={() => {
                     setShowEditModal(false);
@@ -1215,14 +1216,14 @@ export default function TeachersPage() {
                       </svg>
                     </div>
                     <div>
-                      <h4 className="font-medium text-blue-900">Subject to Reassign</h4>
+                      <h4 className="font-medium text-blue-900">{t.tables.subjectToReassign}</h4>
                       <p className="text-blue-700 text-sm">{editingAssignment.subject.name}</p>
                       {editingAssignment.subject.code && (
-                        <p className="text-blue-600 text-xs">Code: {editingAssignment.subject.code}</p>
+                        <p className="text-blue-600 text-xs">{t.tables.code} {editingAssignment.subject.code}</p>
                       )}
                       {editingAssignment.subject.class && (
                         <p className="text-blue-600 text-xs">
-                          Current Class: {editingAssignment.subject.class.name}
+                          {t.tables.currentClass} {editingAssignment.subject.class.name}
                           {editingAssignment.subject.class.grade && ` - ${editingAssignment.subject.class.grade}`}
                         </p>
                       )}
@@ -1233,7 +1234,7 @@ export default function TeachersPage() {
 
               <div className="mb-6">
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Select new class for this subject:
+                  {t.tables.selectNewClassForSubject}
                 </label>
                 <div className="space-y-2 max-h-60 overflow-y-auto">
                   {classes.map((cls) => (
@@ -1247,7 +1248,7 @@ export default function TeachersPage() {
                         <div>
                           <div className="font-medium text-gray-900">{cls.name}</div>
                           {cls.grade && (
-                            <div className="text-sm text-gray-600">Grade: {cls.grade}</div>
+                            <div className="text-sm text-gray-600">{t.tables.gradeLabel} {cls.grade}</div>
                           )}
                         </div>
                         <div className="flex items-center gap-2">
@@ -1263,7 +1264,7 @@ export default function TeachersPage() {
                       <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
                       </svg>
-                      <p className="text-gray-500 text-sm mt-2">No classes available</p>
+                      <p className="text-gray-500 text-sm mt-2">{t.tables.noClassesAvailable}</p>
                     </div>
                   )}
                 </div>
@@ -1277,7 +1278,7 @@ export default function TeachersPage() {
                   }}
                   className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
                 >
-                  Cancel
+                  {t.tables.cancel}
                 </button>
               </div>
             </div>
@@ -1294,10 +1295,10 @@ export default function TeachersPage() {
               <div className="flex items-center justify-between mb-6">
                 <div>
                   <h3 className="text-2xl font-bold text-gray-900">
-                    Assign Subject to Teacher
+                    {t.tables.assignSubjectToTeacher}
                   </h3>
                   <p className="text-sm text-gray-600 mt-1">
-                    Select both a subject and a class for assignment
+                    {t.tables.selectSubjectAndClass}
                   </p>
                 </div>
                 <button
@@ -1313,7 +1314,7 @@ export default function TeachersPage() {
               {/* Teacher Selection */}
               <div className="mb-6">
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Select Teacher
+                  {t.tables.selectTeacher}
                 </label>
                 <select
                   value={selectedTeacher?.id || ''}
@@ -1323,7 +1324,7 @@ export default function TeachersPage() {
                   }}
                   className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
                 >
-                  <option value="">Choose a teacher...</option>
+                  <option value="">{t.tables.chooseTeacher}</option>
                   {teachers.map((teacher) => (
                     <option key={teacher.id} value={teacher.id}>
                       {(teacher as any).user.firstName} {(teacher as any).user.lastName} ({(teacher as any).user.email})
@@ -1335,14 +1336,14 @@ export default function TeachersPage() {
               {/* Subject Selection */}
               <div className="mb-6">
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Select Subject
+                  {t.tables.selectSubject}
                 </label>
                 <select
                   value={selectedSubjectId}
                   onChange={(e) => setSelectedSubjectId(e.target.value)}
                   className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
                 >
-                  <option value="">Choose a subject...</option>
+                  <option value="">{t.tables.chooseSubject}</option>
                   {subjects.map((subject) => (
                     <option key={subject.id} value={subject.id}>
                       {subject.name}
@@ -1354,14 +1355,14 @@ export default function TeachersPage() {
               {/* Class Selection */}
               <div className="mb-6">
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Select Class
+                  {t.tables.selectClass}
                 </label>
                 <select
                   value={selectedClassId}
                   onChange={(e) => setSelectedClassId(e.target.value)}
                   className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
                 >
-                  <option value="">Choose a class...</option>
+                  <option value="">{t.tables.chooseClass}</option>
                   {classes.map((cls) => (
                     <option key={cls.id} value={cls.id}>
                       {cls.name}
@@ -1400,7 +1401,7 @@ export default function TeachersPage() {
                   onClick={() => setShowAssignmentModal(false)}
                   className="px-6 py-3 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
                 >
-                  Cancel
+                  {t.tables.cancel}
                 </button>
                 <button
                   onClick={handleConfirmAssignment}
@@ -1410,14 +1411,14 @@ export default function TeachersPage() {
                   {assigningSubject ? (
                     <>
                       <LoadingSpinner size="sm" />
-                      Assigning...
+                      {t.tables.assigning}
                     </>
                   ) : (
                     <>
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                       </svg>
-                      Assign Subject
+                      {t.tables.assignSubject}
                     </>
                   )}
                 </button>
