@@ -1,6 +1,6 @@
 {
   "common": {
-    "appName": "Study follow-up center",
+    "appName": "Watan Center for Academic Follow-up",
     "settings": "Settings",
     "logout": "Logout",
     "language": "Language",
@@ -12,7 +12,8 @@
     "back": "Back"
   },
   "login": {
-    "title": "Study follow-up center",
+    "title": "Watan Center for Academic Follow-up",
+    "tagline": "Alaa & Rose - Alkhalil · since 2013",
     "subtitle": "Sign in to your account",
     "welcomeMessage": "Empowering education, one student at a time",
     "quote": "Education is the most powerful weapon which you can use to change the world.",
@@ -221,8 +222,8 @@
     "announcementsDesc": "Read announcements",
     "evaluations": "Evaluations",
     "evaluationsDesc": "View your evaluations",
-    "instituteTerms": "Institute Terms and Conditions",
-    "instituteTermsDesc": "View institute terms and conditions",
+    "instituteTerms": "Watan Center Terms and Conditions",
+    "instituteTermsDesc": "View Watan Center terms and conditions",
     "payroll": "Payroll",
     "payrollDesc": "View payroll information"
   },

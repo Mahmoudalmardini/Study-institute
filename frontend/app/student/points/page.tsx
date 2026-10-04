@@ -95,7 +95,7 @@ export default function StudentPointsPage() {
   return (
     <div className="min-h-screen gradient-bg pb-12">
       {/* Header */}
-      <header className="bg-gradient-to-r from-blue-600 to-cyan-600 text-white shadow-xl relative">
+      <header className="gradient-primary text-white shadow-xl relative">
         <div className="absolute inset-0 bg-[url('/pattern.svg')] opacity-10"></div>
         <div className="container mx-auto px-3 sm:px-4 lg:px-8 py-4 sm:py-6 lg:py-8 relative z-10">
           <div className="flex justify-between items-start gap-3">

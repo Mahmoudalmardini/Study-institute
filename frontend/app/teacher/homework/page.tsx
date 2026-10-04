@@ -709,7 +709,7 @@ export default function TeacherHomeworkPage() {
                   <div className="space-y-3">
                     <label className="flex items-center p-4 border-2 rounded-lg cursor-pointer transition-all hover:bg-green-50"
                            style={{
-                             borderColor: evaluationForm.evaluation === 'ACCEPTED' ? '#10b981' : '#e5e7eb',
+                             borderColor: evaluationForm.evaluation === 'ACCEPTED' ? '#10b981' : '#E7E3D9',
                              backgroundColor: evaluationForm.evaluation === 'ACCEPTED' ? '#f0fdf4' : 'white'
                            }}>
                       <input
@@ -731,7 +731,7 @@ export default function TeacherHomeworkPage() {
                     
                     <label className="flex items-center p-4 border-2 rounded-lg cursor-pointer transition-all hover:bg-red-50"
                            style={{
-                             borderColor: evaluationForm.evaluation === 'REJECTED' ? '#ef4444' : '#e5e7eb',
+                             borderColor: evaluationForm.evaluation === 'REJECTED' ? '#ef4444' : '#E7E3D9',
                              backgroundColor: evaluationForm.evaluation === 'REJECTED' ? '#fef2f2' : 'white'
                            }}>
                       <input

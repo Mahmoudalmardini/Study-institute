@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useI18n } from '@/lib/i18n-context';
 import SettingsMenu from '@/components/SettingsMenu';
+import { Logo } from '@/components/Logo';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -360,18 +361,23 @@ export default function UsersPage() {
   });
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <nav className="bg-white shadow sticky top-0 z-40">
+    <div className="min-h-screen gradient-bg">
+      <nav className="gradient-primary shadow-lg sticky top-0 z-40">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
-            <div className="flex items-center min-w-0 flex-1">
+            <div className="flex items-center min-w-0 flex-1 gap-3">
               <button
                 onClick={() => router.push('/admin')}
-                className="text-blue-600 hover:text-blue-800 mr-2 sm:mr-4 flex-shrink-0"
+                className="w-10 h-10 bg-white/10 hover:bg-white/20 rounded-lg flex items-center justify-center text-gold-300 flex-shrink-0"
+                aria-label="Back"
               >
-                ←
+                <span className="rtl:rotate-180 inline-block">←</span>
               </button>
-              <h1 className="text-lg sm:text-xl font-bold truncate">{t.users.title}</h1>
+              <Logo />
+              <h1 className="text-lg sm:text-xl font-bold text-white truncate">
+                <span className="hidden sm:inline">{t.common.appName} - </span>
+                {t.users.title}
+              </h1>
             </div>
             <div className="flex items-center flex-shrink-0">
               <SettingsMenu onLogout={handleLogout} />

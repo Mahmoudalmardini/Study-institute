@@ -421,7 +421,7 @@ export default function AdminHomeworkReviewPage() {
                   <div className="space-y-3">
                     <label className="flex items-center p-4 border-2 rounded-lg cursor-pointer transition-all hover:bg-green-50"
                            style={{
-                             borderColor: reviewForm.evaluation === 'ACCEPTED' ? '#10b981' : '#e5e7eb',
+                             borderColor: reviewForm.evaluation === 'ACCEPTED' ? '#10b981' : '#E7E3D9',
                              backgroundColor: reviewForm.evaluation === 'ACCEPTED' ? '#f0fdf4' : 'white'
                            }}>
                       <input
@@ -443,7 +443,7 @@ export default function AdminHomeworkReviewPage() {
                     
                     <label className="flex items-center p-4 border-2 rounded-lg cursor-pointer transition-all hover:bg-red-50"
                            style={{
-                             borderColor: reviewForm.evaluation === 'REJECTED' ? '#ef4444' : '#e5e7eb',
+                             borderColor: reviewForm.evaluation === 'REJECTED' ? '#ef4444' : '#E7E3D9',
                              backgroundColor: reviewForm.evaluation === 'REJECTED' ? '#fef2f2' : 'white'
                            }}>
                       <input

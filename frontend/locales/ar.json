@@ -1,6 +1,6 @@
 {
   "common": {
-    "appName": "مركز المتابعة الدراسية",
+    "appName": "مركز وطن للمتابعة الدراسية",
     "settings": "الإعدادات",
     "logout": "تسجيل الخروج",
     "language": "اللغة",
@@ -12,7 +12,8 @@
     "back": "رجوع"
   },
   "login": {
-    "title": "مركز المتابعة الدراسية",
+    "title": "مركز وطن للمتابعة الدراسية",
+    "tagline": "Alaa & Rose - Alkhalil · since 2013",
     "subtitle": "تسجيل الدخول إلى حسابك",
     "welcomeMessage": "تمكين التعليم، طالب واحد في كل مرة",
     "quote": "التعليم هو السلاح الأقوى الذي يمكنك استخدامه لتغيير العالم.",
@@ -221,8 +222,8 @@
     "announcementsDesc": "قراءة الإعلانات",
     "evaluations": "التقييمات",
     "evaluationsDesc": "عرض تقييماتك",
-    "instituteTerms": "شروط وأحكام المعهد",
-    "instituteTermsDesc": "عرض شروط وأحكام المعهد",
+    "instituteTerms": "شروط وأحكام المركز",
+    "instituteTermsDesc": "عرض شروط وأحكام مركز وطن",
     "payroll": "الرواتب",
     "payrollDesc": "عرض معلومات الرواتب"
   },
