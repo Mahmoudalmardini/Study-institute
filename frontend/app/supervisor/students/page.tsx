@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { useI18n } from '@/lib/i18n-context';
 import { fmt, dateLocale } from '@/lib/utils';
@@ -51,38 +51,34 @@ export default function SupervisorStudentsPage() {
   const [loadingTeachers, setLoadingTeachers] = useState<Record<string, boolean>>({});
   const [saving, setSaving] = useState(false);
 
-  useEffect(() => {
-    const token = localStorage.getItem('accessToken');
-    if (!token) {
-      router.push('/login');
-      return;
-    }
-    fetchData();
-    // fetchData is a plain function declared below; listing it here threw a TDZ ReferenceError on every render
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [router, page]);
-
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     try {
       setLoading(true);
       const token = localStorage.getItem('accessToken');
-      
+
       if (!token) {
         router.push('/login');
         return;
       }
 
-      // Fetch paginated users with STUDENT role and student profiles
-      const [usersRes, studentsRes] = await Promise.all([
+      const [usersRes, classesData, subjectsData] = await Promise.all([
         apiClient.get(`/users?role=STUDENT&page=${page}&limit=${limit}`),
-        apiClient.get(`/students?page=${page}&limit=${limit}`),
+        apiClient.get('/classes?page=1&limit=1000'),
+        apiClient.get('/subjects?page=1&limit=1000'),
       ]);
-      
+      setAllClasses(Array.isArray(classesData) ? classesData : ((classesData as any)?.data || []));
+      setAllSubjects(Array.isArray(subjectsData) ? subjectsData : ((subjectsData as any)?.data || []));
+
       // Handle paginated responses
       const usersData = usersRes?.data || (Array.isArray(usersRes) ? usersRes : []);
       const usersMeta = usersRes?.meta || { total: usersData.length, totalPages: 1 };
       const users = Array.isArray(usersData) ? usersData : usersData?.data || [];
 
+      // Fetch exactly the profiles of the users on this page (the /students list is paginated independently)
+      const userIds = users.map((u: any) => u.id);
+      const studentsRes: any = userIds.length
+        ? await apiClient.get(`/students?userIds=${userIds.join(',')}&limit=${userIds.length}`)
+        : [];
       const studentsData = studentsRes?.data || (Array.isArray(studentsRes) ? studentsRes : []);
       const studentProfiles = Array.isArray(studentsData) ? studentsData : studentsData?.data || [];
 
@@ -110,15 +106,11 @@ export default function SupervisorStudentsPage() {
       
       setStudents(studentsWithProfiles);
       
-      // Load subjects for students with profiles in parallel batches (max 10 concurrent)
-      const studentsWithProfilesList = studentsWithProfiles.filter(s => s.studentProfile);
+      // Page size is bounded (limit), so load every student's subjects in one parallel round
+      const studentsWithProfilesList = studentsWithProfiles.filter((s: any) => s.studentProfile);
       if (studentsWithProfilesList.length > 0) {
-        const batchSize = 10; // Process 10 students at a time
-        const studentsWithSubjects = [...studentsWithProfiles];
-        
-        for (let i = 0; i < studentsWithProfilesList.length; i += batchSize) {
-          const batch = studentsWithProfilesList.slice(i, i + batchSize);
-          const subjectPromises = batch.map(async (student) => {
+        const results = await Promise.all(
+          studentsWithProfilesList.map(async (student: any) => {
             try {
               const subjectsData = await apiClient.get(`/students/${student.studentProfile.id}/subjects`);
               const studentSubjects = Array.isArray(subjectsData) ? subjectsData : (subjectsData as any)?.data || [];
@@ -127,27 +119,13 @@ export default function SupervisorStudentsPage() {
               console.error(`Error fetching subjects for student ${student.id}:`, err);
               return { studentId: student.id, subjects: [] };
             }
-          });
-          
-          const results = await Promise.all(subjectPromises);
-          results.forEach(({ studentId, subjects }) => {
-            const studentIndex = studentsWithSubjects.findIndex(s => s.id === studentId);
-            if (studentIndex >= 0) {
-              studentsWithSubjects[studentIndex].subjects = subjects;
-            }
-          });
-        }
-        
-        setStudents(studentsWithSubjects);
+          }),
+        );
+        const subjectsByStudent = new Map(results.map((r) => [r.studentId, r.subjects]));
+        setStudents(
+          studentsWithProfiles.map((s: any) => ({ ...s, subjects: subjectsByStudent.get(s.id) ?? s.subjects })),
+        );
       }
-
-      // Fetch all classes using apiClient
-      const classesData = await apiClient.get('/classes');
-      setAllClasses(Array.isArray(classesData) ? classesData : ((classesData as any)?.data || []));
-
-      // Fetch all subjects using apiClient
-      const subjectsData = await apiClient.get('/subjects');
-      setAllSubjects(Array.isArray(subjectsData) ? subjectsData : ((subjectsData as any)?.data || []));
 
     } catch (err: any) {
       console.error('Error fetching data:', err);
@@ -159,7 +137,7 @@ export default function SupervisorStudentsPage() {
         
         if (status === 429) {
           // Rate limit hit - don't logout, retry after delay
-          errorMessage = 'Too many requests. Please wait a moment...';
+          errorMessage = t.tables.tooManyRequests;
           setError(errorMessage);
           setTimeout(() => {
             fetchData();
@@ -177,7 +155,16 @@ export default function SupervisorStudentsPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [router, page, limit]);
+
+  useEffect(() => {
+    const token = localStorage.getItem('accessToken');
+    if (!token) {
+      router.push('/login');
+      return;
+    }
+    fetchData();
+  }, [router, fetchData]);
 
   const openStudentModal = async (student: Student) => {
     setShowModal(true);
@@ -197,7 +184,7 @@ export default function SupervisorStudentsPage() {
     if (!studentProfile) {
       try {
         // Try to get all students and find this one using apiClient
-        const studentsData = await apiClient.get('/students');
+        const studentsData = await apiClient.get(`/students?userIds=${student.id}&limit=1`);
         const studentsArray = Array.isArray(studentsData) ? studentsData : ((studentsData as any)?.data || []);
         const existingProfile = studentsArray.find((s: any) => s.userId === student.id);
         
@@ -223,7 +210,7 @@ export default function SupervisorStudentsPage() {
           // Profile already exists, try to fetch it directly
           console.log('Profile already exists, fetching it...');
           try {
-            const studentsData = await apiClient.get('/students');
+            const studentsData = await apiClient.get(`/students?userIds=${student.id}&limit=1`);
             const studentsArray = Array.isArray(studentsData) ? studentsData : ((studentsData as any)?.data || []);
             studentProfile = studentsArray.find((s: any) => s.userId === student.id);
             if (studentProfile) {
@@ -352,7 +339,7 @@ export default function SupervisorStudentsPage() {
       
     } catch (err: any) {
       console.error('Save error:', err);
-      setError(err.message || t.students?.errorSaving || t.tables.errorSavingChanges);
+      setError(err.message || t.students.errorSaving);
     } finally {
       setSaving(false);
     }
@@ -403,12 +390,12 @@ export default function SupervisorStudentsPage() {
     }
   };
 
-  const filteredStudents = students.filter((student) => {
+  const filteredStudents = useMemo(() => students.filter((student) => {
     const fullName = `${student.firstName} ${student.lastName}`.toLowerCase();
     const email = student.email.toLowerCase();
     const search = searchTerm.toLowerCase();
     return fullName.includes(search) || email.includes(search);
-  });
+  }), [students, searchTerm]);
 
   // Fetch subjects for selected class
   useEffect(() => {
@@ -500,29 +487,29 @@ export default function SupervisorStudentsPage() {
               <table className="data-table min-w-full">
                 <thead>
                   <tr>
-                    <th className="px-6 py-4 text-left text-xs font-medium text-white uppercase tracking-wider">
-                      {t.users?.name || t.tables.name}
+                    <th className="px-6 py-4 text-xs">
+                      {t.users.name}
                     </th>
-                    <th className="px-6 py-4 text-left text-xs font-medium text-white uppercase tracking-wider">
-                      {t.users?.email || t.tables.email}
+                    <th className="px-6 py-4 text-xs">
+                      {t.users.email}
                     </th>
-                    <th className="px-6 py-4 text-left text-xs font-medium text-white uppercase tracking-wider">
+                    <th className="px-6 py-4 text-xs">
                       {t.students?.class || 'Class'}
                     </th>
-                    <th className="px-6 py-4 text-left text-xs font-medium text-white uppercase tracking-wider">
+                    <th className="px-6 py-4 text-xs">
                       {t.students?.subjects || t.tables.subjects}
                     </th>
-                    <th className="px-6 py-4 text-left text-xs font-medium text-white uppercase tracking-wider">
-                      {t.users?.status || t.tables.status}
+                    <th className="px-6 py-4 text-xs">
+                      {t.users.status}
                     </th>
-                    <th className="px-6 py-4 text-left text-xs font-medium text-white uppercase tracking-wider">
-                      {t.users?.actions || t.tables.actions}
+                    <th className="px-6 py-4 text-xs">
+                      {t.users.actions}
                     </th>
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
                   {filteredStudents.map((student) => (
-                    <tr key={student.id} className="hover:bg-gray-50 cursor-pointer" onClick={() => openStudentModal(student)}>
+                    <tr key={student.id} className="cursor-pointer" onClick={() => openStudentModal(student)}>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="flex items-center">
                           <div className="flex-shrink-0 h-10 w-10 bg-gradient-to-br from-gray-800 to-gray-950 ring-2 ring-gold-400/60 rounded-full flex items-center justify-center">
@@ -575,7 +562,7 @@ export default function SupervisorStudentsPage() {
                               : 'bg-red-100 text-red-800'
                           }`}
                         >
-                          {student.isActive ? t.users?.active || t.tables.active : t.users?.inactive || 'Inactive'}
+                          {student.isActive ? t.users.active : t.users.inactive}
                         </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm">
@@ -624,7 +611,7 @@ export default function SupervisorStudentsPage() {
                           : 'bg-red-100 text-red-800'
                       }`}
                     >
-                      {student.isActive ? t.users?.active || t.tables.active : t.users?.inactive || 'Inactive'}
+                      {student.isActive ? t.users.active : t.users.inactive}
                     </span>
                   </div>
                   <div className="mb-3">
@@ -638,7 +625,7 @@ export default function SupervisorStudentsPage() {
                     
                     {/* Class Display */}
                     <div className="mb-2">
-                      <span className="text-xs font-medium text-gray-600">{t.tables.classLabel}</span>
+                      <span className="text-xs font-medium text-gray-600 me-1">{t.tables.classLabel}</span>
                       {student.class ? (
                         <span className="px-2 py-1 bg-blue-100 text-blue-800 rounded-full text-xs font-medium">
                           {student.class.name}
@@ -650,7 +637,7 @@ export default function SupervisorStudentsPage() {
                     
                     {/* Subjects Display */}
                     <div className="mb-2">
-                      <span className="text-xs font-medium text-gray-600">{t.tables.subjectsLabel}</span>
+                      <span className="text-xs font-medium text-gray-600 me-1">{t.tables.subjectsLabel}</span>
                       <div className="flex flex-wrap gap-1 mt-1">
                         {student.subjects && student.subjects.length > 0 ? (
                           student.subjects.map((subject: any) => (
@@ -732,7 +719,7 @@ export default function SupervisorStudentsPage() {
             <div className="p-6 space-y-6 overflow-y-auto flex-1">
               {/* Student Info */}
               <div className="bg-gray-50 rounded-lg p-4">
-                <h3 className="text-sm font-medium text-gray-700 mb-2">{t.tables.student}</h3>
+                <h3 className="text-sm font-medium text-gray-700 mb-2">{t.students.student}</h3>
                 <div className="flex items-center gap-3">
                   <div className="h-12 w-12 bg-gradient-to-br from-gray-800 to-gray-950 ring-2 ring-gold-400/60 rounded-full flex items-center justify-center">
                     <span className="text-gold-300 font-semibold text-lg">
@@ -989,7 +976,7 @@ export default function SupervisorStudentsPage() {
                       onClick={() => setShowModal(false)}
                       className="px-6 py-3 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 font-medium transition-colors"
                     >
-                      {t.tables.cancel}
+                      {t.common.cancel}
                     </button>
                     <button
                       onClick={handleSaveChanges}

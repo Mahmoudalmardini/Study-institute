@@ -1,8 +1,10 @@
 -- AlterTable: Add monthlyInstallment column to class_subjects table (if not exists)
-DO $$ 
+-- Misdated: on an empty database class_subjects does not exist yet, so this is a no-op
+-- there and 20261004000000_reconcile_installment_columns performs the change.
+DO $$
 BEGIN
-    IF NOT EXISTS (
-        SELECT 1 FROM information_schema.columns 
+    IF to_regclass('class_subjects') IS NOT NULL AND NOT EXISTS (
+        SELECT 1 FROM information_schema.columns
         WHERE table_name = 'class_subjects' AND column_name = 'monthlyInstallment'
     ) THEN
         ALTER TABLE "class_subjects" ADD COLUMN "monthlyInstallment" DECIMAL(10,2);

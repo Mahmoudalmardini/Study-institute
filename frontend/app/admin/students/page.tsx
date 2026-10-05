@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { useI18n } from '@/lib/i18n-context';
 import { fmt, dateLocale } from '@/lib/utils';
@@ -64,12 +64,10 @@ export default function StudentsPage() {
         return;
       }
 
-      // Fetch paginated users with STUDENT role and student profiles
-      const [usersRes, studentsRes, classesRes, subjectsRes] = await Promise.all([
+      const [usersRes, classesRes, subjectsRes] = await Promise.all([
         apiClient.get(`/users?role=STUDENT&page=${currentPage}&limit=${currentLimit}`),
-        apiClient.get(`/students?page=${currentPage}&limit=${currentLimit}`),
-        apiClient.get('/classes'),
-        apiClient.get('/subjects'),
+        apiClient.get('/classes?page=1&limit=1000'),
+        apiClient.get('/subjects?page=1&limit=1000'),
       ]);
 
       // Handle paginated responses
@@ -77,8 +75,12 @@ export default function StudentsPage() {
       const usersMeta = usersRes?.meta || { total: usersData.length, totalPages: 1 };
       const users = Array.isArray(usersData) ? usersData : usersData?.data || [];
 
+      // Fetch exactly the profiles of the users on this page (the /students list is paginated independently)
+      const userIds = users.map((u: any) => u.id);
+      const studentsRes: any = userIds.length
+        ? await apiClient.get(`/students?userIds=${userIds.join(',')}&limit=${userIds.length}`)
+        : [];
       const studentsData = studentsRes?.data || (Array.isArray(studentsRes) ? studentsRes : []);
-      const studentsMeta = studentsRes?.meta || { total: studentsData.length, totalPages: 1 };
       const studentProfiles = Array.isArray(studentsData) ? studentsData : studentsData?.data || [];
 
       const classes = Array.isArray(classesRes) ? classesRes : (classesRes as any)?.data || [];
@@ -108,15 +110,11 @@ export default function StudentsPage() {
       
       setStudents(studentsWithProfiles);
       
-      // Load subjects for students with profiles in parallel batches (max 10 concurrent)
-      const studentsWithProfilesList = studentsWithProfiles.filter(s => s.studentProfile);
+      // Page size is bounded (limit), so load every student's subjects in one parallel round
+      const studentsWithProfilesList = studentsWithProfiles.filter((s: any) => s.studentProfile);
       if (studentsWithProfilesList.length > 0) {
-        const batchSize = 10; // Process 10 students at a time
-        const studentsWithSubjects = [...studentsWithProfiles];
-        
-        for (let i = 0; i < studentsWithProfilesList.length; i += batchSize) {
-          const batch = studentsWithProfilesList.slice(i, i + batchSize);
-          const subjectPromises = batch.map(async (student) => {
+        const results = await Promise.all(
+          studentsWithProfilesList.map(async (student: any) => {
             try {
               const subjectsData = await apiClient.get(`/students/${student.studentProfile.id}/subjects`);
               const studentSubjects = Array.isArray(subjectsData) ? subjectsData : (subjectsData as any)?.data || [];
@@ -125,18 +123,12 @@ export default function StudentsPage() {
               console.error(`Error fetching subjects for student ${student.id}:`, err);
               return { studentId: student.id, subjects: [] };
             }
-          });
-          
-          const results = await Promise.all(subjectPromises);
-          results.forEach(({ studentId, subjects }) => {
-            const studentIndex = studentsWithSubjects.findIndex(s => s.id === studentId);
-            if (studentIndex >= 0) {
-              studentsWithSubjects[studentIndex].subjects = subjects;
-            }
-          });
-        }
-        
-        setStudents(studentsWithSubjects);
+          }),
+        );
+        const subjectsByStudent = new Map(results.map((r) => [r.studentId, r.subjects]));
+        setStudents(
+          studentsWithProfiles.map((s: any) => ({ ...s, subjects: subjectsByStudent.get(s.id) ?? s.subjects })),
+        );
       }
       setAllClasses(classes);
       setAllSubjects(subjects);
@@ -157,7 +149,7 @@ export default function StudentsPage() {
         
         if (status === 429) {
           // Rate limit hit - don't logout, retry after delay
-          errorMessage = 'Too many requests. Please wait a moment...';
+          errorMessage = t.tables.tooManyRequests;
           setError(errorMessage);
           setTimeout(() => {
             fetchData(currentPage, currentLimit);
@@ -209,9 +201,8 @@ export default function StudentsPage() {
     // If no profile, try to fetch it first, then create if needed (only once)
     if (!studentProfile) {
       try {
-        // First try to fetch all students and find this one
-        const allStudents = await apiClient.get(`/students?page=1&limit=1000`);
-        const studentsList = allStudents?.data || (Array.isArray(allStudents) ? allStudents : (allStudents as any)?.data || []);
+        const found = await apiClient.get(`/students?userIds=${student.id}&limit=1`);
+        const studentsList = found?.data || (Array.isArray(found) ? found : (found as any)?.data || []);
         studentProfile = studentsList.find((s: any) => s.userId === student.id);
         
         if (studentProfile) {
@@ -228,7 +219,7 @@ export default function StudentsPage() {
             // If 409 conflict, profile exists - fetch it one more time
             if (createErr.response?.status === 409) {
               console.log('Profile already exists (409), fetching again...');
-              const retryStudents = await apiClient.get(`/students?page=1&limit=1000`);
+              const retryStudents = await apiClient.get(`/students?userIds=${student.id}&limit=1`);
               const retryList = retryStudents?.data || (Array.isArray(retryStudents) ? retryStudents : (retryStudents as any)?.data || []);
               studentProfile = retryList.find((s: any) => s.userId === student.id);
               
@@ -262,13 +253,13 @@ export default function StudentsPage() {
     // Fetch student's class and subjects if they have a profile
     if (studentProfile) {
       try {
-        // Fetch full student details
-        const studentData = await apiClient.get(`/students/${studentProfile.id}`);
+        const [studentData, studentSubjects] = await Promise.all([
+          apiClient.get(`/students/${studentProfile.id}`),
+          apiClient.get(`/students/${studentProfile.id}/subjects`),
+        ]);
         const fullStudent = studentData.data || studentData;
         setSelectedClassId(fullStudent.classId || '');
-        
-        // Fetch subjects using apiClient
-        const studentSubjects = await apiClient.get(`/students/${studentProfile.id}/subjects`);
+
         const subjectsArray = Array.isArray(studentSubjects) ? studentSubjects : (studentSubjects as any)?.data || [];
         setSelectedSubjectIds(subjectsArray.map((ss: any) => ss.subjectId || ss.subject?.id));
         
@@ -284,13 +275,13 @@ export default function StudentsPage() {
         console.log('Loaded teacher assignments:', teacherAssignments);
         setSubjectTeachers(teacherAssignments);
         
-        // Fetch teachers for all enrolled subjects
-        for (const ss of subjectsArray) {
-          const subjectId = ss.subjectId || ss.subject?.id;
-          if (subjectId) {
-            await fetchTeachersForSubject(subjectId);
-          }
-        }
+        // Fetch teachers for all enrolled subjects (state updates are functional, so parallel is safe)
+        await Promise.all(
+          subjectsArray
+            .map((ss: any) => ss.subjectId || ss.subject?.id)
+            .filter(Boolean)
+            .map((subjectId: string) => fetchTeachersForSubject(subjectId)),
+        );
         
         setSelectedStudent({
           ...student,
@@ -402,7 +393,7 @@ export default function StudentsPage() {
       
     } catch (err: any) {
       console.error('Save error:', err);
-      setError(err.message || t.tables.errorSavingChanges);
+      setError(err.message || t.students.errorSaving);
     } finally {
       setSaving(false);
     }
@@ -468,12 +459,12 @@ export default function StudentsPage() {
     }
   };
 
-  const filteredStudents = students.filter((student) => {
+  const filteredStudents = useMemo(() => students.filter((student) => {
     const fullName = `${student.firstName} ${student.lastName}`.toLowerCase();
     const email = student.email.toLowerCase();
     const search = searchTerm.toLowerCase();
     return fullName.includes(search) || email.includes(search);
-  });
+  }), [students, searchTerm]);
 
   // Fetch subjects for selected class
   useEffect(() => {
@@ -570,29 +561,29 @@ export default function StudentsPage() {
               <table className="data-table min-w-full">
                 <thead>
                   <tr>
-                    <th className="px-6 py-4 text-left text-xs font-medium text-white uppercase tracking-wider">
-                      {t.users?.name || t.tables.name}
+                    <th className="px-6 py-4 text-xs">
+                      {t.users.name}
                     </th>
-                    <th className="px-6 py-4 text-left text-xs font-medium text-white uppercase tracking-wider">
-                      {t.users?.email || t.tables.email}
+                    <th className="px-6 py-4 text-xs">
+                      {t.users.email}
                     </th>
-                    <th className="px-6 py-4 text-left text-xs font-medium text-white uppercase tracking-wider">
+                    <th className="px-6 py-4 text-xs">
                       {t.students?.class || 'Class'}
                     </th>
-                    <th className="px-6 py-4 text-left text-xs font-medium text-white uppercase tracking-wider">
+                    <th className="px-6 py-4 text-xs">
                       {t.students?.subjects || t.tables.subjects}
                     </th>
-                    <th className="px-6 py-4 text-left text-xs font-medium text-white uppercase tracking-wider">
-                      {t.users?.status || t.tables.status}
+                    <th className="px-6 py-4 text-xs">
+                      {t.users.status}
                     </th>
-                    <th className="px-6 py-4 text-left text-xs font-medium text-white uppercase tracking-wider">
-                      {t.users?.actions || t.tables.actions}
+                    <th className="px-6 py-4 text-xs">
+                      {t.users.actions}
                     </th>
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
                   {filteredStudents.map((student) => (
-                    <tr key={student.id} className="hover:bg-gray-50 cursor-pointer" onClick={() => openStudentModal(student)}>
+                    <tr key={student.id} className="cursor-pointer" onClick={() => openStudentModal(student)}>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="flex items-center">
                           <div className="flex-shrink-0 h-10 w-10 bg-gradient-to-br from-gray-800 to-gray-950 ring-2 ring-gold-400/60 rounded-full flex items-center justify-center">
@@ -645,7 +636,7 @@ export default function StudentsPage() {
                               : 'bg-red-100 text-red-800'
                           }`}
                         >
-                          {student.isActive ? t.users?.active || t.tables.active : t.users?.inactive || 'Inactive'}
+                          {student.isActive ? t.users.active : t.users.inactive}
                         </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm">
@@ -694,7 +685,7 @@ export default function StudentsPage() {
                           : 'bg-red-100 text-red-800'
                       }`}
                     >
-                      {student.isActive ? t.users?.active || t.tables.active : t.users?.inactive || 'Inactive'}
+                      {student.isActive ? t.users.active : t.users.inactive}
                     </span>
                   </div>
                   <div className="mb-3">
@@ -708,7 +699,7 @@ export default function StudentsPage() {
                     
                     {/* Class Display */}
                     <div className="mb-2">
-                      <span className="text-xs font-medium text-gray-600">{t.tables.classLabel}</span>
+                      <span className="text-xs font-medium text-gray-600 me-1">{t.tables.classLabel}</span>
                       {student.class ? (
                         <span className="px-2 py-1 bg-blue-100 text-blue-800 rounded-full text-xs font-medium">
                           {student.class.name}
@@ -720,7 +711,7 @@ export default function StudentsPage() {
                     
                     {/* Subjects Display */}
                     <div className="mb-2">
-                      <span className="text-xs font-medium text-gray-600">{t.tables.subjectsLabel}</span>
+                      <span className="text-xs font-medium text-gray-600 me-1">{t.tables.subjectsLabel}</span>
                       <div className="flex flex-wrap gap-1 mt-1">
                         {student.subjects && student.subjects.length > 0 ? (
                           student.subjects.map((subject: any) => (
@@ -1130,12 +1121,12 @@ export default function StudentsPage() {
                       onClick={() => setShowModal(false)}
                       className="px-6 py-3 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 font-medium transition-colors"
                     >
-                      {t.tables.cancel}
+                      {t.common.cancel}
                     </button>
                     <button
                       onClick={handleSaveChanges}
                       disabled={saving || !selectedClassId || selectedSubjectIds.length === 0}
-                      className="px-6 py-3 gradient-gold text-gray-900 font-semibold rounded-lg hover-glow disabled:opacity-50 disabled:shadow-none disabled:cursor-not-allowed transition-colors font-medium flex items-center gap-2"
+                      className="px-6 py-3 gradient-gold text-gray-900 font-semibold rounded-lg hover-glow disabled:opacity-50 disabled:shadow-none disabled:cursor-not-allowed transition-colors flex items-center gap-2"
                     >
                       {saving ? (
                         <>

@@ -77,6 +77,15 @@ export class TeachersService {
     };
   }
 
+  // Lightweight existence check for internal guards; same error as findOne()
+  private async assertExists(id: string) {
+    const found = await this.prisma.teacher.findUnique({ where: { id }, select: { id: true } });
+    if (!found) {
+      throw new NotFoundException(`Teacher with ID ${id} not found`);
+    }
+    return found;
+  }
+
   async findOne(id: string) {
     const teacher = await this.prisma.teacher.findUnique({
       where: { id },
@@ -152,7 +161,7 @@ export class TeachersService {
   }
 
   async getTeacherSubjects(teacherId: string) {
-    await this.findOne(teacherId); // Validate teacher exists
+    await this.assertExists(teacherId); // Validate teacher exists
 
     return this.prisma.teacherSubject.findMany({
       where: { teacherId },

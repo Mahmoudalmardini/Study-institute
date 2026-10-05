@@ -8,11 +8,9 @@ import {
   Delete,
   Query,
   UseGuards,
-  UseInterceptors,
   ParseIntPipe,
   DefaultValuePipe,
 } from '@nestjs/common';
-import { CacheInterceptor } from '@nestjs/cache-manager';
 import { StudentsService } from './students.service';
 import { CreateStudentDto } from './dto/create-student.dto';
 import { UpdateStudentDto } from './dto/update-student.dto';
@@ -20,13 +18,12 @@ import { EnrollSubjectsDto } from './dto/enroll-subjects.dto';
 import { AssignClassesDto } from './dto/assign-classes.dto';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { RolesGuard } from '../../common/guards/roles.guard';
-import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { Role } from '@prisma/client';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import type { CurrentUserData } from '../../common/decorators/current-user.decorator';
 
 @Controller('students')
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(RolesGuard)
 export class StudentsController {
   constructor(private readonly studentsService: StudentsService) {}
 
@@ -38,13 +35,13 @@ export class StudentsController {
 
   @Get()
   @Roles(Role.ADMIN, Role.SUPERVISOR, Role.TEACHER)
-  // @UseInterceptors(CacheInterceptor) // Temporarily disabled for debugging
   findAll(
     @Query('classId') classId?: string,
     @Query('assignedSubjectsOnly') assignedSubjectsOnly?: string,
     @Query('includeSubjects') includeSubjects?: string,
     @Query('page', new DefaultValuePipe(1), ParseIntPipe) page: number = 1,
     @Query('limit', new DefaultValuePipe(20), ParseIntPipe) limit: number = 20,
+    @Query('userIds') userIds?: string,
   ) {
     return this.studentsService.findAll(
       classId,
@@ -57,6 +54,9 @@ export class StudentsController {
           typeof includeSubjects === 'string'
             ? includeSubjects === 'true'
             : undefined,
+        userIds: userIds
+          ? userIds.split(',').map((id) => id.trim()).filter(Boolean)
+          : undefined,
       },
       page,
       limit,

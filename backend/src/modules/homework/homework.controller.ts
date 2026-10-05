@@ -12,9 +12,9 @@ import {
   UseInterceptors,
   ParseIntPipe,
   DefaultValuePipe,
+  Logger,
 } from '@nestjs/common';
 import { FilesInterceptor } from '@nestjs/platform-express';
-import { CacheInterceptor } from '@nestjs/cache-manager';
 import { HomeworkService } from './homework.service';
 import { CreateHomeworkDto } from './dto/create-homework.dto';
 import { UpdateHomeworkDto } from './dto/update-homework.dto';
@@ -25,14 +25,15 @@ import { TeacherEvaluateSubmissionDto } from './dto/teacher-evaluate-submission.
 import { AdminReviewSubmissionDto } from './dto/admin-review-submission.dto';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { RolesGuard } from '../../common/guards/roles.guard';
-import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { Role } from '@prisma/client';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import type { CurrentUserData } from '../../common/decorators/current-user.decorator';
 
 @Controller('homework')
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(RolesGuard)
 export class HomeworkController {
+  private readonly logger = new Logger(HomeworkController.name);
+
   constructor(private readonly homeworkService: HomeworkService) {}
 
   @Post()
@@ -46,7 +47,6 @@ export class HomeworkController {
 
   @Get()
   @Roles(Role.ADMIN, Role.SUPERVISOR, Role.TEACHER, Role.STUDENT)
-  @UseInterceptors(CacheInterceptor)
   findAll(
     @CurrentUser() user: CurrentUserData,
     @Query('classId') classId?: string,
@@ -111,9 +111,9 @@ export class HomeworkController {
     @Body() dto: any,
     @UploadedFiles() files: Express.Multer.File[],
   ) {
-    console.log('[Controller] submitToTeacher called by user:', user.id);
-    console.log('[Controller] submitToTeacher dto:', dto);
-    console.log('[Controller] submitToTeacher files:', files);
+    this.logger.debug('[Controller] submitToTeacher called by user:', user.id);
+    this.logger.debug('[Controller] submitToTeacher dto:', dto);
+    this.logger.debug('[Controller] submitToTeacher files:', files);
     return this.homeworkService.submitToTeacher(user.id, dto, files);
   }
 
@@ -121,15 +121,14 @@ export class HomeworkController {
   @Get('submissions/received')
   @Roles(Role.TEACHER)
   async getTeacherSubmissionsReceived(@CurrentUser() user: CurrentUserData) {
-    console.log('========================================');
-    console.log('✅ ROUTE HIT: submissions/received');
-    console.log('[Controller] getTeacherSubmissions called by user:', user.id);
-    console.log('[Controller] User email:', user.email);
-    console.log('[Controller] User role:', user.role);
-    console.log('========================================');
+    this.logger.debug('========================================');
+    this.logger.debug('✅ ROUTE HIT: submissions/received');
+    this.logger.debug('[Controller] getTeacherSubmissions called by user:', user.id);
+    this.logger.debug('[Controller] User email:', user.email);
+    this.logger.debug('[Controller] User role:', user.role);
+    this.logger.debug('========================================');
     const result = await this.homeworkService.getTeacherSubmissions(user.id);
-    console.log('Returning', result.length, 'submissions');
-    console.log('Submissions data:', JSON.stringify(result, null, 2));
+    this.logger.debug('Returning', result.length, 'submissions');
     return { success: true, data: result };
   }
 
@@ -207,9 +206,9 @@ export class HomeworkController {
     @Body() dto: any,
     @UploadedFiles() files: Express.Multer.File[],
   ) {
-    console.log('[Controller] submitToSubject called by user:', user.id);
-    console.log('[Controller] submitToSubject dto:', dto);
-    console.log('[Controller] submitToSubject files:', files);
+    this.logger.debug('[Controller] submitToSubject called by user:', user.id);
+    this.logger.debug('[Controller] submitToSubject dto:', dto);
+    this.logger.debug('[Controller] submitToSubject files:', files);
     return this.homeworkService.submitToSubject(user.id, dto, files);
   }
 
@@ -240,9 +239,9 @@ export class HomeworkController {
     @Body() dto: SubmitToSubjectTeacherDto,
     @UploadedFiles() files: Express.Multer.File[],
   ) {
-    console.log('[Controller] submitToSubjectTeacher called by user:', user.id);
-    console.log('[Controller] submitToSubjectTeacher dto:', dto);
-    console.log('[Controller] submitToSubjectTeacher files:', files?.length || 0);
+    this.logger.debug('[Controller] submitToSubjectTeacher called by user:', user.id);
+    this.logger.debug('[Controller] submitToSubjectTeacher dto:', dto);
+    this.logger.debug('[Controller] submitToSubjectTeacher files:', files?.length || 0);
     return this.homeworkService.submitToSubjectWithTeacher(user.id, dto, files);
   }
 
@@ -253,11 +252,11 @@ export class HomeworkController {
     @CurrentUser() user: CurrentUserData,
     @Param('homeworkId') homeworkId: string,
   ) {
-    console.log('========================================');
-    console.log('❌ WRONG ROUTE HIT: :homeworkId/submissions');
-    console.log('[Controller] getSubmissions called with homeworkId:', homeworkId);
-    console.log('[Controller] User:', user.id);
-    console.log('========================================');
+    this.logger.debug('========================================');
+    this.logger.debug('❌ WRONG ROUTE HIT: :homeworkId/submissions');
+    this.logger.debug('[Controller] getSubmissions called with homeworkId:', homeworkId);
+    this.logger.debug('[Controller] User:', user.id);
+    this.logger.debug('========================================');
     const teacherId = user.role === Role.TEACHER ? user.id : undefined;
     return this.homeworkService.getSubmissions(homeworkId, teacherId);
   }

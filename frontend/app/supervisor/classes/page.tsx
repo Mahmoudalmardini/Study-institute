@@ -8,6 +8,7 @@ import { Logo } from '@/components/Logo';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import Pagination from '@/components/ui/Pagination';
 import apiClient from '@/lib/api-client';
+import { asList } from '@/lib/utils';
 
 interface Class {
   id: string;
@@ -74,37 +75,6 @@ export default function ClassesPage() {
   const [editingInstallmentValue, setEditingInstallmentValue] = useState<string>('');
   const canManageInstallments = false;
 
-  useEffect(() => {
-    const fetchUserAndData = async () => {
-      const token = localStorage.getItem('accessToken');
-      if (!token) {
-        router.push('/login');
-        return;
-      }
-
-      try {
-        // Fetch actual user profile to validate token
-        const userProfile: any = await apiClient.get('/users/profile');
-        setUser({
-          name: `${userProfile.firstName} ${userProfile.lastName}`,
-          role: userProfile.role,
-        });
-        setMounted(true);
-        await fetchClasses(page, limit);
-        await fetchTeachers();
-      } catch (error: any) {
-        console.error('Error fetching user profile:', error);
-        if (error.response?.status === 401) {
-          localStorage.removeItem('accessToken');
-          localStorage.removeItem('refreshToken');
-          router.push('/login');
-        }
-      }
-    };
-
-    fetchUserAndData();
-  }, [router, page, fetchClasses]);
-
   const fetchClasses = useCallback(async (currentPage: number, currentLimit: number) => {
     try {
       const data = await apiClient.get(`/classes?page=${currentPage}&limit=${currentLimit}`);
@@ -147,10 +117,40 @@ export default function ClassesPage() {
     }
   }, [router]);
 
+  useEffect(() => {
+    const fetchUserAndData = async () => {
+      const token = localStorage.getItem('accessToken');
+      if (!token) {
+        router.push('/login');
+        return;
+      }
+
+      try {
+        // Fetch actual user profile to validate token
+        const userProfile: any = await apiClient.get('/users/profile');
+        setUser({
+          name: `${userProfile.firstName} ${userProfile.lastName}`,
+          role: userProfile.role,
+        });
+        setMounted(true);
+        await Promise.all([fetchClasses(page, limit), fetchTeachers()]);
+      } catch (error: any) {
+        console.error('Error fetching user profile:', error);
+        if (error.response?.status === 401) {
+          localStorage.removeItem('accessToken');
+          localStorage.removeItem('refreshToken');
+          router.push('/login');
+        }
+      }
+    };
+
+    fetchUserAndData();
+  }, [router, page, fetchClasses]);
+
   const fetchTeachers = async () => {
     try {
-      const data = await apiClient.get('/teachers');
-      setTeachers(data || []);
+      const data = await apiClient.get('/teachers?page=1&limit=1000');
+      setTeachers(asList(data));
     } catch (error) {
       console.error('Error fetching teachers:', error);
       setTeachers([]);
@@ -159,8 +159,8 @@ export default function ClassesPage() {
 
   const fetchAllSubjects = async () => {
     try {
-      const data = await apiClient.get('/subjects');
-      setAllSubjects(data || []);
+      const data = await apiClient.get('/subjects?page=1&limit=1000');
+      setAllSubjects(asList(data));
     } catch (error) {
       console.error('Error fetching subjects:', error);
       setAllSubjects([]);

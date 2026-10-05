@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { useI18n } from '@/lib/i18n-context';
 import { fmt, dateLocale } from '@/lib/utils';
@@ -129,14 +129,14 @@ export default function TeachersPage() {
     } catch (err: any) {
       console.error('Error fetching teachers:', err);
       
-      let errorMessage = 'Error loading teachers';
+      let errorMessage = t.tables.errorLoadingTeachers;
       
       if (err.response) {
         const status = err.response.status;
         
         if (status === 429) {
           // Rate limit hit - don't logout, retry after delay
-          errorMessage = 'Too many requests. Please wait a moment...';
+          errorMessage = t.tables.tooManyRequests;
           setError(errorMessage);
           setTimeout(() => {
             fetchTeachers(pg, lmt);
@@ -164,13 +164,18 @@ export default function TeachersPage() {
       return;
     }
     fetchTeachers();
+  }, [router, page, fetchTeachers]);
+
+  // Subject and class lists do not depend on the teacher page, so load them once
+  useEffect(() => {
+    if (!localStorage.getItem('accessToken')) return;
     fetchSubjects();
     fetchClasses();
-  }, [router, page, fetchTeachers]);
+  }, []);
 
   const fetchSubjects = async () => {
     try {
-      const response = await apiClient.get('/subjects');
+      const response = await apiClient.get('/subjects?page=1&limit=1000');
       // Handle different response structures
       if (Array.isArray(response)) {
         setSubjects(response);
@@ -188,7 +193,7 @@ export default function TeachersPage() {
 
   const fetchClasses = async () => {
     try {
-      const response = await apiClient.get('/classes');
+      const response = await apiClient.get('/classes?page=1&limit=1000');
       // Handle different response structures
       if (Array.isArray(response)) {
         setClasses(response);
@@ -328,7 +333,7 @@ export default function TeachersPage() {
 
           if (isAlreadyAssigned) {
             const subjectName = availableSubjectsForClass.find(s => s.id === subjectId)?.name || t.tables.subject;
-            results.failed.push(`${subjectName} (already assigned)`);
+            results.failed.push(fmt(t.tables.alreadyAssignedSuffix, { subject: subjectName }));
             continue;
           }
 
@@ -793,12 +798,12 @@ export default function TeachersPage() {
     }
   };
 
-  const filteredTeachers = teachers.filter((teacher) => {
+  const filteredTeachers = useMemo(() => teachers.filter((teacher) => {
     const fullName = `${teacher.user.firstName} ${teacher.user.lastName}`.toLowerCase();
     const email = teacher.user.email.toLowerCase();
     const search = searchTerm.toLowerCase();
     return fullName.includes(search) || email.includes(search);
-  });
+  }), [teachers, searchTerm]);
 
   return (
     <div className="min-h-screen gradient-bg">
@@ -854,7 +859,7 @@ export default function TeachersPage() {
             </div>
             <button
               onClick={handleOpenAssignmentModal}
-              className="w-full sm:w-auto gradient-gold text-gray-900 font-semibold px-6 py-3 rounded-lg hover-glow focus:outline-none focus:ring-2 focus:ring-gold-500 focus:ring-offset-2 transition-colors flex items-center justify-center gap-2 font-medium"
+              className="w-full sm:w-auto gradient-gold text-gray-900 font-semibold px-6 py-3 rounded-lg hover-glow focus:outline-none focus:ring-2 focus:ring-gold-500 focus:ring-offset-2 transition-colors flex items-center justify-center gap-2"
             >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
@@ -902,26 +907,26 @@ export default function TeachersPage() {
               <table className="data-table min-w-full">
                 <thead>
                   <tr>
-                    <th className="px-6 py-4 text-left text-xs font-medium text-white uppercase tracking-wider">
-                      {t.tables.name}
+                    <th className="px-6 py-4 text-xs">
+                      {t.users.name}
                     </th>
-                    <th className="px-6 py-4 text-left text-xs font-medium text-white uppercase tracking-wider">
-                      {t.tables.email}
+                    <th className="px-6 py-4 text-xs">
+                      {t.users.email}
                     </th>
-                    <th className="px-6 py-4 text-left text-xs font-medium text-white uppercase tracking-wider">
+                    <th className="px-6 py-4 text-xs">
                       {t.tables.subjects}
                     </th>
-                    <th className="px-6 py-4 text-left text-xs font-medium text-white uppercase tracking-wider">
-                      {t.tables.status}
+                    <th className="px-6 py-4 text-xs">
+                      {t.users.status}
                     </th>
-                    <th className="px-6 py-4 text-center text-xs font-medium text-white uppercase tracking-wider">
-                      {t.tables.actions}
+                    <th className="px-6 py-4 text-center text-xs">
+                      {t.users.actions}
                     </th>
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
                   {filteredTeachers.map((teacher) => (
-                    <tr key={teacher.id} className="hover:bg-gray-50">
+                    <tr key={teacher.id}>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="flex items-center">
                           <div className="flex-shrink-0 h-10 w-10 bg-gradient-to-br from-gray-800 to-gray-950 ring-2 ring-gold-400/60 rounded-full flex items-center justify-center">
@@ -981,7 +986,7 @@ export default function TeachersPage() {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <span className="px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
-                          {t.tables.active}
+                          {t.users.active}
                         </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-center">
@@ -1051,7 +1056,7 @@ export default function TeachersPage() {
                       </div>
                     </div>
                     <span className="px-3 py-1.5 text-xs font-semibold rounded-full bg-green-100 text-green-800 flex-shrink-0">
-                      {t.tables.active}
+                      {t.users.active}
                     </span>
                   </div>
                   
@@ -1351,7 +1356,7 @@ export default function TeachersPage() {
                       {t.tables.availableSubjects}
                       {selectedSubjectIds.length > 0 && (
                         <span className="ml-2 text-sm font-normal text-purple-600">
-                          ({selectedSubjectIds.length} selected)
+                          {fmt(t.tables.selectedCount, { count: selectedSubjectIds.length })}
                         </span>
                       )}
                     </h4>
@@ -1540,7 +1545,7 @@ export default function TeachersPage() {
                   }}
                   className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
                 >
-                  {t.tables.cancel}
+                  {t.common.cancel}
                 </button>
               </div>
             </div>
@@ -1652,7 +1657,7 @@ export default function TeachersPage() {
                   }}
                   className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
                 >
-                  {t.tables.cancel}
+                  {t.common.cancel}
                 </button>
                 <button
                   onClick={handleUpdateAssignment}
@@ -1821,7 +1826,7 @@ export default function TeachersPage() {
                   onClick={() => setShowAssignmentModal(false)}
                   className="px-6 py-3 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
                 >
-                  {t.tables.cancel}
+                  {t.common.cancel}
                 </button>
                 <button
                   onClick={handleConfirmAssignment}

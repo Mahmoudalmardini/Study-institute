@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import SettingsMenu from '@/components/SettingsMenu';
+import apiClient from '@/lib/api-client';
 
 interface StudentHomeworkSubmission {
   id: string;
@@ -348,15 +349,25 @@ export default function TeacherHomeworkPage() {
     return Math.round((bytes / Math.pow(k, i)) * 100) / 100 + ' ' + sizes[i];
   };
 
+  const handleOpenFile = async (fileUrl: string) => {
+    // Open the tab synchronously (popup blockers), then point it at the authenticated blob
+    const win = window.open('', '_blank');
+    try {
+      const blob = (await apiClient.get(fileUrl, { responseType: 'blob' })) as unknown as Blob;
+      const blobUrl = window.URL.createObjectURL(blob);
+      if (win) win.location.href = blobUrl;
+      setTimeout(() => window.URL.revokeObjectURL(blobUrl), 60_000);
+    } catch (error) {
+      win?.close();
+      console.error('Open file error:', error);
+      setError(t.homeworkEvaluation.failedToDownload);
+    }
+  };
+
   const handleDownloadFile = async (fileUrl: string, fileName: string) => {
     try {
-      // Fetch the file as a blob
-      const response = await fetch(fileUrl);
-      if (!response.ok) {
-        throw new Error(t.homeworkEvaluation.failedToDownload);
-      }
-      
-      const blob = await response.blob();
+      // Uploaded files require auth, so fetch through apiClient (adds the token, refreshes it)
+      const blob = (await apiClient.get(fileUrl, { responseType: 'blob' })) as unknown as Blob;
       
       // Create a temporary URL for the blob
       const blobUrl = window.URL.createObjectURL(blob);
@@ -554,15 +565,14 @@ export default function TeacherHomeworkPage() {
                                 )}
                               </div>
                               <div className="flex items-center gap-2 flex-shrink-0">
-                                <a
-                                  href={file.url}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
+                                <button
+                                  type="button"
+                                  onClick={() => handleOpenFile(file.url)}
                                   className="text-teal-600 hover:text-teal-700 text-xs font-medium"
                                   aria-label={t.homeworkEvaluation.open}
                                 >
                                   {t.homeworkEvaluation.open}
-                                </a>
+                                </button>
                                 <button
                                   type="button"
                                   onClick={() => handleDownloadFile(file.url, file.name)}
@@ -665,15 +675,14 @@ export default function TeacherHomeworkPage() {
                           {file.size > 0 && <span className="text-xs text-gray-500">({formatFileSize(file.size)})</span>}
                         </div>
                         <div className="flex items-center gap-3">
-                          <a
-                            href={file.url}
-                            target="_blank"
-                            rel="noopener noreferrer"
+                          <button
+                            type="button"
+                            onClick={() => handleOpenFile(file.url)}
                             className="text-teal-600 hover:text-teal-700 text-sm font-medium"
                             aria-label={t.homeworkEvaluation.open}
                           >
                             {t.homeworkEvaluation.open}
-                          </a>
+                          </button>
                           <button
                             type="button"
                             onClick={() => handleDownloadFile(file.url, file.name)}

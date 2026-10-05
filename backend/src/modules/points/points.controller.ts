@@ -1,6 +1,5 @@
 import { Controller, Post, Body, UseGuards, Get, Query, Param } from '@nestjs/common';
 import { PointsService } from './points.service';
-import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
@@ -24,7 +23,7 @@ class CreatePointDto {
 }
 
 @Controller('points')
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(RolesGuard)
 export class PointsController {
 	constructor(private readonly pointsService: PointsService) {}
 
@@ -82,15 +81,7 @@ export class PointsController {
 		
 		// For teachers, filter to only students they can access
 		if (user.role === 'TEACHER') {
-			const accessibleIds: string[] = [];
-			for (const studentId of limitedIds) {
-				try {
-					await this.pointsService['assertTeacherCanModifyStudent'](user.id, studentId);
-					accessibleIds.push(studentId);
-				} catch {
-					// Skip students teacher cannot access
-				}
-			}
+			const accessibleIds = await this.pointsService.filterStudentsTeacherCanAccess(user.id, limitedIds);
 			if (accessibleIds.length === 0) {
 				return {};
 			}

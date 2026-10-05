@@ -1,10 +1,7 @@
 import { Module } from '@nestjs/common';
-import { ServeStaticModule } from '@nestjs/serve-static';
-import { join } from 'path';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { APP_GUARD, APP_FILTER, APP_INTERCEPTOR } from '@nestjs/core';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
-import { CacheModule } from '@nestjs/cache-manager';
 import { ScheduleModule } from '@nestjs/schedule';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
@@ -33,31 +30,11 @@ import { HealthModule } from './health/health.module';
 @Module({
   imports: [
     // Serve uploaded files at /uploads/*
-    ServeStaticModule.forRoot({
-      rootPath: join(process.cwd(), 'uploads'),
-      serveRoot: '/uploads',
-      serveStaticOptions: {
-        index: false, // Disable directory index (don't serve index.html)
-        fallthrough: false, // Don't fall through to other handlers
-      },
-    }),
     ConfigModule.forRoot({
       isGlobal: true,
       load: [configuration],
     }),
     ScheduleModule.forRoot(),
-    CacheModule.registerAsync({
-      isGlobal: true,
-      inject: [ConfigService],
-      useFactory: async (config: ConfigService) => {
-        // Configure cache with default TTL
-        // Redis store can be configured later when @nestjs/cache-manager supports NestJS 11
-        return {
-          ttl: 300, // 5 minutes default TTL
-          max: 1000, // Maximum number of items in cache
-        };
-      },
-    }),
     ThrottlerModule.forRootAsync({
       inject: [ConfigService],
       useFactory: (config: ConfigService) => [

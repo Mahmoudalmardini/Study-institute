@@ -124,6 +124,15 @@ export class SubjectsService {
     };
   }
 
+  // Lightweight existence check for internal guards; same error as findOne()
+  private async assertExists(id: string) {
+    const found = await this.prisma.subject.findUnique({ where: { id }, select: { id: true } });
+    if (!found) {
+      throw new NotFoundException(`Subject with ID ${id} not found`);
+    }
+    return found;
+  }
+
   async findOne(id: string) {
     const subject = await this.prisma.subject.findUnique({
       where: { id },
@@ -172,7 +181,7 @@ export class SubjectsService {
   }
 
   async update(id: string, updateSubjectDto: UpdateSubjectDto) {
-    await this.findOne(id); // Check if subject exists
+    await this.assertExists(id); // Check if subject exists
 
     // Validate class exists if provided
     if (updateSubjectDto.classId) {
@@ -233,7 +242,7 @@ export class SubjectsService {
   }
 
   async remove(id: string) {
-    await this.findOne(id); // Check if subject exists
+    await this.assertExists(id); // Check if subject exists
 
     // Check if subject has enrolled students
     const subject = await this.prisma.subject.findUnique({
@@ -260,7 +269,7 @@ export class SubjectsService {
 
   async assignTeacher(subjectId: string, teacherId: string, assignedBy: string) {
     // Validate subject exists
-    const subject = await this.findOne(subjectId);
+    const subject = await this.assertExists(subjectId);
 
     // Validate teacher exists
     const teacher = await this.prisma.teacher.findUnique({
@@ -316,7 +325,7 @@ export class SubjectsService {
 
   async unassignTeacher(subjectId: string, teacherId: string) {
     // Validate subject exists
-    await this.findOne(subjectId);
+    await this.assertExists(subjectId);
 
     // Check if assignment exists
     const assignment = await this.prisma.teacherSubject.findFirst({
@@ -374,7 +383,7 @@ export class SubjectsService {
   }
 
   async getTeachersBySubject(subjectId: string) {
-    await this.findOne(subjectId);
+    await this.assertExists(subjectId);
 
     return this.prisma.teacherSubject.findMany({
       where: { subjectId },

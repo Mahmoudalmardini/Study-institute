@@ -47,7 +47,7 @@ export default function SupervisorPointsPage() {
     let mounted = true;
     (async () => {
       try {
-        const list = await apiClient.get('/students');
+        const list = await apiClient.get('/students?page=1&limit=1000');
         const studentsList = Array.isArray(list) ? list : (list?.data ?? []);
         const filteredStudents = studentsList.filter((s: any) => {
           const role = s?.user?.role || s?.role;

@@ -8,22 +8,19 @@ import {
   Delete,
   Query,
   UseGuards,
-  UseInterceptors,
   ParseIntPipe,
   DefaultValuePipe,
 } from '@nestjs/common';
-import { CacheInterceptor } from '@nestjs/cache-manager';
 import { UsersService } from './users.service';
 import { CreateUserDto, UpdateUserDto } from './dto';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { RolesGuard } from '../../common/guards/roles.guard';
-import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { Role } from '@prisma/client';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import type { CurrentUserData } from '../../common/decorators/current-user.decorator';
 
 @Controller('users')
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(RolesGuard)
 export class UsersController {
   constructor(private readonly usersService: UsersService) {}
 
@@ -35,7 +32,6 @@ export class UsersController {
 
   @Get()
   @Roles(Role.ADMIN, Role.SUPERVISOR)
-  // @UseInterceptors(CacheInterceptor) // Temporarily disabled for debugging
   findAll(
     @Query('role') role?: string,
     @Query('page', new DefaultValuePipe(1), ParseIntPipe) page: number = 1,

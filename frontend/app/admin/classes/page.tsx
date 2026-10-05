@@ -8,6 +8,7 @@ import { Logo } from '@/components/Logo';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import Pagination from '@/components/ui/Pagination';
 import apiClient from '@/lib/api-client';
+import { asList } from '@/lib/utils';
 
 interface Class {
   id: string;
@@ -132,8 +133,7 @@ export default function ClassesPage() {
           role: userProfile.role,
         });
         setMounted(true);
-        await fetchClasses(page, limit);
-        await fetchTeachers();
+        await Promise.all([fetchClasses(page, limit), fetchTeachers()]);
       } catch (error: any) {
         console.error('Error fetching user profile:', error);
         if (error.response?.status === 401) {
@@ -149,8 +149,8 @@ export default function ClassesPage() {
 
   const fetchTeachers = async () => {
     try {
-      const data = await apiClient.get('/teachers');
-      setTeachers(data || []);
+      const data = await apiClient.get('/teachers?page=1&limit=1000');
+      setTeachers(asList(data));
     } catch (error) {
       console.error('Error fetching teachers:', error);
       setTeachers([]);

@@ -95,16 +95,20 @@ export class StudentsService {
 
   async findAll(
     classId?: string,
-    options?: { assignedSubjectsOnly?: boolean; includeSubjects?: boolean },
+    options?: { assignedSubjectsOnly?: boolean; includeSubjects?: boolean; userIds?: string[] },
     page: number = 1,
     limit: number = 20,
   ): Promise<PaginationResponse<any>> {
-    const { assignedSubjectsOnly, includeSubjects } = options || {};
+    const { assignedSubjectsOnly, includeSubjects, userIds } = options || {};
 
     const where: Prisma.StudentWhereInput = {};
 
     if (classId) {
       where.classId = classId;
+    }
+
+    if (userIds?.length) {
+      where.userId = { in: userIds };
     }
 
     if (assignedSubjectsOnly) {
@@ -179,6 +183,15 @@ export class StudentsService {
         totalPages: Math.ceil(total / limit),
       },
     };
+  }
+
+  // Lightweight existence check for internal guards; same error as findOne()
+  private async assertExists(id: string) {
+    const found = await this.prisma.student.findUnique({ where: { id }, select: { id: true, classId: true } });
+    if (!found) {
+      throw new NotFoundException('Student not found');
+    }
+    return found;
   }
 
   async findOne(id: string) {
@@ -321,26 +334,18 @@ export class StudentsService {
           throw new NotFoundException('Class not found');
         }
       }
+    }
 
-      // Also update/create StudentClass junction table record
-      if (dto.classId) {
-        // Remove old class assignments
-        await this.prisma.studentClass.deleteMany({
+    // Junction rows and the student row change together or not at all
+    return this.prisma.$transaction(async (tx) => {
+      if (dto.classId !== undefined) {
+        // Remove old class assignments (null classId means remove all)
+        await tx.studentClass.deleteMany({
           where: { studentId: id },
         });
 
-        // Create new class assignment
-        const existing = await this.prisma.studentClass.findUnique({
-          where: {
-            studentId_classId: {
-              studentId: id,
-              classId: dto.classId,
-            },
-          },
-        });
-
-        if (!existing) {
-          await this.prisma.studentClass.create({
+        if (dto.classId) {
+          await tx.studentClass.create({
             data: {
               studentId: id,
               classId: dto.classId,
@@ -348,32 +353,25 @@ export class StudentsService {
             },
           });
         }
-      } else {
-        // If classId is null, remove all class assignments
-        await this.prisma.studentClass.deleteMany({
-          where: { studentId: id },
-        });
       }
-    }
 
-    const updatedStudent = await this.prisma.student.update({
-      where: { id },
-      data: dto,
-      include: {
-        user: {
-          select: {
-            id: true,
-            email: true,
-            firstName: true,
-            lastName: true,
-            phone: true,
+      return tx.student.update({
+        where: { id },
+        data: dto,
+        include: {
+          user: {
+            select: {
+              id: true,
+              email: true,
+              firstName: true,
+              lastName: true,
+              phone: true,
+            },
           },
+          class: true,
         },
-        class: true,
-      },
+      });
     });
-
-    return updatedStudent;
   }
 
   async remove(id: string) {
@@ -397,7 +395,7 @@ export class StudentsService {
     subjects: Array<{ subjectId: string; teacherId?: string }>,
     enrolledBy: string,
   ) {
-    const student = await this.findOne(studentId); // Validate student exists
+    const student = await this.assertExists(studentId); // Validate student exists
 
     // Validate minimum 1 subject
     if (!subjects || subjects.length === 0) {
@@ -437,17 +435,21 @@ export class StudentsService {
         );
       }
 
-      // Validate that teachers are assigned to the corresponding subjects
+      // Validate that teachers are assigned to the corresponding subjects (one query for all pairs)
+      const pairs = subjects
+        .filter((s) => s.teacherId)
+        .map((s) => ({ teacherId: s.teacherId!, subjectId: s.subjectId }));
+      const assigned = new Set(
+        (
+          await this.prisma.teacherSubject.findMany({
+            where: { OR: pairs },
+            select: { teacherId: true, subjectId: true },
+          })
+        ).map((ts) => `${ts.teacherId}|${ts.subjectId}`),
+      );
       for (const subj of subjects) {
         if (subj.teacherId) {
-          const teacherSubject = await this.prisma.teacherSubject.findFirst({
-            where: {
-              teacherId: subj.teacherId,
-              subjectId: subj.subjectId,
-            },
-          });
-
-          if (!teacherSubject) {
+          if (!assigned.has(`${subj.teacherId}|${subj.subjectId}`)) {
             const subject = subjectRecords.find(s => s.id === subj.subjectId);
             throw new ConflictException(
               `Teacher is not assigned to teach subject: ${subject?.name || subj.subjectId}`,
@@ -499,37 +501,25 @@ export class StudentsService {
       );
     }
 
-    // Remove existing enrollments not in the new list
-    await this.prisma.studentSubject.deleteMany({
-      where: {
-        studentId,
-        subjectId: { notIn: subjectIds },
-      },
-    });
+    // Replace enrollments atomically so a failure can't leave them half-updated
+    const enrollments = await this.prisma.$transaction(async (tx) => {
+      await tx.studentSubject.deleteMany({
+        where: {
+          studentId,
+          subjectId: { notIn: subjectIds },
+        },
+      });
 
-    // Create or update enrollments
-    const enrollments = await Promise.all(
-      subjects.map(async ({ subjectId, teacherId }) => {
-        const existing = await this.prisma.studentSubject.findUnique({
-          where: {
-            studentId_subjectId: {
+      return Promise.all(
+        subjects.map(({ subjectId, teacherId }) =>
+          tx.studentSubject.upsert({
+            where: { studentId_subjectId: { studentId, subjectId } },
+            update: { teacherId: teacherId || null },
+            create: {
               studentId,
               subjectId,
-            },
-          },
-        });
-
-        if (existing) {
-          // Update existing enrollment with teacher if provided
-          return this.prisma.studentSubject.update({
-            where: {
-              studentId_subjectId: {
-                studentId,
-                subjectId,
-              },
-            },
-            data: {
               teacherId: teacherId || null,
+              enrolledBy,
             },
             include: {
               subject: true,
@@ -546,34 +536,10 @@ export class StudentsService {
                 },
               },
             },
-          });
-        }
-
-        return this.prisma.studentSubject.create({
-          data: {
-            studentId,
-            subjectId,
-            teacherId: teacherId || null,
-            enrolledBy,
-          },
-          include: {
-            subject: true,
-            teacher: {
-              include: {
-                user: {
-                  select: {
-                    id: true,
-                    firstName: true,
-                    lastName: true,
-                    email: true,
-                  },
-                },
-              },
-            },
-          },
-        });
-      }),
-    );
+          }),
+        ),
+      );
+    });
 
     // Automatically create installments for enrolled subjects
     // Calculate for the enrollment month and current month if different
@@ -628,7 +594,7 @@ export class StudentsService {
     classIds: string[],
     assignedBy: string,
   ) {
-    await this.findOne(studentId); // Validate student exists
+    await this.assertExists(studentId); // Validate student exists
 
     // Validate all classes exist
     const classes = await this.prisma.class.findMany({
@@ -680,7 +646,7 @@ export class StudentsService {
   }
 
   async getStudentClasses(studentId: string) {
-    await this.findOne(studentId); // Validate student exists
+    await this.assertExists(studentId); // Validate student exists
 
     return this.prisma.studentClass.findMany({
       where: { studentId },
@@ -695,7 +661,7 @@ export class StudentsService {
   }
 
   async removeStudentClass(studentId: string, classId: string) {
-    await this.findOne(studentId); // Validate student exists
+    await this.assertExists(studentId); // Validate student exists
 
     const assignment = await this.prisma.studentClass.findUnique({
       where: {

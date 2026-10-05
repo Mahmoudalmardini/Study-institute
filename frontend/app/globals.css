@@ -337,63 +337,67 @@
     0 8px 10px -6px rgba(23, 21, 16, 0.08);
 }
 
-/* Data tables: unlayered on purpose so it overrides the per-cell utilities already in the markup */
-.data-table {
-  width: 100%;
-  border-collapse: separate;
-  border-spacing: 0;
+/* Data tables: component layer, so per-cell utilities (e.g. text-center) still override */
+@layer components {
+  .data-table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+  }
+
+  .data-table thead {
+    background: linear-gradient(135deg, #121009 0%, #2A251A 55%, #121009 100%);
+  }
+
+  .data-table thead th {
+    text-align: start;
+    color: #EDC95F;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    border-bottom: 2px solid #D4A017;
+  }
+
+  .data-table td {
+    text-align: start;
+  }
+
+  .data-table tbody tr {
+    background-color: #FFFFFF;
+    transition: background-color 0.2s ease;
+  }
+
+  .data-table tbody tr:nth-child(even) {
+    background-color: #FAF9F6;
+  }
+
+  .data-table tbody tr + tr td {
+    border-top: 1px solid #E7E3D9;
+  }
+
+  .data-table tbody tr:hover {
+    background-color: #FDF9EC;
+  }
+
+  .data-table tbody tr:hover td:first-child {
+    box-shadow: inset 3px 0 0 0 #D4A017;
+  }
+
+  [dir="rtl"] .data-table tbody tr:hover td:first-child {
+    box-shadow: inset -3px 0 0 0 #D4A017;
+  }
 }
 
-.data-table thead {
-  background: linear-gradient(135deg, #121009 0%, #2A251A 55%, #121009 100%);
-}
-
-.data-table thead th {
-  text-align: start;
-  color: #EDC95F;
-  font-weight: 600;
-  letter-spacing: 0.04em;
-  border-bottom: 2px solid #D4A017;
-}
-
-.data-table td {
-  text-align: start;
-}
-
-.data-table tbody tr {
-  background-color: #FFFFFF;
-  transition: background-color 0.2s ease;
-}
-
-.data-table tbody tr:nth-child(even) {
-  background-color: #FAF9F6;
-}
-
-.data-table tbody tr + tr td {
-  border-top: 1px solid #E7E3D9;
-}
-
-.data-table tbody tr:hover {
-  background-color: #FDF9EC;
-}
-
-.data-table tbody tr:hover td:first-child {
-  box-shadow: inset 3px 0 0 0 #D4A017;
-}
-
-[dir="rtl"] .data-table tbody tr:hover td:first-child {
-  box-shadow: inset -3px 0 0 0 #D4A017;
-}
-
-.hover-glow:hover {
+.hover-glow:hover:not(:disabled) {
   box-shadow: 0 0 20px rgba(212, 160, 23, 0.45);
 }
 
-/* Smooth Transitions */
-* {
-  transition-property: background-color, border-color, color, fill, stroke, opacity, box-shadow, transform;
-  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
-  transition-duration: 200ms;
+/* Smooth Transitions: base layer so transition/duration utilities can override */
+@layer base {
+  * {
+    transition-property: background-color, border-color, color, fill, stroke, opacity, box-shadow, transform;
+    transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+    transition-duration: 200ms;
+  }
 }
 
 /* Reduce motion for accessibility */

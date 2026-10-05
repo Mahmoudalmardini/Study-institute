@@ -5,7 +5,7 @@ import { PrismaService } from '../prisma/prisma.service';
 export class PointsService {
 	constructor(private readonly prisma: PrismaService) {}
 
-	private async assertTeacherCanModifyStudent(teacherUserId: string, studentId: string): Promise<void> {
+	private async teacherClassIds(teacherUserId: string): Promise<Set<string>> {
 		const teacher = await this.prisma.teacher.findUnique({ where: { userId: teacherUserId }, select: { id: true } });
 		if (!teacher) throw new ForbiddenException('Not a teacher');
 
@@ -23,6 +23,31 @@ export class PointsService {
 
 		const classIds = new Set<string>([...ownedClassIds, ...taughtSubjectClassIds]);
 		if (classIds.size === 0) throw new ForbiddenException('No classes');
+		return classIds;
+	}
+
+	/** Same rule as assertTeacherCanModifyStudent, applied to many students with one student query. */
+	async filterStudentsTeacherCanAccess(teacherUserId: string, studentIds: string[]): Promise<string[]> {
+		let classIds: Set<string>;
+		try {
+			classIds = await this.teacherClassIds(teacherUserId);
+		} catch {
+			return [];
+		}
+		const students = await this.prisma.student.findMany({
+			where: { id: { in: studentIds } },
+			select: { id: true, classId: true, classes: { select: { classId: true } } },
+		});
+		const allowed = new Set(
+			students
+				.filter((s) => (s.classId && classIds.has(s.classId)) || s.classes.some((sc) => classIds.has(sc.classId)))
+				.map((s) => s.id),
+		);
+		return studentIds.filter((id) => allowed.has(id));
+	}
+
+	private async assertTeacherCanModifyStudent(teacherUserId: string, studentId: string): Promise<void> {
+		const classIds = await this.teacherClassIds(teacherUserId);
 
 		// check student membership
 		const s = await this.prisma.student.findUnique({
