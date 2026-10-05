@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback, useMemo } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useI18n } from '@/lib/i18n-context';
 import { fmt, dateLocale } from '@/lib/utils';
@@ -11,6 +11,7 @@ import Pagination from '@/components/ui/Pagination';
 import apiClient, {
   calculateInstallment,
 } from '@/lib/api-client';
+import { useDebouncedSearch, searchParam } from '@/lib/use-debounced-search';
 import type { Class, Subject, StudentClass, StudentSubject } from '@/types';
 
 interface Student {
@@ -42,6 +43,7 @@ export default function StudentsPage() {
   const [limit] = useState(15);
   const [total, setTotal] = useState(0);
   const [totalPages, setTotalPages] = useState(0);
+  const debouncedSearch = useDebouncedSearch(searchTerm, () => setPage(1));
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
   const [showModal, setShowModal] = useState(false);
   const [modalLoading, setModalLoading] = useState(false);
@@ -54,7 +56,7 @@ export default function StudentsPage() {
   const [saving, setSaving] = useState(false);
 
   // Import useCallback
-  const fetchData = useCallback(async (currentPage: number, currentLimit: number) => {
+  const fetchData = useCallback(async (currentPage: number, currentLimit: number, currentSearch: string) => {
     try {
       setLoading(true);
       const token = localStorage.getItem('accessToken');
@@ -65,7 +67,7 @@ export default function StudentsPage() {
       }
 
       const [usersRes, classesRes, subjectsRes] = await Promise.all([
-        apiClient.get(`/users?role=STUDENT&page=${currentPage}&limit=${currentLimit}`),
+        apiClient.get(`/users?role=STUDENT&page=${currentPage}&limit=${currentLimit}${searchParam(currentSearch)}`),
         apiClient.get('/classes?page=1&limit=1000'),
         apiClient.get('/subjects?page=1&limit=1000'),
       ]);
@@ -152,7 +154,7 @@ export default function StudentsPage() {
           errorMessage = t.tables.tooManyRequests;
           setError(errorMessage);
           setTimeout(() => {
-            fetchData(currentPage, currentLimit);
+            fetchData(currentPage, currentLimit, currentSearch);
           }, 2000);
           return;
         } else if (status === 401) {
@@ -179,8 +181,8 @@ export default function StudentsPage() {
       router.push('/login');
       return;
     }
-    fetchData(page, limit);
-  }, [router, page, fetchData]);
+    fetchData(page, limit, debouncedSearch);
+  }, [router, page, debouncedSearch, fetchData]);
 
 
   const openStudentModal = async (student: Student) => {
@@ -388,7 +390,7 @@ export default function StudentsPage() {
       }
       setTimeout(() => {
         setShowModal(false);
-        fetchData(page, limit);
+        fetchData(page, limit, debouncedSearch);
       }, 1500);
       
     } catch (err: any) {
@@ -459,12 +461,8 @@ export default function StudentsPage() {
     }
   };
 
-  const filteredStudents = useMemo(() => students.filter((student) => {
-    const fullName = `${student.firstName} ${student.lastName}`.toLowerCase();
-    const email = student.email.toLowerCase();
-    const search = searchTerm.toLowerCase();
-    return fullName.includes(search) || email.includes(search);
-  }), [students, searchTerm]);
+  // Search runs on the server (see debouncedSearch)
+  const filteredStudents = students;
 
   // Fetch subjects for selected class
   useEffect(() => {

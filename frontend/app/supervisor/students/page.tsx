@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState, useMemo } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useI18n } from '@/lib/i18n-context';
 import { fmt, dateLocale } from '@/lib/utils';
@@ -9,6 +9,7 @@ import { Logo } from '@/components/Logo';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import Pagination from '@/components/ui/Pagination';
 import apiClient from '@/lib/api-client';
+import { useDebouncedSearch, searchParam } from '@/lib/use-debounced-search';
 import type { Class, Subject, StudentClass, StudentSubject } from '@/types';
 
 interface Student {
@@ -40,6 +41,7 @@ export default function SupervisorStudentsPage() {
   const [limit] = useState(15);
   const [total, setTotal] = useState(0);
   const [totalPages, setTotalPages] = useState(0);
+  const debouncedSearch = useDebouncedSearch(searchTerm, () => setPage(1));
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
   const [showModal, setShowModal] = useState(false);
   const [modalLoading, setModalLoading] = useState(false);
@@ -62,7 +64,7 @@ export default function SupervisorStudentsPage() {
       }
 
       const [usersRes, classesData, subjectsData] = await Promise.all([
-        apiClient.get(`/users?role=STUDENT&page=${page}&limit=${limit}`),
+        apiClient.get(`/users?role=STUDENT&page=${page}&limit=${limit}${searchParam(debouncedSearch)}`),
         apiClient.get('/classes?page=1&limit=1000'),
         apiClient.get('/subjects?page=1&limit=1000'),
       ]);
@@ -155,7 +157,7 @@ export default function SupervisorStudentsPage() {
     } finally {
       setLoading(false);
     }
-  }, [router, page, limit]);
+  }, [router, page, limit, debouncedSearch]);
 
   useEffect(() => {
     const token = localStorage.getItem('accessToken');
@@ -390,12 +392,8 @@ export default function SupervisorStudentsPage() {
     }
   };
 
-  const filteredStudents = useMemo(() => students.filter((student) => {
-    const fullName = `${student.firstName} ${student.lastName}`.toLowerCase();
-    const email = student.email.toLowerCase();
-    const search = searchTerm.toLowerCase();
-    return fullName.includes(search) || email.includes(search);
-  }), [students, searchTerm]);
+  // Search runs on the server (see debouncedSearch)
+  const filteredStudents = students;
 
   // Fetch subjects for selected class
   useEffect(() => {

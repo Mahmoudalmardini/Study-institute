@@ -93,6 +93,9 @@ export default function AdminPointsPage() {
           params: {
             assignedSubjectsOnly: true,
             includeSubjects: true,
+            // without a limit the list stopped at the first 20 students
+            page: 1,
+            limit: 1000,
           },
         });
         const studentsList = Array.isArray(list) ? list : (list?.data ?? []);

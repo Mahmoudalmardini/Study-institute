@@ -8,6 +8,7 @@ import { Logo } from '@/components/Logo';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import Pagination from '@/components/ui/Pagination';
 import apiClient from '@/lib/api-client';
+import { useDebouncedSearch, searchParam } from '@/lib/use-debounced-search';
 
 interface Subject {
   id: string;
@@ -48,6 +49,7 @@ export default function SubjectsPage() {
   const [user, setUser] = useState<any>(null);
   const [mounted, setMounted] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  const debouncedSearch = useDebouncedSearch(searchTerm, () => setPage(1));
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [page, setPage] = useState(1);
@@ -55,9 +57,9 @@ export default function SubjectsPage() {
   const [total, setTotal] = useState(0);
   const [totalPages, setTotalPages] = useState(0);
 
-  const fetchSubjects = useCallback(async (currentPage: number, currentLimit: number) => {
+  const fetchSubjects = useCallback(async (currentPage: number, currentLimit: number, currentSearch: string) => {
     try {
-      const data = await apiClient.get(`/subjects?page=${currentPage}&limit=${currentLimit}`);
+      const data = await apiClient.get(`/subjects?page=${currentPage}&limit=${currentLimit}${searchParam(currentSearch)}`);
       const subjectsData = data?.data || (Array.isArray(data) ? data : []);
       const meta = data?.meta || {};
 
@@ -87,7 +89,7 @@ export default function SubjectsPage() {
           errorMessage = 'Too many requests. Please wait a moment...';
           setError(errorMessage);
           setTimeout(() => {
-            fetchSubjects(currentPage, currentLimit);
+            fetchSubjects(currentPage, currentLimit, currentSearch);
           }, 2000);
           return;
         } else if (status === 401) {
@@ -106,8 +108,8 @@ export default function SubjectsPage() {
   }, [router, t.subjects?.failedToLoad]);
 
   const fetchData = useCallback(async () => {
-    await fetchSubjects(page, limit);
-  }, [page, limit, fetchSubjects]);
+    await fetchSubjects(page, limit, debouncedSearch);
+  }, [page, limit, debouncedSearch, fetchSubjects]);
 
   useEffect(() => {
     const fetchUserAndData = async () => {
@@ -160,7 +162,7 @@ export default function SubjectsPage() {
       setShowForm(false);
       setEditingSubject(null);
       setFormData({ name: '' });
-      fetchSubjects();
+      fetchSubjects(page, limit, debouncedSearch);
       setTimeout(() => setSuccess(''), 3000);
     } catch (error: any) {
       console.error('Error saving subject:', error);
@@ -187,7 +189,7 @@ export default function SubjectsPage() {
       setError('');
       await apiClient.delete(`/subjects/${id}`);
       setSuccess(t.subjects?.subjectDeleted || 'Subject deleted successfully!');
-      fetchSubjects();
+      fetchSubjects(page, limit, debouncedSearch);
       setTimeout(() => setSuccess(''), 3000);
     } catch (error: any) {
       console.error('Error deleting subject:', error);
@@ -212,10 +214,8 @@ export default function SubjectsPage() {
     }
   };
 
-  const filteredSubjects = subjects.filter(subject =>
-    subject.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (subject.code && subject.code.toLowerCase().includes(searchTerm.toLowerCase()))
-  );
+  // Search runs on the server (see debouncedSearch)
+  const filteredSubjects = subjects;
 
   if (loading) {
     return (

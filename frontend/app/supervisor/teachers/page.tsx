@@ -1,13 +1,15 @@
 'use client';
 
-import { useEffect, useState, useMemo } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useI18n } from '@/lib/i18n-context';
 import { fmt, dateLocale, asList } from '@/lib/utils';
 import SettingsMenu from '@/components/SettingsMenu';
 import { Logo } from '@/components/Logo';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
+import Pagination from '@/components/ui/Pagination';
 import apiClient from '@/lib/api-client';
+import { useDebouncedSearch, searchParam } from '@/lib/use-debounced-search';
 
 interface Subject {
   id: string;
@@ -52,6 +54,11 @@ export default function TeachersPage() {
   const [classes, setClasses] = useState<Class[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+  const [page, setPage] = useState(1);
+  const [limit] = useState(15);
+  const [total, setTotal] = useState(0);
+  const [totalPages, setTotalPages] = useState(0);
+  const debouncedSearch = useDebouncedSearch(searchTerm, () => setPage(1));
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [selectedTeacher, setSelectedTeacher] = useState<Teacher | null>(null);
@@ -72,36 +79,46 @@ export default function TeachersPage() {
   const [loadingClassSubjects, setLoadingClassSubjects] = useState(false);
 
 
+  // Returns the fetched page so action handlers can refresh the teacher open in a modal
+  const fetchTeachers = useCallback(async (): Promise<Teacher[]> => {
+    try {
+      setLoading(true);
+      const token = localStorage.getItem('accessToken');
+
+      if (!token) {
+        router.push('/login');
+        return [];
+      }
+
+      const response: any = await apiClient.get(`/teachers?page=${page}&limit=${limit}${searchParam(debouncedSearch)}`);
+      const list = asList<Teacher>(response);
+      setTeachers(list);
+      setTotal(response?.meta?.total ?? list.length);
+      setTotalPages(response?.meta?.totalPages ?? 1);
+      return list;
+    } catch (err) {
+      console.error('Error fetching teachers:', err);
+      setError(t.tables.errorLoadingTeachers);
+      return [];
+    } finally {
+      setLoading(false);
+    }
+  }, [router, page, limit, debouncedSearch, t]);
+
   useEffect(() => {
-    const token = localStorage.getItem('accessToken');
-    if (!token) {
+    if (!localStorage.getItem('accessToken')) {
       router.push('/login');
       return;
     }
     fetchTeachers();
+  }, [router, fetchTeachers]);
+
+  // Subject and class lists do not depend on the teacher page, so load them once
+  useEffect(() => {
+    if (!localStorage.getItem('accessToken')) return;
     fetchSubjects();
     fetchClasses();
-  }, [router]);
-
-  const fetchTeachers = async () => {
-    try {
-      setLoading(true);
-      const token = localStorage.getItem('accessToken');
-      
-      if (!token) {
-        router.push('/login');
-        return;
-      }
-
-      const response = await apiClient.get('/teachers?page=1&limit=1000');
-      setTeachers(asList(response));
-    } catch (err) {
-      console.error('Error fetching teachers:', err);
-      setError(t.tables.errorLoadingTeachers);
-    } finally {
-      setLoading(false);
-    }
-  };
+  }, []);
 
   const fetchSubjects = async () => {
     try {
@@ -327,11 +344,10 @@ export default function TeachersPage() {
       setSuccess(t.tables.subjectAssigned);
 
       // Refresh teachers data
-      await fetchTeachers();
+      const refreshedTeachers = await fetchTeachers();
 
       // Update the selected teacher with fresh data
-      const updatedTeachersResponse = await apiClient.get('/teachers?page=1&limit=1000');
-      const updatedTeacher = asList<Teacher>(updatedTeachersResponse).find(
+      const updatedTeacher = refreshedTeachers.find(
         (t: Teacher) => t.id === selectedTeacher.id
       );
       if (updatedTeacher) {
@@ -356,9 +372,8 @@ export default function TeachersPage() {
       }
 
       // Refresh data to sync UI with backend
-      await fetchTeachers();
-      const updatedTeachersResponse = await apiClient.get('/teachers?page=1&limit=1000');
-      const updatedTeacher = asList<Teacher>(updatedTeachersResponse).find(
+      const refreshedTeachers = await fetchTeachers();
+      const updatedTeacher = refreshedTeachers.find(
         (t: Teacher) => t.id === selectedTeacher.id
       );
       if (updatedTeacher) {
@@ -382,11 +397,10 @@ export default function TeachersPage() {
       setSuccess(t.tables.subjectAssigned);
 
       // Refresh teachers data
-      await fetchTeachers();
+      const refreshedTeachers = await fetchTeachers();
 
       // Update the selected teacher with fresh data
-      const updatedTeachersResponse = await apiClient.get('/teachers?page=1&limit=1000');
-      const updatedTeacher = asList<Teacher>(updatedTeachersResponse).find(
+      const updatedTeacher = refreshedTeachers.find(
         (t: Teacher) => t.id === selectedTeacher.id
       );
       if (updatedTeacher) {
@@ -410,9 +424,8 @@ export default function TeachersPage() {
       }
 
       // Refresh data to sync UI with backend
-      await fetchTeachers();
-      const updatedTeachersResponse = await apiClient.get('/teachers?page=1&limit=1000');
-      const updatedTeacher = asList<Teacher>(updatedTeachersResponse).find(
+      const refreshedTeachers = await fetchTeachers();
+      const updatedTeacher = refreshedTeachers.find(
         (t: Teacher) => t.id === selectedTeacher.id
       );
       if (updatedTeacher) {
@@ -437,11 +450,10 @@ export default function TeachersPage() {
       setSuccess(message);
       
       // Refresh teachers data
-      await fetchTeachers();
+      const refreshedTeachers = await fetchTeachers();
       
       // Update the selected teacher with fresh data
-      const updatedTeachersResponse = await apiClient.get('/teachers?page=1&limit=1000');
-      const updatedTeacher = asList<Teacher>(updatedTeachersResponse).find(
+      const updatedTeacher = refreshedTeachers.find(
         (t: Teacher) => t.id === selectedTeacher.id
       );
       if (updatedTeacher) {
@@ -454,9 +466,8 @@ export default function TeachersPage() {
       setError(err.response?.data?.message || t.tables.errorUnassigningSubject);
       
       // Refresh data to sync UI with backend
-      await fetchTeachers();
-      const updatedTeachersResponse = await apiClient.get('/teachers?page=1&limit=1000');
-      const updatedTeacher = asList<Teacher>(updatedTeachersResponse).find(
+      const refreshedTeachers = await fetchTeachers();
+      const updatedTeacher = refreshedTeachers.find(
         (t: Teacher) => t.id === selectedTeacher.id
       );
       if (updatedTeacher) {
@@ -495,11 +506,10 @@ export default function TeachersPage() {
       setSuccess(successMessage);
 
       // Refresh teachers data
-      await fetchTeachers();
+      const refreshedTeachers = await fetchTeachers();
 
       // Update the selected teacher with fresh data
-      const updatedTeachersResponse = await apiClient.get('/teachers?page=1&limit=1000');
-      const updatedTeacher = asList<Teacher>(updatedTeachersResponse).find(
+      const updatedTeacher = refreshedTeachers.find(
         (t: Teacher) => t.id === selectedTeacher.id
       );
       if (updatedTeacher) {
@@ -529,12 +539,8 @@ export default function TeachersPage() {
     }
   };
 
-  const filteredTeachers = useMemo(() => teachers.filter((teacher) => {
-    const fullName = `${(teacher as any).user.firstName} ${(teacher as any).user.lastName}`.toLowerCase();
-    const email = (teacher as any).user.email.toLowerCase();
-    const search = searchTerm.toLowerCase();
-    return fullName.includes(search) || email.includes(search);
-  }), [teachers, searchTerm]);
+  // Search runs on the server (see debouncedSearch)
+  const filteredTeachers = teachers;
 
   return (
     <div className="min-h-screen gradient-bg">
@@ -624,7 +630,7 @@ export default function TeachersPage() {
         ) : (
           <>
             <div className="mb-4 text-sm text-gray-600">
-              {t.tables.totalTeachers} {filteredTeachers.length}
+              {t.tables.totalTeachers} {total}
             </div>
 
             {/* Desktop Table View */}
@@ -805,6 +811,19 @@ export default function TeachersPage() {
                 </div>
               ))}
             </div>
+
+            {totalPages > 0 && (
+              <Pagination
+                currentPage={page}
+                totalPages={totalPages}
+                total={total}
+                limit={limit}
+                onPageChange={(newPage) => {
+                  setPage(newPage);
+                  window.scrollTo({ top: 0, behavior: 'smooth' });
+                }}
+              />
+            )}
 
             {filteredTeachers.length === 0 && (
               <div className="text-center py-12 bg-white rounded-xl shadow-md">

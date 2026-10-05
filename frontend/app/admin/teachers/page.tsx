@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback, useMemo } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useI18n } from '@/lib/i18n-context';
 import { fmt, dateLocale } from '@/lib/utils';
@@ -9,6 +9,7 @@ import { Logo } from '@/components/Logo';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import Pagination from '@/components/ui/Pagination';
 import apiClient from '@/lib/api-client';
+import { useDebouncedSearch, searchParam } from '@/lib/use-debounced-search';
 
 interface Subject {
   id: string;
@@ -65,6 +66,7 @@ export default function TeachersPage() {
   const [limit] = useState(15);
   const [total, setTotal] = useState(0);
   const [totalPages, setTotalPages] = useState(0);
+  const debouncedSearch = useDebouncedSearch(searchTerm, () => setPage(1));
   const [selectedTeacher, setSelectedTeacher] = useState<Teacher | null>(null);
   const [showSubjectModal, setShowSubjectModal] = useState(false);
   const [assigningSubject, setAssigningSubject] = useState(false);
@@ -116,7 +118,7 @@ export default function TeachersPage() {
         return [];
       }
 
-      const response = await apiClient.get(`/teachers?page=${pg}&limit=${lmt}`);
+      const response = await apiClient.get(`/teachers?page=${pg}&limit=${lmt}${searchParam(debouncedSearch)}`);
       const teachersData = response?.data || (Array.isArray(response) ? response : []);
       const meta = response?.meta || { total: teachersData.length, totalPages: 1 };
       
@@ -155,7 +157,7 @@ export default function TeachersPage() {
     } finally {
       setLoading(false);
     }
-  }, [router, page, limit]);
+  }, [router, page, limit, debouncedSearch]);
 
   useEffect(() => {
     const token = localStorage.getItem('accessToken');
@@ -798,12 +800,8 @@ export default function TeachersPage() {
     }
   };
 
-  const filteredTeachers = useMemo(() => teachers.filter((teacher) => {
-    const fullName = `${teacher.user.firstName} ${teacher.user.lastName}`.toLowerCase();
-    const email = teacher.user.email.toLowerCase();
-    const search = searchTerm.toLowerCase();
-    return fullName.includes(search) || email.includes(search);
-  }), [teachers, searchTerm]);
+  // Search runs on the server (see debouncedSearch)
+  const filteredTeachers = teachers;
 
   return (
     <div className="min-h-screen gradient-bg">
@@ -899,7 +897,7 @@ export default function TeachersPage() {
         ) : (
           <>
             <div className="mb-4 text-sm text-gray-600">
-              {t.tables.totalTeachers} {filteredTeachers.length}
+              {t.tables.totalTeachers} {total}
             </div>
 
             {/* Desktop Table View */}
