@@ -8,8 +8,6 @@ import {
   Delete,
   Query,
   UseGuards,
-  ParseIntPipe,
-  DefaultValuePipe,
 } from '@nestjs/common';
 import { GradesService } from './grades.service';
 import { CreateGradeDto } from './dto/create-grade.dto';
@@ -19,6 +17,7 @@ import { RolesGuard } from '../../common/guards/roles.guard';
 import { Role } from '@prisma/client';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import type { CurrentUserData } from '../../common/decorators/current-user.decorator';
+import { PageQuery, LimitQuery } from '../../common/decorators/pagination-query.decorator';
 
 @Controller('grades')
 @UseGuards(RolesGuard)
@@ -37,11 +36,11 @@ export class GradesController {
   @Get()
   @Roles(Role.ADMIN, Role.SUPERVISOR, Role.TEACHER)
   findAll(
-    @Query('studentId') studentId?: string,
-    @Query('academicYear') academicYear?: string,
-    @Query('term') term?: string,
-    @Query('page', new DefaultValuePipe(1), ParseIntPipe) page: number = 1,
-    @Query('limit', new DefaultValuePipe(20), ParseIntPipe) limit: number = 20,
+    @Query('studentId') studentId: string | undefined,
+    @Query('academicYear') academicYear: string | undefined,
+    @Query('term') term: string | undefined,
+    @PageQuery() page: number,
+    @LimitQuery() limit: number,
   ) {
     return this.gradesService.findAll(studentId, academicYear, term, page, limit);
   }

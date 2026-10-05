@@ -8,8 +8,6 @@ import {
   Delete,
   Query,
   UseGuards,
-  ParseIntPipe,
-  DefaultValuePipe,
 } from '@nestjs/common';
 import { UsersService } from './users.service';
 import { CreateUserDto, UpdateUserDto } from './dto';
@@ -18,6 +16,7 @@ import { RolesGuard } from '../../common/guards/roles.guard';
 import { Role } from '@prisma/client';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import type { CurrentUserData } from '../../common/decorators/current-user.decorator';
+import { PageQuery, LimitQuery } from '../../common/decorators/pagination-query.decorator';
 
 @Controller('users')
 @UseGuards(RolesGuard)
@@ -33,11 +32,12 @@ export class UsersController {
   @Get()
   @Roles(Role.ADMIN, Role.SUPERVISOR)
   findAll(
-    @Query('role') role?: string,
-    @Query('page', new DefaultValuePipe(1), ParseIntPipe) page: number = 1,
-    @Query('limit', new DefaultValuePipe(20), ParseIntPipe) limit: number = 20,
+    @Query('role') role: string | undefined,
+    @PageQuery() page: number,
+    @LimitQuery() limit: number,
+    @Query('search') search: string | undefined,
   ) {
-    return this.usersService.findAll(role, page, limit);
+    return this.usersService.findAll(role, page, limit, search);
   }
 
   @Get('profile')

@@ -60,7 +60,8 @@ export class PointsController {
 	@Get('students/:studentId/transactions')
 	@Roles(Role.ADMIN, Role.SUPERVISOR, Role.TEACHER)
 	list(@CurrentUser() user: CurrentUserData, @Param('studentId') studentId: string, @Query('limit') limit?: string, @Query('cursor') cursor?: string) {
-		const lim = Math.max(1, Math.min(100, parseInt(limit || '50', 10)));
+		const parsed = parseInt(limit || '50', 10);
+		const lim = Number.isFinite(parsed) ? Math.max(1, Math.min(100, parsed)) : 50;
 		if (user.role === 'TEACHER') {
 			return this.pointsService
 				['assertTeacherCanModifyStudent'](user.id, studentId)

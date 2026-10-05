@@ -4,10 +4,12 @@ import {
   ConflictException,
   Logger,
 } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateUserDto, UpdateUserDto } from './dto';
 import * as bcrypt from 'bcrypt';
 import { PaginationResponse } from '../../common/interfaces/pagination-response.interface';
+import { wordSearch } from '../../common/pagination/search';
 
 @Injectable()
 export class UsersService {
@@ -80,8 +82,12 @@ export class UsersService {
     role?: string,
     page: number = 1,
     limit: number = 20,
+    search?: string,
   ): Promise<PaginationResponse<any>> {
-    const where = role ? { role: role as any } : {};
+    const where: Prisma.UserWhereInput = {
+      ...(role ? { role: role as any } : {}),
+      ...wordSearch<Prisma.UserWhereInput>(search, ['firstName', 'lastName', 'email']),
+    };
     const skip = (page - 1) * limit;
 
     const [data, total] = await Promise.all([
@@ -133,7 +139,7 @@ export class UsersService {
             },
           },
         },
-        orderBy: { createdAt: 'desc' },
+        orderBy: [{ createdAt: 'desc' }, { id: 'asc' }],
       }),
       this.prisma.user.count({ where }),
     ]);

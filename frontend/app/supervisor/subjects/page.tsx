@@ -1,12 +1,14 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useI18n } from '@/lib/i18n-context';
 import SettingsMenu from '@/components/SettingsMenu';
 import { Logo } from '@/components/Logo';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
+import Pagination from '@/components/ui/Pagination';
 import apiClient from '@/lib/api-client';
+import { useDebouncedSearch, searchParam } from '@/lib/use-debounced-search';
 import { asList } from '@/lib/utils';
 
 interface Subject {
@@ -48,6 +50,11 @@ export default function SubjectsPage() {
   const [user, setUser] = useState<any>(null);
   const [mounted, setMounted] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  const [page, setPage] = useState(1);
+  const [limit] = useState(15);
+  const [total, setTotal] = useState(0);
+  const [totalPages, setTotalPages] = useState(0);
+  const debouncedSearch = useDebouncedSearch(searchTerm, () => setPage(1));
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
@@ -67,7 +74,6 @@ export default function SubjectsPage() {
           role: userProfile.role,
         });
         setMounted(true);
-        await fetchData();
       } catch (error: any) {
         console.error('Error fetching user profile:', error);
         if (error.response?.status === 401) {
@@ -81,14 +87,13 @@ export default function SubjectsPage() {
     fetchUserAndData();
   }, [router]);
 
-  const fetchData = async () => {
-    await fetchSubjects();
-  };
-
-  const fetchSubjects = async () => {
+  const fetchSubjects = useCallback(async () => {
     try {
-      const data = await apiClient.get('/subjects?page=1&limit=1000');
-      setSubjects(asList(data));
+      const data: any = await apiClient.get(`/subjects?page=${page}&limit=${limit}${searchParam(debouncedSearch)}`);
+      const list = asList<Subject>(data);
+      setSubjects(list);
+      setTotal(data?.meta?.total ?? list.length);
+      setTotalPages(data?.meta?.totalPages ?? 1);
     } catch (error) {
       console.error('Error fetching subjects:', error);
       setSubjects([]);
@@ -96,7 +101,11 @@ export default function SubjectsPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [page, limit, debouncedSearch]);
+
+  useEffect(() => {
+    if (mounted) fetchSubjects();
+  }, [mounted, fetchSubjects]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -171,10 +180,8 @@ export default function SubjectsPage() {
     }
   };
 
-  const filteredSubjects = subjects.filter(subject =>
-    subject.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (subject.code && subject.code.toLowerCase().includes(searchTerm.toLowerCase()))
-  );
+  // Search runs on the server (see debouncedSearch)
+  const filteredSubjects = subjects;
 
   if (loading) {
     return (
@@ -420,6 +427,19 @@ export default function SubjectsPage() {
             </div>
           ))}
         </div>
+
+        {totalPages > 0 && (
+          <Pagination
+            currentPage={page}
+            totalPages={totalPages}
+            total={total}
+            limit={limit}
+            onPageChange={(newPage) => {
+              setPage(newPage);
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }}
+          />
+        )}
 
         {/* Empty State */}
         {filteredSubjects.length === 0 && !loading && (

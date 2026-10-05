@@ -49,6 +49,11 @@ export class InstallmentsService {
         where,
         take: limit,
         skip,
+        orderBy: [
+          { user: { firstName: 'asc' } },
+          { user: { lastName: 'asc' } },
+          { id: 'asc' },
+        ],
         include: {
           user: {
             select: {

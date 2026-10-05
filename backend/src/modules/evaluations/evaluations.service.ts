@@ -111,7 +111,7 @@ export class EvaluationsService {
             },
           },
         },
-        orderBy: [{ academicYear: 'desc' }, { term: 'desc' }],
+        orderBy: [{ academicYear: 'desc' }, { term: 'desc' }, { id: 'asc' }],
       }),
       this.prisma.evaluation.count({ where }),
     ]);

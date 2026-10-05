@@ -8,6 +8,7 @@ import { Logo } from '@/components/Logo';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import Pagination from '@/components/ui/Pagination';
 import apiClient from '@/lib/api-client';
+import { useDebouncedSearch, searchParam } from '@/lib/use-debounced-search';
 import { asList } from '@/lib/utils';
 
 interface Class {
@@ -59,6 +60,7 @@ export default function ClassesPage() {
   const [user, setUser] = useState<any>(null);
   const [mounted, setMounted] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  const debouncedSearch = useDebouncedSearch(searchTerm, () => setPage(1));
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [page, setPage] = useState(1);
@@ -75,9 +77,9 @@ export default function ClassesPage() {
   const [editingInstallmentValue, setEditingInstallmentValue] = useState<string>('');
   const canManageInstallments = false;
 
-  const fetchClasses = useCallback(async (currentPage: number, currentLimit: number) => {
+  const fetchClasses = useCallback(async (currentPage: number, currentLimit: number, currentSearch: string) => {
     try {
-      const data = await apiClient.get(`/classes?page=${currentPage}&limit=${currentLimit}`);
+      const data = await apiClient.get(`/classes?page=${currentPage}&limit=${currentLimit}${searchParam(currentSearch)}`);
       const classesData = data?.data || (Array.isArray(data) ? data : []);
       const meta = data?.meta || { total: classesData.length, totalPages: 1 };
       
@@ -99,7 +101,7 @@ export default function ClassesPage() {
           errorMessage = 'Too many requests. Please wait a moment...';
           setError(errorMessage);
           setTimeout(() => {
-            fetchClasses(currentPage, currentLimit);
+            fetchClasses(currentPage, currentLimit, currentSearch);
           }, 2000);
           return;
         } else if (status === 401) {
@@ -133,7 +135,7 @@ export default function ClassesPage() {
           role: userProfile.role,
         });
         setMounted(true);
-        await Promise.all([fetchClasses(page, limit), fetchTeachers()]);
+        await Promise.all([fetchClasses(page, limit, debouncedSearch), fetchTeachers()]);
       } catch (error: any) {
         console.error('Error fetching user profile:', error);
         if (error.response?.status === 401) {
@@ -145,7 +147,7 @@ export default function ClassesPage() {
     };
 
     fetchUserAndData();
-  }, [router, page, fetchClasses]);
+  }, [router, page, debouncedSearch, fetchClasses]);
 
   const fetchTeachers = async () => {
     try {
@@ -361,7 +363,7 @@ export default function ClassesPage() {
       setShowForm(false);
       setEditingClass(null);
       setFormData({ name: '' });
-      fetchClasses();
+      fetchClasses(page, limit, debouncedSearch);
       
       // Clear success message after 3 seconds
       setTimeout(() => setSuccess(''), 3000);
@@ -389,7 +391,7 @@ export default function ClassesPage() {
       setError('');
       await apiClient.delete(`/classes/${id}`);
       setSuccess('Class deleted successfully!');
-      fetchClasses();
+      fetchClasses(page, limit, debouncedSearch);
       setTimeout(() => setSuccess(''), 3000);
     } catch (error: any) {
       console.error('Error deleting class:', error);
@@ -414,11 +416,8 @@ export default function ClassesPage() {
     }
   };
 
-  const filteredClasses = classes.filter(cls =>
-    cls.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    cls.grade.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    cls.academicYear.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  // Search runs on the server (see debouncedSearch)
+  const filteredClasses = classes;
 
   if (loading) {
     return (

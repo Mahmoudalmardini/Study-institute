@@ -8,8 +8,6 @@ import {
   Delete,
   Query,
   UseGuards,
-  ParseIntPipe,
-  DefaultValuePipe,
 } from '@nestjs/common';
 import { StudentsService } from './students.service';
 import { CreateStudentDto } from './dto/create-student.dto';
@@ -21,6 +19,7 @@ import { RolesGuard } from '../../common/guards/roles.guard';
 import { Role } from '@prisma/client';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import type { CurrentUserData } from '../../common/decorators/current-user.decorator';
+import { PageQuery, LimitQuery } from '../../common/decorators/pagination-query.decorator';
 
 @Controller('students')
 @UseGuards(RolesGuard)
@@ -36,11 +35,11 @@ export class StudentsController {
   @Get()
   @Roles(Role.ADMIN, Role.SUPERVISOR, Role.TEACHER)
   findAll(
-    @Query('classId') classId?: string,
-    @Query('assignedSubjectsOnly') assignedSubjectsOnly?: string,
-    @Query('includeSubjects') includeSubjects?: string,
-    @Query('page', new DefaultValuePipe(1), ParseIntPipe) page: number = 1,
-    @Query('limit', new DefaultValuePipe(20), ParseIntPipe) limit: number = 20,
+    @Query('classId') classId: string | undefined,
+    @Query('assignedSubjectsOnly') assignedSubjectsOnly: string | undefined,
+    @Query('includeSubjects') includeSubjects: string | undefined,
+    @PageQuery() page: number,
+    @LimitQuery() limit: number,
     @Query('userIds') userIds?: string,
   ) {
     return this.studentsService.findAll(

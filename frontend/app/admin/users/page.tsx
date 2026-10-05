@@ -10,6 +10,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import Pagination from '@/components/ui/Pagination';
 import { apiClient } from '@/lib/api-client';
+import { useDebouncedSearch, searchParam } from '@/lib/use-debounced-search';
 
 interface User {
   id: string;
@@ -51,21 +52,22 @@ export default function UsersPage() {
   const [limit] = useState(15);
   const [total, setTotal] = useState(0);
   const [totalPages, setTotalPages] = useState(0);
-  
+  const debouncedSearch = useDebouncedSearch(searchTerm, () => setPage(1));
+
   // Debounce and request management
   const fetchTimeoutRef = useRef<NodeJS.Timeout>();
   const isSubmittingRef = useRef(false);
 
   // Fetch users function - defined with useCallback to ensure it uses latest values
-  const fetchUsers = useCallback(async (currentPage: number, currentLimit: number, currentRoleFilter: string) => {
+  const fetchUsers = useCallback(async (currentPage: number, currentLimit: number, currentRoleFilter: string, currentSearch: string) => {
     try {
       setLoading(true);
       setError(''); // Clear previous errors
 
       // Use apiClient which handles the API URL and authentication automatically
-      const url = currentRoleFilter 
-        ? `/users?role=${currentRoleFilter}&page=${currentPage}&limit=${currentLimit}` 
-        : `/users?page=${currentPage}&limit=${currentLimit}`;
+      const url = (currentRoleFilter
+        ? `/users?role=${currentRoleFilter}&page=${currentPage}&limit=${currentLimit}`
+        : `/users?page=${currentPage}&limit=${currentLimit}`) + searchParam(currentSearch);
       const usersData = await apiClient.get(url);
       
       // Handle paginated response format
@@ -105,7 +107,7 @@ export default function UsersPage() {
           setError(errorMessage);
           // Retry after 2 seconds with current values
           setTimeout(() => {
-            fetchUsers(currentPage, currentLimit, currentRoleFilter);
+            fetchUsers(currentPage, currentLimit, currentRoleFilter, currentSearch);
           }, 2000);
           return;
         } else if (status === 401) {
@@ -153,11 +155,11 @@ export default function UsersPage() {
     
     if (shouldDebounce) {
       fetchTimeoutRef.current = setTimeout(() => {
-        fetchUsers(page, limit, roleFilter);
+        fetchUsers(page, limit, roleFilter, debouncedSearch);
       }, 300); // 300ms debounce for filter changes
     } else {
       // Fetch immediately for page changes
-      fetchUsers(page, limit, roleFilter);
+      fetchUsers(page, limit, roleFilter, debouncedSearch);
     }
     
     return () => {
@@ -165,7 +167,7 @@ export default function UsersPage() {
         clearTimeout(fetchTimeoutRef.current);
       }
     };
-  }, [page, roleFilter, router, fetchUsers]);
+  }, [page, roleFilter, debouncedSearch, router, fetchUsers]);
 
   const handleLogout = () => {
     const confirmLogout = window.confirm(t.messages.logoutConfirm);
@@ -254,7 +256,7 @@ export default function UsersPage() {
         setSuccess(t.users.userAdded);
       }
 
-      fetchUsers(page, limit, roleFilter);
+      fetchUsers(page, limit, roleFilter, debouncedSearch);
       setTimeout(() => {
         closeModal();
         isSubmittingRef.current = false;
@@ -307,7 +309,7 @@ export default function UsersPage() {
     try {
       await apiClient.delete(`/users/${userId}`);
       setSuccess(t.users.userDeleted);
-      fetchUsers(page, limit, roleFilter);
+      fetchUsers(page, limit, roleFilter, debouncedSearch);
       setTimeout(() => setSuccess(''), 3000);
     } catch (err: any) {
       console.error('Delete error:', err);
@@ -347,18 +349,8 @@ export default function UsersPage() {
     }
   };
 
-  const filteredUsers = users.filter((user) => {
-    // Hide the default admin account from the user management interface
-    if (user.email === 'admin') {
-      return false;
-    }
-    
-    const matchesSearch =
-      user.firstName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      user.lastName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      user.email.toLowerCase().includes(searchTerm.toLowerCase());
-    return matchesSearch;
-  });
+  // Search runs on the server; only hide the default admin account here
+  const filteredUsers = users.filter((user) => user.email !== 'admin');
 
   return (
     <div className="min-h-screen gradient-bg">
@@ -412,7 +404,10 @@ export default function UsersPage() {
               />
               <select
                 value={roleFilter}
-                onChange={(e) => setRoleFilter(e.target.value)}
+                onChange={(e) => {
+                  setRoleFilter(e.target.value);
+                  setPage(1);
+                }}
                 className="px-3 py-2 border border-gray-300 rounded-md min-w-[150px]"
                 aria-label={t.tables.filterByRole}
               >

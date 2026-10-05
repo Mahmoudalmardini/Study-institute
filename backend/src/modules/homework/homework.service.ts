@@ -108,7 +108,7 @@ export class HomeworkService {
             },
           },
         },
-        orderBy: { dueDate: 'desc' },
+        orderBy: [{ dueDate: 'desc' }, { id: 'asc' }],
       }),
       this.prisma.homework.count({ where }),
     ]);

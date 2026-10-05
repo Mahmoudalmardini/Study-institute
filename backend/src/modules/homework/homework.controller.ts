@@ -10,8 +10,6 @@ import {
   UseGuards,
   UploadedFiles,
   UseInterceptors,
-  ParseIntPipe,
-  DefaultValuePipe,
   Logger,
 } from '@nestjs/common';
 import { FilesInterceptor } from '@nestjs/platform-express';
@@ -28,6 +26,7 @@ import { RolesGuard } from '../../common/guards/roles.guard';
 import { Role } from '@prisma/client';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import type { CurrentUserData } from '../../common/decorators/current-user.decorator';
+import { PageQuery, LimitQuery } from '../../common/decorators/pagination-query.decorator';
 
 @Controller('homework')
 @UseGuards(RolesGuard)
@@ -49,9 +48,9 @@ export class HomeworkController {
   @Roles(Role.ADMIN, Role.SUPERVISOR, Role.TEACHER, Role.STUDENT)
   findAll(
     @CurrentUser() user: CurrentUserData,
-    @Query('classId') classId?: string,
-    @Query('page', new DefaultValuePipe(1), ParseIntPipe) page: number = 1,
-    @Query('limit', new DefaultValuePipe(20), ParseIntPipe) limit: number = 20,
+    @Query('classId') classId: string | undefined,
+    @PageQuery() page: number,
+    @LimitQuery() limit: number,
   ) {
     const teacherId = user.role === Role.TEACHER ? user.id : undefined;
     return this.homeworkService.findAll(classId, teacherId, page, limit);
