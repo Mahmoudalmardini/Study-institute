@@ -8,6 +8,17 @@ import {
 } from '@nestjs/common';
 import { Response } from 'express';
 
+// HttpStatus.UNAUTHORIZED -> "Unauthorized", HttpStatus.NOT_FOUND -> "Not Found"
+function statusLabel(status: number): string {
+  const name = HttpStatus[status];
+  if (!name) return 'Error';
+  return name
+    .toLowerCase()
+    .split('_')
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+    .join(' ');
+}
+
 @Catch()
 export class AllExceptionsFilter implements ExceptionFilter {
   private readonly logger = new Logger(AllExceptionsFilter.name);
@@ -23,8 +34,10 @@ export class AllExceptionsFilter implements ExceptionFilter {
 
     if (exception instanceof HttpException) {
       status = exception.getStatus();
+      // e.g. passport's 401 response has no `error` field; label it by its status
+      error = statusLabel(status);
       const exceptionResponse = exception.getResponse();
-      
+
       if (typeof exceptionResponse === 'string') {
         message = exceptionResponse;
       } else if (typeof exceptionResponse === 'object') {
@@ -34,7 +47,7 @@ export class AllExceptionsFilter implements ExceptionFilter {
     } else if (exception instanceof Error) {
       message = exception.message;
       error = exception.name;
-      
+
       // Log the full error for debugging
       this.logger.error(
         `Unhandled exception: ${exception.message}`,
@@ -42,20 +55,24 @@ export class AllExceptionsFilter implements ExceptionFilter {
       );
     }
 
-    // Log error details for debugging
-    this.logger.error(
-      `HTTP ${status} Error - ${request.method} ${request.url}`,
-      {
-        status,
-        error,
-        message,
-        path: request.url,
-        method: request.method,
-        timestamp: new Date().toISOString(),
-        // Include stack trace for 500 errors
-        ...(status === 500 && exception instanceof Error ? { stack: exception.stack } : {}),
-      },
-    );
+    if (status >= 500) {
+      this.logger.error(
+        `HTTP ${status} Error - ${request.method} ${request.url}`,
+        {
+          status,
+          error,
+          message,
+          path: request.url,
+          method: request.method,
+          timestamp: new Date().toISOString(),
+          ...(exception instanceof Error ? { stack: exception.stack } : {}),
+        },
+      );
+    } else {
+      // Client errors (expired tokens, 404s, validation) are expected traffic, not failures
+      const text = Array.isArray(message) ? message.join('; ') : message;
+      this.logger.warn(`HTTP ${status} ${request.method} ${request.url} - ${text}`);
+    }
 
     response.status(status).json({
       statusCode: status,
