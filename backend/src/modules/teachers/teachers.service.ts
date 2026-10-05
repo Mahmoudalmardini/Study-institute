@@ -30,6 +30,7 @@ export class TeachersService {
               lastName: true,
               email: true,
               phone: true,
+              isActive: true,
             },
           },
           subjects: {

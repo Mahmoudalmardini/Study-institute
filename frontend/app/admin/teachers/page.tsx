@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useI18n } from '@/lib/i18n-context';
-import { fmt, dateLocale } from '@/lib/utils';
+import { fmt, dateLocale, asList } from '@/lib/utils';
 import SettingsMenu from '@/components/SettingsMenu';
 import { Logo } from '@/components/Logo';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
@@ -56,6 +56,7 @@ export default function TeachersPage() {
   const router = useRouter();
   const { t, locale } = useI18n();
   const [teachers, setTeachers] = useState<Teacher[]>([]);
+  const [teacherOptions, setTeacherOptions] = useState<Teacher[]>([]);
   const [subjects, setSubjects] = useState<Subject[]>([]);
   const [classes, setClasses] = useState<Class[]>([]);
   const [loading, setLoading] = useState(true);
@@ -397,6 +398,11 @@ export default function TeachersPage() {
 
   const handleOpenAssignmentModal = () => {
     setShowAssignmentModal(true);
+    // The table is paged, but the picker must offer every teacher
+    apiClient
+      .get('/teachers?page=1&limit=1000')
+      .then((res) => setTeacherOptions(asList<Teacher>(res)))
+      .catch((err) => console.error('Error fetching teachers:', err));
     setSelectedSubjectId('');
     setSelectedClassId('');
     setAvailableSubjectsForClass([]);
@@ -1715,13 +1721,13 @@ export default function TeachersPage() {
                 <select
                   value={selectedTeacher?.id || ''}
                   onChange={(e) => {
-                    const teacher = teachers.find(t => t.id === e.target.value);
+                    const teacher = teacherOptions.find(t => t.id === e.target.value);
                     setSelectedTeacher(teacher || null);
                   }}
                   className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
                 >
                   <option value="">{t.tables.chooseTeacher}</option>
-                  {teachers.map((teacher) => (
+                  {teacherOptions.map((teacher) => (
                     <option key={teacher.id} value={teacher.id}>
                       {teacher.user.firstName} {teacher.user.lastName} ({teacher.user.email})
                     </option>
