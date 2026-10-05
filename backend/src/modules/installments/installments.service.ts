@@ -137,9 +137,6 @@ export class InstallmentsService {
     // Validate student exists
     const student = await this.prisma.student.findUnique({
       where: { id: studentId },
-      include: {
-        class: true,
-      },
     });
 
     if (!student) {
@@ -192,14 +189,6 @@ export class InstallmentsService {
       const classSubjects = await this.prisma.classSubject.findMany({
         where: {
           classId: student.classId,
-        },
-        include: {
-          subject: {
-            select: {
-              id: true,
-              name: true,
-            },
-          },
         },
       });
 

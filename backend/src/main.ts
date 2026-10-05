@@ -2,7 +2,7 @@ import { NestFactory } from '@nestjs/core';
 import { ValidationPipe, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { AppModule } from './app.module';
-import { AllExceptionsFilter } from './common/filters/http-exception.filter';
+import compression from 'compression';
 
 async function bootstrap() {
   const logger = new Logger('Bootstrap');
@@ -14,11 +14,14 @@ async function bootstrap() {
     logger.log('🚀 Starting application...');
     
     const app = await NestFactory.create(AppModule, {
-      logger: ['error', 'warn', 'log', 'debug', 'verbose'],
+      logger:
+        process.env.NODE_ENV === 'production'
+          ? ['error', 'warn', 'log']
+          : ['error', 'warn', 'log', 'debug', 'verbose'],
     });
-    
-    // Apply global exception filter for better error logging
-    app.useGlobalFilters(new AllExceptionsFilter());
+
+    // AllExceptionsFilter is registered once, via APP_FILTER in AppModule
+    app.use(compression());
     
     logger.log('✅ Application created successfully');
 

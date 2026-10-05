@@ -3,6 +3,7 @@ import {
   NotFoundException,
   ForbiddenException,
   BadRequestException,
+  Logger,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateHomeworkDto } from './dto/create-homework.dto';
@@ -17,6 +18,8 @@ import { PaginationResponse } from '../../common/interfaces/pagination-response.
 
 @Injectable()
 export class HomeworkService {
+  private readonly logger = new Logger(HomeworkService.name);
+
   constructor(private prisma: PrismaService) {}
 
   async create(teacherId: string, dto: CreateHomeworkDto) {
@@ -417,10 +420,10 @@ export class HomeworkService {
     dto: any,
     files?: Express.Multer.File[],
   ) {
-    console.log('[submitToTeacher] Student user ID:', studentUserId);
-    console.log('[submitToTeacher] DTO:', dto);
-    console.log('[submitToTeacher] Files received:', files?.length || 0);
-    console.log('[submitToTeacher] File details:', files?.map(f => ({
+    this.logger.debug('[submitToTeacher] Student user ID:', studentUserId);
+    this.logger.debug('[submitToTeacher] DTO:', dto);
+    this.logger.debug('[submitToTeacher] Files received:', files?.length || 0);
+    this.logger.debug('[submitToTeacher] File details:', files?.map(f => ({
       filename: f.filename,
       originalname: f.originalname,
       path: f.path,
@@ -432,31 +435,31 @@ export class HomeworkService {
       where: { userId: studentUserId },
     });
 
-    console.log('[submitToTeacher] Student profile:', student);
+    this.logger.debug('[submitToTeacher] Student profile:', student);
 
     if (!student) {
       // Auto-create student profile if it doesn't exist
-      console.log('[submitToTeacher] Creating student profile');
+      this.logger.debug('[submitToTeacher] Creating student profile');
       student = await this.prisma.student.create({
         data: { userId: studentUserId },
       });
-      console.log('[submitToTeacher] Created student profile:', student);
+      this.logger.debug('[submitToTeacher] Created student profile:', student);
     }
 
     // Verify teacher exists
-    console.log('[submitToTeacher] Looking for teacher with ID:', dto.teacherId);
+    this.logger.debug('[submitToTeacher] Looking for teacher with ID:', dto.teacherId);
     const teacher = await this.prisma.teacher.findUnique({
       where: { id: dto.teacherId },
     });
 
-    console.log('[submitToTeacher] Teacher profile:', teacher);
+    this.logger.debug('[submitToTeacher] Teacher profile:', teacher);
 
     if (!teacher) {
       throw new NotFoundException('Teacher not found');
     }
 
     // Create a simple homework assignment for this submission
-    console.log('[submitToTeacher] Creating homework with teacherId:', teacher.id);
+    this.logger.debug('[submitToTeacher] Creating homework with teacherId:', teacher.id);
     const homework = await this.prisma.homework.create({
       data: {
         title: dto.title,
@@ -467,11 +470,11 @@ export class HomeworkService {
       },
     });
 
-    console.log('[submitToTeacher] Created homework:', homework);
+    this.logger.debug('[submitToTeacher] Created homework:', homework);
 
     // Build file URLs from uploaded files
     const fileUrls = files ? files.map((f) => f.path) : [];
-    console.log('[submitToTeacher] File URLs to save:', fileUrls);
+    this.logger.debug('[submitToTeacher] File URLs to save:', fileUrls);
 
     // Create submission
     const submission = await this.prisma.submission.create({
@@ -499,33 +502,33 @@ export class HomeworkService {
       },
     });
 
-    console.log('[submitToTeacher] Created submission:', submission);
-    console.log('[submitToTeacher] Submission fileUrls:', submission.fileUrls);
+    this.logger.debug('[submitToTeacher] Created submission:', submission);
+    this.logger.debug('[submitToTeacher] Submission fileUrls:', submission.fileUrls);
 
     return submission;
   }
 
   async getTeacherSubmissions(teacherUserId: string) {
-    console.log('[getTeacherSubmissions] Fetching submissions for teacher user:', teacherUserId);
+    this.logger.debug('[getTeacherSubmissions] Fetching submissions for teacher user:', teacherUserId);
     
     // Find teacher profile
     let teacher = await this.prisma.teacher.findFirst({
       where: { userId: teacherUserId },
     });
 
-    console.log('[getTeacherSubmissions] Teacher profile found:', teacher);
-    console.log('[getTeacherSubmissions] Teacher ID:', teacher?.id);
+    this.logger.debug('[getTeacherSubmissions] Teacher profile found:', teacher);
+    this.logger.debug('[getTeacherSubmissions] Teacher ID:', teacher?.id);
 
     if (!teacher) {
-      console.log('[getTeacherSubmissions] No teacher profile found, creating one...');
+      this.logger.debug('[getTeacherSubmissions] No teacher profile found, creating one...');
       // Auto-create teacher profile if it doesn't exist
       teacher = await this.prisma.teacher.create({
         data: { userId: teacherUserId },
       });
-      console.log('[getTeacherSubmissions] Created teacher profile:', teacher);
+      this.logger.debug('[getTeacherSubmissions] Created teacher profile:', teacher);
     }
 
-    console.log('[getTeacherSubmissions] Searching for submissions with teacherId:', teacher.id);
+    this.logger.debug('[getTeacherSubmissions] Searching for submissions with teacherId:', teacher.id);
 
     // Get submissions directly assigned to this teacher (new approach)
     const directSubmissions = await this.prisma.submission.findMany({
@@ -555,8 +558,7 @@ export class HomeworkService {
       orderBy: { submittedAt: 'desc' },
     });
 
-    console.log('[getTeacherSubmissions] Found direct submissions:', directSubmissions.length);
-    console.log('[getTeacherSubmissions] Direct submissions:', JSON.stringify(directSubmissions, null, 2));
+    this.logger.debug('[getTeacherSubmissions] Found direct submissions:', directSubmissions.length);
 
     // Get all submissions for homework created by this teacher (legacy approach)
     const homeworkSubmissions = await this.prisma.submission.findMany({
@@ -590,13 +592,12 @@ export class HomeworkService {
       orderBy: { submittedAt: 'desc' },
     });
 
-    console.log('[getTeacherSubmissions] Found homework submissions:', homeworkSubmissions.length);
+    this.logger.debug('[getTeacherSubmissions] Found homework submissions:', homeworkSubmissions.length);
 
     // Combine both types of submissions
     const allSubmissions = [...directSubmissions, ...homeworkSubmissions];
 
-    console.log('[getTeacherSubmissions] Found total submissions:', allSubmissions.length);
-    console.log('[getTeacherSubmissions] Submissions:', JSON.stringify(allSubmissions, null, 2));
+    this.logger.debug('[getTeacherSubmissions] Found total submissions:', allSubmissions.length);
 
     return allSubmissions;
   }
@@ -792,9 +793,9 @@ export class HomeworkService {
     dto: any,
     files?: Express.Multer.File[],
   ) {
-    console.log('[submitToSubject] Student user ID:', studentUserId);
-    console.log('[submitToSubject] DTO:', dto);
-    console.log('[submitToSubject] Files received:', files?.length || 0);
+    this.logger.debug('[submitToSubject] Student user ID:', studentUserId);
+    this.logger.debug('[submitToSubject] DTO:', dto);
+    this.logger.debug('[submitToSubject] Files received:', files?.length || 0);
 
     // Find student profile
     let student = await this.prisma.student.findUnique({
@@ -866,7 +867,7 @@ export class HomeworkService {
       },
     });
 
-    console.log('[submitToSubject] Created submission:', submission);
+    this.logger.debug('[submitToSubject] Created submission:', submission);
     return submission;
   }
 
@@ -926,7 +927,7 @@ export class HomeworkService {
 
   // Get student's subjects for homework submission
   async getStudentSubjects(studentUserId: string) {
-    console.log('[getStudentSubjects] Starting for user ID:', studentUserId);
+    this.logger.debug('[getStudentSubjects] Starting for user ID:', studentUserId);
     
     let student = await this.prisma.student.findUnique({
       where: { userId: studentUserId },
@@ -946,7 +947,7 @@ export class HomeworkService {
       },
     });
 
-    console.log('[getStudentSubjects] Student found:', {
+    this.logger.debug('[getStudentSubjects] Student found:', {
       studentId: student?.id,
       classId: student?.classId,
       classesCount: student?.classes?.length || 0,
@@ -954,7 +955,7 @@ export class HomeworkService {
 
     if (!student) {
       // Auto-create student profile if it doesn't exist
-      console.log('[getStudentSubjects] Student profile not found, creating new one');
+      this.logger.debug('[getStudentSubjects] Student profile not found, creating new one');
       student = await this.prisma.student.create({
         data: { userId: studentUserId },
         include: {
@@ -972,7 +973,7 @@ export class HomeworkService {
           },
         },
       });
-      console.log('[getStudentSubjects] Created student profile:', student.id);
+      this.logger.debug('[getStudentSubjects] Created student profile:', student.id);
     }
 
     // Get all class IDs the student is enrolled in
@@ -981,7 +982,7 @@ export class HomeworkService {
       ...(student.classes?.map(sc => sc.classId) || []),
     ];
 
-    console.log('[getStudentSubjects] Student class IDs:', studentClassIds);
+    this.logger.debug('[getStudentSubjects] Student class IDs:', studentClassIds);
 
     // Get explicit StudentSubject enrollments
     const studentSubjects = await this.prisma.studentSubject.findMany({
@@ -1028,7 +1029,7 @@ export class HomeworkService {
       },
     });
 
-    console.log('[getStudentSubjects] Explicit enrollments found:', studentSubjects.length);
+    this.logger.debug('[getStudentSubjects] Explicit enrollments found:', studentSubjects.length);
 
     // Only return explicitly enrolled subjects (added by admin/supervisor)
     // Do NOT include all class subjects - only subjects specifically assigned to the student
@@ -1046,7 +1047,7 @@ export class HomeworkService {
       const subject = ss.subject;
       let classInfo = subject.class;
       
-      console.log(`[getStudentSubjects] Processing subject: ${subject.name}`, {
+      this.logger.debug(`[getStudentSubjects] Processing subject: ${subject.name}`, {
         hasDirectClass: !!subject.class,
         classSubjectsCount: subject.classSubjects?.length || 0,
         studentClassIds,
@@ -1062,18 +1063,18 @@ export class HomeworkService {
           );
           if (matchingClassSubject) {
             classInfo = matchingClassSubject.class;
-            console.log(`[getStudentSubjects] Found matching class for ${subject.name}:`, classInfo);
+            this.logger.debug(`[getStudentSubjects] Found matching class for ${subject.name}:`, classInfo);
           }
         }
         
         // If still no match, just take the first one
         if (!classInfo) {
           classInfo = subject.classSubjects[0].class;
-          console.log(`[getStudentSubjects] Using first classSubject for ${subject.name}:`, classInfo);
+          this.logger.debug(`[getStudentSubjects] Using first classSubject for ${subject.name}:`, classInfo);
         }
       }
       
-      console.log(`[getStudentSubjects] Final class for ${subject.name}:`, classInfo);
+      this.logger.debug(`[getStudentSubjects] Final class for ${subject.name}:`, classInfo);
       
       return {
         ...ss,
@@ -1084,8 +1085,8 @@ export class HomeworkService {
       };
     });
     
-    console.log('[getStudentSubjects] Returning', result.length, 'explicitly enrolled subjects');
-    console.log('[getStudentSubjects] Note: Only subjects explicitly assigned by admin/supervisor are returned');
+    this.logger.debug('[getStudentSubjects] Returning', result.length, 'explicitly enrolled subjects');
+    this.logger.debug('[getStudentSubjects] Note: Only subjects explicitly assigned by admin/supervisor are returned');
     return result;
   }
 
