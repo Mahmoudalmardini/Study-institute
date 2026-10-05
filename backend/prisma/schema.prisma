@@ -218,6 +218,8 @@ model Homework {
   @@index([subjectId])
   @@index([teacherId])
   @@index([dueDate])
+  @@index([teacherId, dueDate])
+  @@index([classId, dueDate])
   @@map("homework")
 }
 
@@ -262,6 +264,10 @@ model Submission {
   @@index([teacherId])
   @@index([status])
   @@index([reviewStatus])
+  @@index([teacherId, submittedAt])
+  @@index([reviewStatus, teacherReviewedAt])
+  @@index([studentId, reviewStatus])
+  @@index([subjectId, submittedAt])
   @@map("submissions")
 }
 
@@ -475,6 +481,7 @@ model TeacherSalary {
 
   @@index([teacherId])
   @@index([effectiveFrom])
+  @@index([teacherId, effectiveFrom])
   @@map("teacher_salaries")
 }
 
@@ -498,6 +505,8 @@ model HourRequest {
   @@index([date])
   @@index([status])
   @@index([teacherId, date])
+  @@index([status, createdAt])
+  @@index([teacherId, status, date])
   @@map("hour_requests")
 }
 
@@ -536,6 +545,7 @@ model StudentDiscount {
   @@index([studentId])
   @@index([isActive])
   @@index([createdBy])
+  @@index([studentId, isActive])
   @@map("student_discounts")
 }
 
