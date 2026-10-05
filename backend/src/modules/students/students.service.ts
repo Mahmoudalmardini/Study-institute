@@ -169,7 +169,7 @@ export class StudentsService {
         include,
         skip,
         take: limit,
-        orderBy: { enrollmentDate: 'desc' },
+        orderBy: [{ enrollmentDate: 'desc' }, { id: 'asc' }],
       }),
       this.prisma.student.count({ where }),
     ]);

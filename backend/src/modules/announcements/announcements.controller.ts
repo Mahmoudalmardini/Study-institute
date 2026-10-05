@@ -8,8 +8,6 @@ import {
   Delete,
   Query,
   UseGuards,
-  ParseIntPipe,
-  DefaultValuePipe,
 } from '@nestjs/common';
 import { AnnouncementsService } from './announcements.service';
 import { CreateAnnouncementDto } from './dto/create-announcement.dto';
@@ -19,6 +17,7 @@ import { RolesGuard } from '../../common/guards/roles.guard';
 import { Role } from '@prisma/client';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import type { CurrentUserData } from '../../common/decorators/current-user.decorator';
+import { PageQuery, LimitQuery } from '../../common/decorators/pagination-query.decorator';
 
 @Controller('announcements')
 @UseGuards(RolesGuard)
@@ -38,8 +37,8 @@ export class AnnouncementsController {
   @Roles(Role.ADMIN, Role.SUPERVISOR, Role.TEACHER, Role.STUDENT)
   findAll(
     @CurrentUser() user: CurrentUserData,
-    @Query('page', new DefaultValuePipe(1), ParseIntPipe) page: number = 1,
-    @Query('limit', new DefaultValuePipe(20), ParseIntPipe) limit: number = 20,
+    @PageQuery() page: number,
+    @LimitQuery() limit: number,
   ) {
     return this.announcementsService.findAll(user.role as Role, page, limit);
   }

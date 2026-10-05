@@ -3,10 +3,12 @@ import {
   NotFoundException,
   BadRequestException,
 } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateClassDto } from './dto/create-class.dto';
 import { UpdateClassDto } from './dto/update-class.dto';
 import { PaginationResponse } from '../../common/interfaces/pagination-response.interface';
+import { wordSearch } from '../../common/pagination/search';
 
 @Injectable()
 export class ClassesService {
@@ -79,11 +81,14 @@ export class ClassesService {
   async findAll(
     page: number = 1,
     limit: number = 20,
+    search?: string,
   ) {
     const skip = (page - 1) * limit;
+    const where = wordSearch<Prisma.ClassWhereInput>(search, ['name', 'grade', 'academicYear']);
 
     const [classes, total] = await Promise.all([
       this.prisma.class.findMany({
+        where,
         skip,
         take: limit,
         include: {
@@ -106,11 +111,9 @@ export class ClassesService {
             },
           },
         },
-        orderBy: {
-          createdAt: 'desc',
-        },
+        orderBy: [{ createdAt: 'desc' }, { id: 'asc' }],
       }),
-      this.prisma.class.count(),
+      this.prisma.class.count({ where }),
     ]);
 
     // Map to use classSubjects count as subjects count for backward compatibility

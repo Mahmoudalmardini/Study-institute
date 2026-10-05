@@ -4,10 +4,12 @@ import {
   BadRequestException,
   ConflictException,
 } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateSubjectDto } from './dto/create-subject.dto';
 import { UpdateSubjectDto } from './dto/update-subject.dto';
 import { PaginationResponse } from '../../common/interfaces/pagination-response.interface';
+import { wordSearch } from '../../common/pagination/search';
 
 @Injectable()
 export class SubjectsService {
@@ -72,8 +74,12 @@ export class SubjectsService {
     classId?: string,
     page: number = 1,
     limit: number = 20,
+    search?: string,
   ) {
-    const where = classId ? { classId } : undefined;
+    const where: Prisma.SubjectWhereInput = {
+      ...(classId ? { classId } : {}),
+      ...wordSearch<Prisma.SubjectWhereInput>(search, ['name', 'code']),
+    };
     const skip = (page - 1) * limit;
 
     const [data, total] = await Promise.all([
@@ -106,9 +112,7 @@ export class SubjectsService {
             },
           },
         },
-        orderBy: {
-          name: 'asc',
-        },
+        orderBy: [{ name: 'asc' }, { id: 'asc' }],
       }),
       this.prisma.subject.count({ where }),
     ]);

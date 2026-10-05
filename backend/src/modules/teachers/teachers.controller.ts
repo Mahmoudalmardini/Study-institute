@@ -1,10 +1,11 @@
-import { Controller, Get, Param, Query, UseGuards, ParseIntPipe, DefaultValuePipe } from '@nestjs/common';
+import { Controller, Get, Param, Query, UseGuards } from '@nestjs/common';
 import { TeachersService } from './teachers.service';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import type { CurrentUserData } from '../../common/decorators/current-user.decorator';
 import { Role } from '@prisma/client';
+import { PageQuery, LimitQuery } from '../../common/decorators/pagination-query.decorator';
 
 @Controller('teachers')
 @UseGuards(RolesGuard)
@@ -14,10 +15,11 @@ export class TeachersController {
   @Get()
   @Roles(Role.ADMIN, Role.SUPERVISOR)
   findAll(
-    @Query('page', new DefaultValuePipe(1), ParseIntPipe) page: number = 1,
-    @Query('limit', new DefaultValuePipe(20), ParseIntPipe) limit: number = 20,
+    @PageQuery() page: number,
+    @LimitQuery() limit: number,
+    @Query('search') search: string | undefined,
   ) {
-    return this.teachersService.findAll(page, limit);
+    return this.teachersService.findAll(page, limit, search);
   }
 
   @Get('me')

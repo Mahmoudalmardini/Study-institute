@@ -121,7 +121,7 @@ export class GradesService {
             },
           },
         },
-        orderBy: [{ academicYear: 'desc' }, { term: 'desc' }],
+        orderBy: [{ academicYear: 'desc' }, { term: 'desc' }, { id: 'asc' }],
       }),
       this.prisma.grade.count({ where }),
     ]);

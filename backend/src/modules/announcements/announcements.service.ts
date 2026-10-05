@@ -73,7 +73,7 @@ export class AnnouncementsService {
             },
           },
         },
-        orderBy: [{ priority: 'desc' }, { createdAt: 'desc' }],
+        orderBy: [{ priority: 'desc' }, { createdAt: 'desc' }, { id: 'asc' }],
       }),
       this.prisma.announcement.count({ where }),
     ]);

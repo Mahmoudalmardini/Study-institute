@@ -1,6 +1,8 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { PaginationResponse } from '../../common/interfaces/pagination-response.interface';
+import { wordSearch } from '../../common/pagination/search';
 
 @Injectable()
 export class TeachersService {
@@ -9,11 +11,15 @@ export class TeachersService {
   async findAll(
     page: number = 1,
     limit: number = 20,
+    search?: string,
   ): Promise<PaginationResponse<any>> {
     const skip = (page - 1) * limit;
+    const userMatch = wordSearch<Prisma.UserWhereInput>(search, ['firstName', 'lastName', 'email']);
+    const where: Prisma.TeacherWhereInput = userMatch ? { user: userMatch } : {};
 
     const [data, total] = await Promise.all([
       this.prisma.teacher.findMany({
+        where,
         skip,
         take: limit,
         include: {
@@ -59,11 +65,9 @@ export class TeachersService {
             },
           },
         },
-        orderBy: {
-          hireDate: 'desc',
-        },
+        orderBy: [{ hireDate: 'desc' }, { id: 'asc' }],
       }),
-      this.prisma.teacher.count(),
+      this.prisma.teacher.count({ where }),
     ]);
 
     return {
